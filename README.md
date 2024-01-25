@@ -12,3 +12,8 @@ This repository encompasses ROS packages that are used to interface the closed-c
    - `cc_affordance_planner_ros`
    - `joint_traj_and_tf_recorder`
 
+4. To use the planner with the Spot arm, build the following package as well:
+   - `cc_affordance_spot_description`
+
+5. To use apriltags to detect affordance, use the following package:
+   - `apriltag_setup`
