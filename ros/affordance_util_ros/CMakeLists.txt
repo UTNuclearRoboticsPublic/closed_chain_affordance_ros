@@ -34,6 +34,9 @@ add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}/${PROJECT_NAME}.cpp  # Source file for the library
 )
 
+# Link Eigen libraries against this project library
+target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
+
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
