@@ -13,11 +13,11 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Find and link required packages
+find_package(Eigen3 REQUIRED)  # Linear algebra library
 # ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)  # ROS 2 communication library
 find_package(rosidl_default_generators REQUIRED) # For message generation
-find_package(tf2_ros REQUIRED)  # ROS 2 library for managing coordinate frames
 find_package(control_msgs REQUIRED)  # ROS 2 messages for robot control
 find_package(geometry_msgs REQUIRED)  # ROS 2 messages for geometry
 find_package(visualization_msgs REQUIRED) # To use visualization markers in Rviz
@@ -28,10 +28,31 @@ find_package(moveit_visual_tools REQUIRED)
 # Include directories for headers
 include_directories(
   ${rclcpp_INCLUDE_DIRS}  # Include rclcpp headers
+  ${Eigen3_INCLUDE_DIRS}  # Include Eigen3 headers
 )
 
+# Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/MoveItPlanAndViz.srv"
+)
+
+# Create executable
+add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp)
+
+# To use interfaces in the target from within this package
+rosidl_target_interfaces(${PROJECT_NAME}_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Install the executables
+install(TARGETS
+   ${PROJECT_NAME}_node
+   DESTINATION lib/${PROJECT_NAME}
+ )
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 # Configure testing (if enabled)
