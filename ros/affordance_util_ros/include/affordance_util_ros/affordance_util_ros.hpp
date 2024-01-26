@@ -35,12 +35,13 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <ament_index_cpp/get_package_share_directory.hpp>
-#include <control_msgs/action/follow_joint_trajectory.h>
+#include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <filesystem>
-#include <geometry_msgs/msg/transform_stamped.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
+#include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <unordered_map>
 
 namespace AffordanceUtilROS
@@ -118,7 +119,7 @@ std::vector<JointTrajPoint> get_ordered_joint_traj(const trajectory_msgs::msg::J
  * @return JointTrajPoint containing the joint trajectory point (i.e. timestamp and joint positions) in the correct
  * order
  */
-JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::ConstPtr &joint_states,
+JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::ConstSharedPtr &joint_states,
                                         const std::vector<std::string> &joint_name_order);
 
 /**
@@ -147,7 +148,7 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
  *
  * @return control_msgs::FollowJointTrajectoryGoal containing ready-to-use ROS follow_joint_trajectory message
  */
-control_msgs::msg::FollowJointTrajectoryGoal follow_joint_trajectory_msg_builder(
+control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_builder(
     const std::vector<Eigen::VectorXd> &bare_trajectory, const Eigen::VectorXd &config_offset,
     const std::vector<std::string> &joint_names, const double &time_step = 0.05);
 } // namespace AffordanceUtilROS
