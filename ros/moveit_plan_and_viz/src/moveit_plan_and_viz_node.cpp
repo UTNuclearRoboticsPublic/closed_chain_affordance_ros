@@ -45,6 +45,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         // Stop executor gracefully
         executor_->cancel();
         executor_thread_.join();
+        rclcpp::shutdown();
     }
 
   private:
@@ -229,6 +230,5 @@ int main(int argc, char **argv)
     auto node = std::make_shared<MoveItPlanAndVizServer>(node_options);
 
     rclcpp::spin(node);
-    rclcpp::shutdown();
     return 0;
 }
