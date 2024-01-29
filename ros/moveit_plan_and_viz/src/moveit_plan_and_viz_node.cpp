@@ -1,3 +1,34 @@
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : moveit_plan_and_viz_node.cpp
+//      Project   : moveit_plan_and_viz
+//      Created   : Jan 2024
+//      Author    : Janak Panthi (Crasun Jans)
+//      Copyright : Copyright© The University of Texas at Austin, 2014-2026. All
+//      rights reserved.
+//
+//          All files within this directory are subject to the following, unless
+//          an alternative license is explicitly included within the text of
+//          each file.
+//
+//          This software and documentation constitute an unpublished work
+//          and contain valuable trade secrets and proprietary information
+//          belonging to the University. None of the foregoing material may be
+//          copied or duplicated or disclosed without the express, written
+//          permission of the University. THE UNIVERSITY EXPRESSLY DISCLAIMS ANY
+//          AND ALL WARRANTIES CONCERNING THIS SOFTWARE AND DOCUMENTATION,
+//          INCLUDING ANY WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+//          PARTICULAR PURPOSE, AND WARRANTIES OF PERFORMANCE, AND ANY WARRANTY
+//          THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
+//          NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF
+//          THE SOFTWARE OR DOCUMENTATION. Under no circumstances shall the
+//          University be liable for incidental, special, indirect, direct or
+//          consequential damages or loss of profits, interruption of business,
+//          or related expenses which may arise from use of software or
+//          documentation, including but not limited to those resulting from
+//          defects in software and/or documentation, or loss or inaccuracy of
+//          data of any kind.
+//
+///////////////////////////////////////////////////////////////////////////////
 #include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -66,8 +97,6 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         const std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Request> serv_req,
         std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Response> serv_res)
     {
-
-        /* MoveIt Planning using planning_pipeline. Most of the code here has been taken from the MoveIt tutorial*/
 
         // Basic housekeeping for planning, need robot model and planning scene monitor, which observes changes in
         // planning scene
@@ -188,18 +217,18 @@ class MoveItPlanAndVizServer : public rclcpp::Node
             moveit::core::robotStateToRobotStateMsg(*robot_state, req.start_state);
 
             // Compute forward kinematics to the EE and store the position and orientation in the marker variable
-            Eigen::Isometry3d eigenTransform = robot_state->getGlobalLinkTransform("arm0_tool0");
+            Eigen::Isometry3d ee_htm = robot_state->getGlobalLinkTransform("arm0_tool0");
             geometry_msgs::msg::Pose waypoint;
             // Set the translation (position) values
-            waypoint.position.x = eigenTransform.translation().x();
-            waypoint.position.y = eigenTransform.translation().y();
-            waypoint.position.z = eigenTransform.translation().z();
+            waypoint.position.x = ee_htm.translation().x();
+            waypoint.position.y = ee_htm.translation().y();
+            waypoint.position.z = ee_htm.translation().z();
             // Set the rotation (orientation) values (quaternion)
-            Eigen::Quaterniond eigenQuaternion(eigenTransform.rotation());
-            waypoint.orientation.x = eigenQuaternion.x();
-            waypoint.orientation.y = eigenQuaternion.y();
-            waypoint.orientation.z = eigenQuaternion.z();
-            waypoint.orientation.w = eigenQuaternion.w();
+            Eigen::Quaterniond ee_quat(ee_htm.rotation());
+            waypoint.orientation.x = ee_quat.x();
+            waypoint.orientation.y = ee_quat.y();
+            waypoint.orientation.z = ee_quat.z();
+            waypoint.orientation.w = ee_quat.w();
 
             // Update EE trajectory marker characteristics
             ee_traj_point.header.stamp = this->get_clock()->now();
