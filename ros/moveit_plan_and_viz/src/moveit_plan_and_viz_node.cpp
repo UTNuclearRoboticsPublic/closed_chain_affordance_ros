@@ -31,7 +31,8 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
         // Create and advertise the service
         srv_ = this->create_service<moveit_plan_and_viz::srv::MoveItPlanAndViz>(
-            "/moveit_plan_and_viz_server", &MoveItPlanAndVizServer::moveit_plan_and_viz_server_callback_);
+            "/moveit_plan_and_viz_server", std::bind(&MoveItPlanAndVizServer::moveit_plan_and_viz_server_callback_,
+                                                     this, std::placeholders::_1, std::placeholders::_2));
 
         // Create a publisher to publish EE trajectory
         marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/tool_trajectory_marker", 10);
