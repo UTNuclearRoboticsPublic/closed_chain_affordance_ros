@@ -38,7 +38,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 # Create executable
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools)
 
 # To use interfaces in the target from within this package
 rosidl_target_interfaces(${PROJECT_NAME}_node
