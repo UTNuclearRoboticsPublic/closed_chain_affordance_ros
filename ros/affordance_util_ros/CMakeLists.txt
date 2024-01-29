@@ -40,16 +40,20 @@ target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
+install(
+	DIRECTORY include/${PROJECT_NAME}
+  DESTINATION include
+)
+
 # Install the library and its headers
 install(TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME} # Export for visibility with other CMake packages
   ARCHIVE DESTINATION lib  # Static library installation path
   LIBRARY DESTINATION lib  # Dynamic library installation path
   RUNTIME DESTINATION bin  # Executable installation path
+  INCLUDES DESTINATION include # Header files
 )
 
-install(DIRECTORY include/ DESTINATION include  # Install header files
-)
 
 # Configure testing (if enabled)
 if(BUILD_TESTING)
