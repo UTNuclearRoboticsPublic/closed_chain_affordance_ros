@@ -18,9 +18,12 @@ find_package(yaml-cpp REQUIRED ) # To parse yaml files
 # ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)  # ROS 2 communication library
+find_package(rclcpp_action REQUIRED)
 find_package(tf2_ros REQUIRED)  # ROS 2 library for managing coordinate frames
 find_package(affordance_util_ros REQUIRED)  # Basic ROS 2 utility functions for affordance work
 find_package(moveit_plan_and_viz REQUIRED)  # To plan and visualize joint and EE trajectories
+find_package(sensor_msgs REQUIRED)
+find_package(control_msgs REQUIRED)
 
 # Find cc affordance cpp libraries
 FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
@@ -36,11 +39,10 @@ include_directories(
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp affordance_util_ros moveit_plan_and_viz)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs)
 
 # Link the executable against external libraries
-target_link_libraries(${PROJECT_NAME}_node
-	${catkin_LIBRARIES} affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen
+target_link_libraries(${PROJECT_NAME}_node affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen
 )
 
 
