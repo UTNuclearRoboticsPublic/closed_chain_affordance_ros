@@ -26,7 +26,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     // Constructor
     explicit CcAffordancePlannerRos(const rclcpp::NodeOptions &options, const std::string &robot_config_file_path)
         : Node("cc_affordance_planner_ros", options), // Use new class name
-          node_logger_(rclcpp::get_logger(this->shared_from_this()->get_name())),
+          node_logger_(this->get_logger()),
           traj_execution_as_name_("/spot_arm/arm_controller/follow_joint_trajectory"),
           plan_and_viz_ss_name_("/moveit_plan_and_viz_server"),
           joint_states_topic_("/joint_states")
@@ -156,8 +156,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
         {
             if (!rclcpp::ok())
             {
-                RCLCPP_ERROR(node_logger_, "Interrupted while waiting for ", plan_and_viz_ss_name_.c_str(),
-                             " service. Exiting.");
+                RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.",
+                             plan_and_viz_ss_name_.c_str());
                 return;
             }
             RCLCPP_INFO(node_logger_, plan_and_viz_ss_name_.c_str(), "service not available, waiting again...");
@@ -178,11 +178,12 @@ class CcAffordancePlannerRos : public rclcpp::Node
         // Send the goal to follow_joint_trajectory action server for execution
         if (!this->traj_execution_client_->wait_for_action_server())
         {
-            RCLCPP_ERROR(node_logger_, traj_execution_as_name_.c_str(), " action server not available after waiting");
+            RCLCPP_ERROR(node_logger_, " %s action server not available after waiting",
+                         traj_execution_as_name_.c_str());
             rclcpp::shutdown();
         }
 
-        RCLCPP_INFO(node_logger_, "Sending goal to ", traj_execution_as_name_.c_str(), " action server");
+        RCLCPP_INFO(node_logger_, "Sending goal to %s action server", traj_execution_as_name_.c_str());
 
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
@@ -263,11 +264,12 @@ class CcAffordancePlannerRos : public rclcpp::Node
         auto goal_handle = future.get();
         if (!goal_handle)
         {
-            RCLCPP_ERROR(node_logger_, "Goal was rejected by ", traj_execution_as_name_.c_str(), " action server");
+            RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", traj_execution_as_name_.c_str());
         }
         else
         {
-            RCLCPP_INFO(node_logger_, "Goal accepted by ", traj_execution_as_name_, " server, waiting for result");
+            RCLCPP_INFO(node_logger_, "Goal accepted by %s action server, waiting for result",
+                        traj_execution_as_name_.c_str());
         }
     }
 };
