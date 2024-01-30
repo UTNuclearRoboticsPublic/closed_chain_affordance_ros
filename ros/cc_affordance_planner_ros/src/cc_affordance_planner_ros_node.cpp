@@ -31,28 +31,30 @@
 ///////////////////////////////////////////////////////////////////////////////
 #include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <actionlib/client/simple_action_client.h>
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cmath>
-#include <control_msgs/FollowJointTrajectoryAction.h>
-#include <moveit_plan_and_viz/MoveItPlanAndViz.h>
-#include <ros/ros.h>
-#include <sensor_msgs/JointState.h>
-#include <tf2_ros/transform_listener.h>
+#include <control_msgs/action/follow_joint_trajectory.hpp>
+#include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
+#include <tf2_ros/buffer.h>
 
-class CcAffordancePlannerRos
+class CcAffordancePlannerRos : public rclcpp::Node
 {
   public:
     CcAffordancePlannerRos(const std::string &robot_config_file_path)
-        : nh_("~"),
-          traj_execution_client_("/spot_arm/arm_controller/follow_joint_trajectory",
-                                 true), // Simple action client does not have a default
-                                        // constructor and needs to initialized this way
-          joint_states_sub_(nh_.subscribe("/joint_states", 1000, &CcAffordancePlannerRos::joint_states_cb_, this)),
+        : Node("cc_affordance_planner_ros_node"),
+          node_logger_(rclcpp::get_logger(node_handle_->get_name())),
+          traj_execution_client_(this, "/spot_arm/arm_controller/follow_joint_trajectory",
+                                 rmw_qos_profile_services_default),
+          joint_states_sub_(this->create_subscription<sensor_msgs::msg::JointState>(
+              "/joint_states", 1000,
+              std::bind(&CcAffordancePlannerRos::joint_states_cb_, this, std::placeholders::_1))),
           moveit_plan_and_viz_client_(
-              nh_.serviceClient<moveit_plan_and_viz::MoveItPlanAndViz>("/moveit_plan_and_viz_server"))
+              this->create_client<moveit_plan_and_viz::srv::MoveItPlanAndViz>("/moveit_plan_and_viz_server"))
     {
         // Extract robot config info
         const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
@@ -136,13 +138,14 @@ class CcAffordancePlannerRos
 
   private:
     // Subscriber and server-related variables
-    ros::NodeHandle nh_;
-    ros::Subscriber joint_states_sub_;              // Joint states subscriber
-    ros::ServiceClient moveit_plan_and_viz_client_; // Service client to visualize
-                                                    // joint trajectory
-    actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
-        traj_execution_client_;                      // Action client to execute joint trajectory on
-                                                     // robot
+    rclcpp::Logger node_logger_;                                                     // logger associated with the node
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_; // Joint states subscriber
+    rclcpp::Client<moveit_plan_and_viz::srv::MoveItPlanAndViz>::SharedPtr
+        moveit_plan_and_viz_client_; // Service client to visualize joint trajectory
+    action_client::Client<control_msgs::action::FollowJointTrajectory>::SharedPtr
+        traj_execution_client_; // Action client to execute joint trajectory on robot
+
+    // robot
     AffordanceUtilROS::JointTrajPoint joint_states_; // Processed and ordered joint states data
 
     // Robot data
@@ -153,7 +156,7 @@ class CcAffordancePlannerRos
 
     // Methods
     // Callback function for the joint_states subscriber
-    void joint_states_cb_(const sensor_msgs::JointState::ConstPtr &msg)
+    void joint_states_cb_(const sensor_msgs::msg::JointState::SharedPtr &msg)
     {
         joint_states_ = AffordanceUtilROS::get_ordered_joint_states(
             msg,
@@ -179,12 +182,13 @@ class CcAffordancePlannerRos
         }
         // Take a second to read callbacks to ensure proper capturing of joint
         // states data
-        ros::Rate loop_rate(4);
+        rclcpp::Rate loop_rate(4); // Create a rate object with 4 Hz frequency
         for (int i = 0; i < 4; ++i)
         {
-            ros::spinOnce();
-            loop_rate.sleep();
+            rclcpp::spin_some(this->get_node_base_interface()); // Process incoming messages and callbacks
+            loop_rate.sleep();                                  // Sleep to maintain the desired loop rate
         }
+
         return joint_states_.positions;
     }
 
@@ -215,11 +219,12 @@ class CcAffordancePlannerRos
 
         // Convert the solution trajectory to ROS message type
         const double traj_time_step = 0.3;
-        const control_msgs::FollowJointTrajectoryGoal goal = AffordanceUtilROS::follow_joint_trajectory_msg_builder(
-            trajectory, joint_states_.positions, joint_names_,
-            traj_time_step); // this function takes care of extracting the right
-                             // number of joint_states although solution
-                             // contains qs data too
+        const control_msgs::action::FollowJointTrajectory_Goal goal =
+            AffordanceUtilROS::follow_joint_trajectory_msg_builder(
+                trajectory, joint_states_.positions, joint_names_,
+                traj_time_step); // this function takes care of extracting the right
+                                 // number of joint_states although solution
+                                 // contains qs data too
 
         //------------------------------------------------------------------------------------------------------
         // Print the contents of the goal using std::cout
@@ -238,22 +243,22 @@ class CcAffordancePlannerRos
             std::cout << "\n    Time From Start: " << point.time_from_start << "\n";
         }
 
-        //------------------------------------------------------------------------------------------------------
         // Visualize plan
-        moveit_plan_and_viz::MoveItPlanAndViz moveit_plan_and_viz_goal;
-        moveit_plan_and_viz_goal.request.joint_traj = goal.trajectory;
+        moveit_plan_and_viz::srv::MoveItPlanAndViz::SharedPtr moveit_plan_and_viz_goal =
+            std::make_shared<moveit_plan_and_viz::srv::MoveItPlanAndViz>();
+        moveit_plan_and_viz_goal->request.joint_traj = goal.trajectory;
 
-        ros::Duration timeout(60.0); // 1 minute
-        if (!ros::service::waitForService(moveit_plan_and_viz_server_name, timeout))
+        rclcpp::Duration timeout(RCL_S(60.0)); // 1 minute
+        if (!this->get_node_base_interface()->wait_for_service(moveit_plan_and_viz_server_name, timeout))
         {
-            std::cout << "Could not find " << moveit_plan_and_viz_server_name << " service within the timeout"
-                      << std::endl;
+            RCLCPP_ERROR(this->get_logger(), "Could not find service %s within the timeout",
+                         moveit_plan_and_viz_server_name);
             return;
         }
 
-        if (moveit_plan_and_viz_client_.call(moveit_plan_and_viz_goal))
+        if (moveit_plan_and_viz_client_->call(moveit_plan_and_viz_goal))
         {
-            std::cout << "Calling " << moveit_plan_and_viz_server_name << " service was successful." << std::endl;
+            RCLCPP_INFO(this->get_logger(), "Calling service %s was successful.", moveit_plan_and_viz_server_name);
 
             // Execute trajectory on the real robot
             std::string execution_conf;
@@ -262,33 +267,33 @@ class CcAffordancePlannerRos
 
             if (execution_conf != "y" && execution_conf != "Y")
             {
-                std::cout << "You indicated you are not ready to execute trajectory" << std::endl;
+                RCLCPP_INFO(this->get_logger(), "You indicated you are not ready to execute trajectory");
                 return;
             }
 
-            if (!traj_execution_client_.waitForServer(timeout))
+            if (!traj_execution_client_->wait_for_server(timeout))
             {
-                std::cout << "Could not find " << traj_execution_server_name << " action server within the timeout"
-                          << std::endl;
+                RCLCPP_ERROR(this->get_logger(), "Could not find action server %s within the timeout",
+                             traj_execution_server_name);
                 return;
             }
 
-            std::cout << "Sending goal to " << traj_execution_server_name << " action server for execution"
-                      << std::endl;
+            RCLCPP_INFO(this->get_logger(), "Sending goal to action server %s for execution",
+                        traj_execution_server_name);
 
-            traj_execution_client_.sendGoal(goal);
+            rclcpp::GoalHandle<control_msgs::action::FollowJointTrajectory>::SharedPtr goal_handle =
+                traj_execution_client_->send_goal(goal);
 
-            if (!traj_execution_client_.waitForResult(timeout))
+            if (!goal_handle->get_result_wait(timeout))
             {
-                std::cout << traj_execution_server_name << " action server did not return result within timeout"
-                          << std::endl;
+                RCLCPP_ERROR(this->get_logger(), "Action server %s did not return result within timeout",
+                             traj_execution_server_name);
                 return;
             }
         }
-
         else
         {
-            std::cout << "Failed to call " << moveit_plan_and_viz_server_name << " service." << std::endl;
+            RCLCPP_ERROR(this->get_logger(), "Failed to call service %s.", moveit_plan_and_viz_server_name);
         }
     }
 };
@@ -296,9 +301,7 @@ class CcAffordancePlannerRos
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "cc_affordance_planner_ros_node");
-    // Set the logging level to INFO
-    /* ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info); */
-    /* ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug); */
+    rclcpp::init(argc, argv);
 
     // Buffer to lookup tf data for the tag
     tf2_ros::Buffer tf_buffer;
@@ -357,12 +360,13 @@ int main(int argc, char **argv)
     /* const double aff_goal = 0.2; // Pushing a drawer*/
 
     // Construct the planner object and run the planner
-    CcAffordancePlannerRos ccAffordancePlannerRos(robot_cc_description_path);
-    ccAffordancePlannerRos.run_cc_affordance_planner(aff_screw, aff_goal);
+    auto node = std::make_shared<affordance_planner_ros::CcAffordancePlannerRos>(robot_cc_description_path);
+    node->run_cc_affordance_planner(aff_screw, aff_goal);
 
     // Call the function again with new (or old) aff_screw and aff_goal to execute
     // another affordance in series
     /* ccAffordancePlannerRos.run_cc_affordance_planner(aff_screw, aff_goal); */
 
+    rclcpp::shutdown();
     return 0;
 }
