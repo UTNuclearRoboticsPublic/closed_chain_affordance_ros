@@ -186,11 +186,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
 
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
-            std::bind(&CcAffordancePlannerRos::goal_response_callback_, this, std::placeholders::_1);
-        send_goal_options.feedback_callback =
-            std::bind(&CcAffordancePlannerRos::feedback_callback_, this, std::placeholders::_1, std::placeholders::_2);
+            std::bind(&CcAffordancePlannerRos::traj_execution_goal_response_callback_, this, std::placeholders::_1);
+        send_goal_options.feedback_callback = std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
+                                                        this, std::placeholders::_1, std::placeholders::_2);
         send_goal_options.result_callback =
-            std::bind(&CcAffordancePlannerRos::result_callback_, this, std::placeholders::_1);
+            std::bind(&CcAffordancePlannerRos::traj_execution_result_callback_, this, std::placeholders::_1);
 
         this->traj_execution_client_->async_send_goal(goal, send_goal_options);
     }
@@ -232,13 +232,13 @@ class CcAffordancePlannerRos : public rclcpp::Node
         return joint_states_.positions;
     }
 
-    void feedback_callback_(GoalHandleFollowJointTrajectory::SharedPtr,
-                            const std::shared_ptr<const FollowJointTrajectory::Feedback> feedback)
+    void traj_execution_feedback_callback_(GoalHandleFollowJointTrajectory::SharedPtr,
+                                           const std::shared_ptr<const FollowJointTrajectory::Feedback> feedback)
     {
         // Empty for now
     }
 
-    void result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
+    void traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
     {
         switch (result.code)
         {
@@ -254,20 +254,20 @@ class CcAffordancePlannerRos : public rclcpp::Node
             RCLCPP_ERROR(node_logger_, "Unknown result code");
             return;
         }
-        RCLCPP_INFO(node_logger_, "Cc Affordance Traj Execution Client concluded");
+        RCLCPP_INFO(node_logger_, traj_execution_as_name_.c_str(), "action server call concluded");
         rclcpp::shutdown();
     }
 
-    void goal_response_callback_(std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> future)
+    void traj_execution_goal_response_callback_(std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> future)
     {
         auto goal_handle = future.get();
         if (!goal_handle)
         {
-            RCLCPP_ERROR(node_logger_, "Goal was rejected by server");
+            RCLCPP_ERROR(node_logger_, "Goal was rejected by ", traj_execution_as_name_.c_str(), " action server");
         }
         else
         {
-            RCLCPP_INFO(node_logger_, "Goal accepted by server, waiting for result");
+            RCLCPP_INFO(node_logger_, "Goal accepted by ", traj_execution_as_name_, " server, waiting for result");
         }
     }
 };
