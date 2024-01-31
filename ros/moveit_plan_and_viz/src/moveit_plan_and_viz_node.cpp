@@ -147,9 +147,9 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         moveit_msgs::msg::MotionPlanResponse response;
 
         // Prompt user to press next to start planning trajectory
-        visual_tools.trigger();
+        /* visual_tools.trigger(); */
         std::cout << "------------DEBUG FLAG---------------------" << std::endl;
-        visual_tools.prompt("Press next to plan the trajectory");
+        /* visual_tools.prompt("Press next to plan the trajectory"); */
         std::cout << "------------DEBUG FLAG---------------------" << std::endl;
 
         // To ensure we plan from the current state of the robot, get the most up-to-date state

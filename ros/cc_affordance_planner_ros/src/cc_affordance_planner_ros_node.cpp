@@ -27,7 +27,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     explicit CcAffordancePlannerRos(const rclcpp::NodeOptions &options, const std::string &robot_config_file_path)
         : Node("cc_affordance_planner_ros", options), // Use new class name
           node_logger_(this->get_logger()),
-          traj_execution_as_name_("/spot_arm/arm_controller/follow_joint_trajectory"),
+          traj_execution_as_name_("/arm_controller/follow_joint_trajectory"),
           plan_and_viz_ss_name_("/moveit_plan_and_viz_server"),
           joint_states_topic_("/spot_driver/joint_states")
     {
@@ -76,7 +76,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
 
         /* const double aff_step = 0.05; // Pulling a drawer */
         /* const double aff_step = 0.05;         // Pushing a drawer */
-        const double aff_step = 0.15; // Moving a stool
+        const double aff_step = 0.3; // Moving a stool
         /* const double aff_step = 0.2;          // Turning a valve2 */
         /* const double aff_step = 0.2;          // Turning a valve4 */
         const double accuracy = 10.0 / 100.0; //
