@@ -29,7 +29,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
           node_logger_(this->get_logger()),
           traj_execution_as_name_("/spot_arm/arm_controller/follow_joint_trajectory"),
           plan_and_viz_ss_name_("/moveit_plan_and_viz_server"),
-          joint_states_topic_("/joint_states")
+          joint_states_topic_("/spot_driver/joint_states")
     {
 
         // Initialize clients and subscribers
@@ -51,12 +51,12 @@ class CcAffordancePlannerRos : public rclcpp::Node
     {
 
         // Get joint states at the start configuration of the affordance
-        /* Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_(); */
-        Eigen::VectorXd robot_thetalist(joint_names_.size());
+        Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_();
+        /* Eigen::VectorXd robot_thetalist(joint_names_.size()); */
         /* robot_thetalist << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // Pulling a drawer */
         /* robot_thetalist << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, */
         /*     -0.00053; // Pushing a drawer */
-        robot_thetalist << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // Moving a stool
+        /* robot_thetalist << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // Moving a stool */
         /* robot_thetalist << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // Turning a valve2 */
         /* robot_thetalist << 0.03456, -1.40627, 2.10997, 0.13891, -0.66079, 0.76027; // Turning a valve4 */
 
@@ -116,7 +116,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
         }
 
         // Visualize and execute trajectory
-        /* visualize_and_execute_trajectory_(solution); */
+        visualize_and_execute_trajectory_(solution);
     }
 
   private:
@@ -173,6 +173,17 @@ class CcAffordancePlannerRos : public rclcpp::Node
         else
         {
             RCLCPP_ERROR(node_logger_, plan_and_viz_ss_name_.c_str(), "service call failed");
+        }
+
+        // Execute trajectory on the real robot
+        std::string execution_conf;
+        std::cout << "Ready to execute the trajectory? y to confirm" << std::endl;
+        std::cin >> execution_conf;
+
+        if (execution_conf != "y" && execution_conf != "Y")
+        {
+            std::cout << "You indicated you are not ready to execute trajectory" << std::endl;
+            return;
         }
 
         // Send the goal to follow_joint_trajectory action server for execution

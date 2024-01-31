@@ -45,18 +45,15 @@
 #include <moveit_msgs/msg/planning_scene.hpp>
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
+using namespace std::chrono_literals;
 class MoveItPlanAndVizServer : public rclcpp::Node
 {
   public:
     MoveItPlanAndVizServer(const rclcpp::NodeOptions &options)
         : Node("moveit_plan_and_viz_server_node", options),
-          node_handle_(this->shared_from_this()),
-          node_logger_(rclcpp::get_logger(node_handle_->get_name())),
+          node_logger_(this->get_logger()),
           executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>())
     {
-        // Add node to executor and start executor thread
-        executor_->add_node(node_handle_);
-        executor_thread_ = std::thread([this]() { executor_->spin(); });
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<moveit_plan_and_viz::srv::MoveItPlanAndViz>(
@@ -73,16 +70,25 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
     ~MoveItPlanAndVizServer()
     {
+        std::cout << "-----------------Destructor Flag------------------" << std::endl;
         // Stop executor gracefully
-        executor_->cancel();
-        executor_thread_.join();
+        /* executor_->cancel(); */
+        /* executor_thread_.join(); */
         rclcpp::shutdown();
+    }
+    void start_and_spin_executor()
+    {
+        // Add node to executor and start executor thread
+        node_handle_ = this->shared_from_this();
+        executor_->add_node(this->shared_from_this());
+        std::thread([this]() { executor_->spin(); }).detach();
     }
 
   private:
     // Variables
     rclcpp::Node::SharedPtr node_handle_; // handle for the node
-    rclcpp::Logger node_logger_;          // logger associated with the node
+
+    rclcpp::Logger node_logger_; // logger associated with the node
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor>
         executor_;                // executor needed for MoveIt robot state checking
     std::thread executor_thread_; // thread
@@ -142,7 +148,9 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
         // Prompt user to press next to start planning trajectory
         visual_tools.trigger();
+        std::cout << "------------DEBUG FLAG---------------------" << std::endl;
         visual_tools.prompt("Press next to plan the trajectory");
+        std::cout << "------------DEBUG FLAG---------------------" << std::endl;
 
         // To ensure we plan from the current state of the robot, get the most up-to-date state
         moveit::core::RobotStatePtr robot_state(new moveit::core::RobotState(
@@ -173,6 +181,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         ee_traj_point.color.r = 0.0;
         ee_traj_point.color.g = 1.0;
         ee_traj_point.color.b = 0.0;
+        std::cout << "------------DEBUG FLAG---------------------" << std::endl;
 
         for (size_t j = 0; j < lof_joint_traj; j++)
         {
@@ -257,7 +266,10 @@ int main(int argc, char **argv)
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
     auto node = std::make_shared<MoveItPlanAndVizServer>(node_options);
+    node->start_and_spin_executor();
 
-    rclcpp::spin(node);
+    while (rclcpp::ok())
+    {
+    }
     return 0;
 }
