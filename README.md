@@ -5,11 +5,11 @@ This repository encompasses ROS packages that are used to interface the closed-c
 
 1. Clone the cpp branch from this repository and install the planner following the instructions in that branch.
 
-2. Build ROS packages from this branch in the following order:
+2. Build ROS packages from this branch:
 	```bash
 	colcon build --packages-select cc_affordance_planner_ros
 	```
-<small>This builds the dependencies, `affordance_util_ros` and `moveit_plan_and_viz` as well.</small>
+<small>	This builds the dependencies, `affordance_util_ros` and `moveit_plan_and_viz` as well.</small>
 
 4. To use the planner with the Spot arm, build the following package:
 	`cc_affordance_spot_description`
