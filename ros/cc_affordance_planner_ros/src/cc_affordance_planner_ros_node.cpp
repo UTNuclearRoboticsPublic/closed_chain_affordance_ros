@@ -101,14 +101,6 @@ class CcAffordancePlannerRos : public rclcpp::Node
             std::cout << "Planner succeeded with " << plannerResult.traj_full_or_partial
                       << " solution, and planning took " << plannerResult.planning_time.count() << " microseconds"
                       << std::endl;
-            /* std::cout << "Here are the start and end affordances, " */
-            /*           << "Start: " << solution[0](9) << ", End: " << solution[solution.size() - 1](9) << std::endl;
-             */
-            /* std::cout << "Here is the full solution:" << std::endl; */
-            /* for (const auto &point : solution) */
-            /* { */
-            /*     std::cout << point << "\n\n"; */
-            /* } */
         }
         else
         {
@@ -199,8 +191,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
             std::bind(&CcAffordancePlannerRos::traj_execution_goal_response_callback_, this, std::placeholders::_1);
-        send_goal_options.feedback_callback = std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
-                                                        this, std::placeholders::_1, std::placeholders::_2);
+        /* send_goal_options.feedback_callback = std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
+         */
+        /*                                                 this, std::placeholders::_1, std::placeholders::_2); */
         send_goal_options.result_callback =
             std::bind(&CcAffordancePlannerRos::traj_execution_result_callback_, this, std::placeholders::_1);
 
@@ -244,11 +237,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
         return joint_states_.positions;
     }
 
-    void traj_execution_feedback_callback_(GoalHandleFollowJointTrajectory::SharedPtr,
-                                           const std::shared_ptr<const FollowJointTrajectory::Feedback> feedback)
-    {
-        // Empty for now
-    }
+    /* void traj_execution_feedback_callback_(GoalHandleFollowJointTrajectory::SharedPtr, */
+    /*                                        const std::shared_ptr<const FollowJointTrajectory::Feedback> feedback) */
+    /* { */
+    /*     // Empty for now */
+    /* } */
 
     void traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
     {
@@ -358,6 +351,6 @@ int main(int argc, char **argv)
     // another affordance in series
     /* node->run_cc_affordance_planner(aff_screw, aff_goal); */
 
-    rclcpp::shutdown();
+    rclcpp::spin(node); // Keep node alive
     return 0;
 }
