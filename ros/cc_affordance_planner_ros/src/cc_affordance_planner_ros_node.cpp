@@ -83,7 +83,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
         const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
         robot_slist_ = robotConfig.Slist;
         M_ = robotConfig.M;
-        tool_name_ = robotConfig.tool_name;
+        ref_frame_ = robotConfig.ref_frame_name;
+        tool_frame_ = robotConfig.tool_name;
         joint_names_ = robotConfig.joint_names;
     }
 
@@ -143,7 +144,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
     Eigen::MatrixXd robot_slist_;
     std::vector<std::string> joint_names_;
     Eigen::MatrixXd M_;
-    std::string tool_name_;
+    std::string ref_frame_;
+    std::string tool_frame_;
 
     AffordanceUtilROS::JointTrajPoint joint_states_; // Processed and ordered joint states data
 
@@ -198,8 +200,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
                                  // number of joint_states although solution
                                  // contains qs data too
 
+        // Fill out service request
         auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
         plan_and_viz_serv_req->joint_traj = goal.trajectory;
+        plan_and_viz_serv_req->ref_frame = ref_frame_;
+        plan_and_viz_serv_req->tool_frame = tool_frame_;
 
         // Call service to visualize
         while (!plan_and_viz_client_->wait_for_service(1s))
