@@ -66,16 +66,10 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
             this->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path", 1);
+        RCLCPP_INFO_STREAM(node_logger_, "/moveit_plan_and_viz service server is active");
     }
 
-    ~MoveItPlanAndVizServer()
-    {
-        std::cout << "-----------------Destructor Flag------------------" << std::endl;
-        // Stop executor gracefully
-        /* executor_->cancel(); */
-        /* executor_thread_.join(); */
-        rclcpp::shutdown();
-    }
+    ~MoveItPlanAndVizServer() { rclcpp::shutdown(); }
     void start_and_spin_executor()
     {
         // Add node to executor and start executor thread
@@ -106,8 +100,9 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
         // Basic housekeeping for planning, need robot model and planning scene monitor, which observes changes in
         // planning scene
-        robot_model_loader::RobotModelLoaderPtr robot_model_loader(
-            new robot_model_loader::RobotModelLoader(node_handle_, "robot_description"));
+        robot_model_loader::RobotModelLoaderPtr robot_model_loader(new robot_model_loader::RobotModelLoader(
+            node_handle_, this->get_parameter("cca_robot_description")
+                              .as_string())); // get the robot_description parameter name from the parameter server
 
         planning_scene_monitor::PlanningSceneMonitorPtr psm(
             new planning_scene_monitor::PlanningSceneMonitor(node_handle_, robot_model_loader));
@@ -127,7 +122,8 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
         // Visualization using MoveIt Visual Tools
         namespace rvt = rviz_visual_tools;
-        moveit_visual_tools::MoveItVisualTools visual_tools(node_handle_, "arm0_base_link", "moveit_plan_and_viz", psm);
+        moveit_visual_tools::MoveItVisualTools visual_tools(node_handle_, serv_req->ref_frame, "moveit_plan_and_viz",
+                                                            psm);
         visual_tools.deleteAllMarkers();
 
         visual_tools.loadRemoteControl(); // load introspection tool so we could step through high-level scripts
@@ -146,12 +142,6 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         moveit_msgs::msg::DisplayTrajectory display_trajectory;
         moveit_msgs::msg::MotionPlanResponse response;
 
-        // Prompt user to press next to start planning trajectory
-        /* visual_tools.trigger(); */
-        std::cout << "------------DEBUG FLAG---------------------" << std::endl;
-        /* visual_tools.prompt("Press next to plan the trajectory"); */
-        std::cout << "------------DEBUG FLAG---------------------" << std::endl;
-
         // To ensure we plan from the current state of the robot, get the most up-to-date state
         moveit::core::RobotStatePtr robot_state(new moveit::core::RobotState(
             planning_scene_monitor::LockedPlanningSceneRO(psm)
@@ -161,17 +151,19 @@ class MoveItPlanAndVizServer : public rclcpp::Node
             *robot_state, req.start_state); // update the planning request start state to be this current state
 
         // Create a JointModelGroup to keep track of the group we are planning for
-        const moveit::core::JointModelGroup *joint_model_group = robot_state->getJointModelGroup("arm");
+        const moveit::core::JointModelGroup *joint_model_group =
+            robot_state->getJointModelGroup(this->get_parameter("cca_planning_group")
+                                                .as_string()); // get the planning group name from the parameter server
 
         // Extract the joint trajectory from the service request and plan and visualize for every subsequent points in
         // the trajectory
         const size_t lof_joint_traj = serv_req->joint_traj.points.size(); // length of the trajectory
 
         // EE trajectory markers
-        visualization_msgs::msg::MarkerArray ee_traj;  // entire trajectory
-        visualization_msgs::msg::Marker ee_traj_point; // a point within trajectory
-        ee_traj_point.header.frame_id = "base_link";   // frame of reference for markers
-        ee_traj_point.ns = "trajectory";
+        visualization_msgs::msg::MarkerArray ee_traj;        // entire trajectory
+        visualization_msgs::msg::Marker ee_traj_point;       // a point within trajectory
+        ee_traj_point.header.frame_id = serv_req->ref_frame; // frame of reference for markers
+        ee_traj_point.ns = "ee_trajectory";
         ee_traj_point.type = visualization_msgs::msg::Marker::SPHERE;
         ee_traj_point.action = visualization_msgs::msg::Marker::ADD;
         ee_traj_point.scale.x = 0.01;
@@ -181,7 +173,6 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         ee_traj_point.color.r = 0.0;
         ee_traj_point.color.g = 1.0;
         ee_traj_point.color.b = 0.0;
-        std::cout << "------------DEBUG FLAG---------------------" << std::endl;
 
         for (size_t j = 0; j < lof_joint_traj; j++)
         {
@@ -226,7 +217,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
             moveit::core::robotStateToRobotStateMsg(*robot_state, req.start_state);
 
             // Compute forward kinematics to the EE and store the position and orientation in the marker variable
-            Eigen::Isometry3d ee_htm = robot_state->getGlobalLinkTransform("arm0_tool0");
+            Eigen::Isometry3d ee_htm = robot_state->getGlobalLinkTransform(serv_req->tool_frame);
             geometry_msgs::msg::Pose waypoint;
             // Set the translation (position) values
             waypoint.position.x = ee_htm.translation().x();
