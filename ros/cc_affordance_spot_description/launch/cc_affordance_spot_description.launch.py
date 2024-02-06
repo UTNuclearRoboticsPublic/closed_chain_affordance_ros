@@ -16,36 +16,36 @@ from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+
 
 def generate_launch_description():
     ld = LaunchDescription()
 
     # Load cc_affordance_<robot>_ros_setup.yaml onto the ROS parameter server
-    ld.add_action(
-        DeclareLaunchArgument(
-            'cc_affordance_robot_ros_setup',
-            default_value=os.path.join(get_package_share_directory('cc_affordance_spot_description'), 'config', 'cc_affordance_spot_ros_setup.yaml'),
-            description='Path to the YAML file containing the robot-related ROS setup for the CC Affordance work'
-        )
+    cc_affordance_robot_ros_setup = os.path.join(
+    get_package_share_directory('cc_affordance_spot_description'),
+    'config',
+    'cc_affordance_spot_ros_setup.yaml'
     )
 
-    param_loader_node = Node(
-        package='rosparam',
-        executable='rosparam',
-        arguments=['load', LaunchConfiguration('cc_affordance_robot_ros_setup')],
-        output='screen',
+    global_param_node = Node(
+    package='cc_affordance_spot_description',
+    executable='global_parameter_server',
+    name='global_parameter_server',
+    parameters=[cc_affordance_robot_ros_setup]
     )
-    ld.add_action(param_loader_node)
+    ld.add_action(global_param_node)
 
     # Load robot description onto the ROS parameter server
     # It is not needed to launch the robot description the following way, but the MoveIt motion planning
     # plugin launcher for Spot also loads robot description, and it is convenient to have the
     # motion planning plugin up and ready in Rviz for GUI-based control. So, we run the following launch file:
-    moveit_motion_planning_plugin_launch_file = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('spot_arm_moveit2_config'), 'launch', 'spot_arm_planning_execution.launch.py')]),
-        launch_arguments={"joint_state_topic": "/spot_driver/joint_states"}.items()
-    )
-    ld.add_action(moveit_motion_planning_plugin_launch_file)
+    # moveit_motion_planning_plugin_launch_file = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('spot_arm_moveit2_config'), 'launch', 'spot_arm_planning_execution.launch.py')]),
+    #     launch_arguments={"joint_state_topic": "/spot_driver/joint_states"}.items()
+    # )
+    # ld.add_action(moveit_motion_planning_plugin_launch_file)
 
     # Run robot state publisher
     # For spot, we run it on the Core computer

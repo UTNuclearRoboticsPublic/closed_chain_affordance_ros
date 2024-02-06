@@ -73,20 +73,22 @@ EOF
 cat << EOF > $package_name/config/cc_affordance_${robot_name}_ros_setup.yaml
 # *** ROS-related attributes pertaining to ${robot_name} *** #
 
-# --- Robot Name ---
-cca_robot: "${robot_name}" # This package must be named cc_affordance_<cca_robot>_description
+global_parameter_server:
+  ros__parameters:
+    # --- Robot Name ---
+    cca_robot: "${robot_name}" # This package must be named cc_affordance_<cca_robot>_description
 
-# --- Action Server ---
-cca_robot_as: "" # Follow joint trajectory action server to execute trajectory on the robot
+    # --- Action Server ---
+    cca_robot_as: "" # Follow joint trajectory action server to execute trajectory on the robot
 
-# --- Topics ---
-cca_joint_states_topic: "" # Joint states topic name
+    # --- Topics ---
+    cca_joint_states_topic: "" # Joint states topic name
 
-# --- Robot Description ---
-cca_robot_description_parameter: "" # Robot description parameter name
+    # --- Robot Description ---
+    cca_robot_description_parameter: "" # Robot description parameter name
 
-# --- Planning Group ---
-cca_planning_group: "" # MoveIt planning group name
+    # --- Planning Group ---
+    cca_planning_group: "" # MoveIt planning group name
 EOF
 
 # Create the launch file
@@ -113,21 +115,19 @@ def generate_launch_description():
 
     # Load cc_affordance_<robot>_ros_setup.yaml onto the ROS parameter server
     #---------------------------------------------------------------#
-    ld.add_action(
-        DeclareLaunchArgument(
-            'cc_affordance_robot_ros_setup',
-            default_value=os.path.join(get_package_share_directory('cc_affordance_${robot_name}_description'), 'config', 'cc_affordance_${robot}_ros_setup.yaml'),
-            description='Path to the YAML file containing the robot-related ROS setup for the CC Affordance work'
-        )
+    cc_affordance_robot_ros_setup = os.path.join(
+    get_package_share_directory('cc_affordance_spot_description'),
+    'config',
+    'cc_affordance_spot_ros_setup.yaml'
     )
 
-    param_loader_node = Node(
-        package='rosparam',
-        executable='rosparam',
-        arguments=['load', LaunchConfiguration('cc_affordance_robot_ros_setup')],
-        output='screen',
+    global_param_node = Node(
+    package='cc_affordance_spot_description',
+    executable='global_parameter_server',
+    name='global_parameter_server',
+    parameters=[cc_affordance_robot_ros_setup]
     )
-    ld.add_action(param_loader_node)
+    ld.add_action(global_param_node)
 
     # Load robot description onto the ROS parameter server here
     #---------------------------------------------------------------#

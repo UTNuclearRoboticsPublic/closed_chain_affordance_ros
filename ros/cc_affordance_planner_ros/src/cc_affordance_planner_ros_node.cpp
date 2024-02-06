@@ -64,19 +64,35 @@ class CcAffordancePlannerRos : public rclcpp::Node
     explicit CcAffordancePlannerRos(const rclcpp::NodeOptions &options)
         : Node("cc_affordance_planner_ros", options), // Use new class name
           node_logger_(this->get_logger()),
-          traj_execution_as_name_(
-              this->get_parameter("cca_robot_as").as_string()), // get action server name from parameter server
           plan_and_viz_ss_name_("/moveit_plan_and_viz_server"),
-          joint_states_topic_(
-              this->get_parameter("cca_joint_states_topic").as_string()) // get topic name from parameter server
+          executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>())
     {
+    }
 
-        // Initialize clients and subscribers
+    void lookup_robot_ros_setup_info()
+    {
+        executor_->add_node(this->shared_from_this());
+        std::thread([this]() { executor_->spin(); }).detach();
+        // Lookup robot_description and planning group name from the global parameter server
+        RCLCPP_INFO_STREAM(node_logger_, "Waiting on global parameter server");
+        global_parameters_client_ = std::make_shared<rclcpp::AsyncParametersClient>(this, "/global_parameter_server");
+        auto parameters =
+            global_parameters_client_->get_parameters({"cca_robot", "cca_robot_as", "cca_joint_states_topic"});
+        robot_name_ = parameters.get()[0].value_to_string();
+        traj_execution_as_name_ = parameters.get()[1].value_to_string();
+        joint_states_topic_ = parameters.get()[2].value_to_string();
+        RCLCPP_INFO_STREAM(node_logger_, "Found global parameter server");
+        if (traj_execution_as_name_ == "not set" || joint_states_topic_ == "not set" || robot_name_ == "not set")
+        {
+            RCLCPP_ERROR(node_logger_, "Some parameters are not set. Ensure all parameters are set in "
+                                       "cc_affordance_<robot>_ros_setup.yaml");
+        }
         traj_execution_client_ = rclcpp_action::create_client<FollowJointTrajectory>(this, traj_execution_as_name_);
-        plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
         joint_states_sub_ = this->create_subscription<JointState>(
             joint_states_topic_, 1000,
             std::bind(&CcAffordancePlannerRos::joint_states_cb_, this, std::placeholders::_1));
+        // Initialize clients and subscribers
+        plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
 
         // Extract robot config info
         const std::string robot_config_file_path = get_cc_affordance_robot_description_();
@@ -92,7 +108,6 @@ class CcAffordancePlannerRos : public rclcpp::Node
                                    const double &aff_step = 0.3, const int &gripper_control_par_tau = 1,
                                    const double &accuracy = 10.0 / 100.0)
     {
-
         // Get joint states at the start configuration of the affordance
         Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_();
 
@@ -139,6 +154,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr traj_execution_client_;
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_; // Service client to visualize joint trajectory
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    // Joint states subscriber
+    rclcpp::AsyncParametersClient::SharedPtr
+        global_parameters_client_; // client to get parameter values from the global parameter server
+    std::shared_ptr<rclcpp::executors::SingleThreadedExecutor>
+        executor_; // executor needed for MoveIt robot state checking
+    std::string robot_name_;
 
     // Robot data
     Eigen::MatrixXd robot_slist_;
@@ -152,8 +172,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
     // Returns full path to the yaml file containing cc affordance robot description
     std::string get_cc_affordance_robot_description_()
     {
-        const std::string package_name = "cc_affordance_" + this->get_parameter("cca_robot").as_string() +
-                                         "_description";     // get package name from the parameter server
+        const std::string package_name =
+            "cc_affordance_" + robot_name_ + "_description"; // get package name from the parameter server
         const std::string rel_dir = "/config/";              // relative directory where yaml file is located
         const std::string filename = package_name + ".yaml"; // yaml file name
         return AffordanceUtilROS::get_filepath_inside_pkg(package_name, rel_dir, filename);
@@ -219,16 +239,16 @@ class CcAffordancePlannerRos : public rclcpp::Node
         }
 
         auto result = plan_and_viz_client_->async_send_request(plan_and_viz_serv_req);
-        // Wait for the result.
-        if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), result) ==
-            rclcpp::FutureReturnCode::SUCCESS)
-        {
-            RCLCPP_INFO(node_logger_, plan_and_viz_ss_name_.c_str(), " service succeeded");
-        }
-        else
-        {
-            RCLCPP_ERROR(node_logger_, plan_and_viz_ss_name_.c_str(), "service call failed");
-        }
+        /* // Wait for the result. */
+        /* if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), result) == */
+        /*     rclcpp::FutureReturnCode::SUCCESS) */
+        /* { */
+        /*     RCLCPP_INFO(node_logger_, plan_and_viz_ss_name_.c_str(), " service succeeded"); */
+        /* } */
+        /* else */
+        /* { */
+        /*     RCLCPP_ERROR(node_logger_, plan_and_viz_ss_name_.c_str(), "service call failed"); */
+        /* } */
 
         // Execute trajectory on the real robot
 
@@ -255,7 +275,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
             std::bind(&CcAffordancePlannerRos::traj_execution_goal_response_callback_, this, std::placeholders::_1);
-        /* send_goal_options.feedback_callback = std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
+        /* send_goal_options.feedback_callback =
+         * std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
          */
         /*                                                 this, std::placeholders::_1, std::placeholders::_2); */
         send_goal_options.result_callback =
@@ -314,6 +335,8 @@ int main(int argc, char **argv)
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
     auto node = std::make_shared<CcAffordancePlannerRos>(node_options);
+    node->lookup_robot_ros_setup_info(); // lookup trajectory as name and joint states topic name from the global
+                                         // parameter server
 
     // Construct buffer to lookup tf data for the tag
     rclcpp::Clock::SharedPtr clock = std::make_shared<rclcpp::Clock>();
@@ -378,6 +401,10 @@ int main(int argc, char **argv)
     // another affordance in series
     /* node->run_cc_affordance_planner(aff_screw, aff_goal); */
 
-    rclcpp::spin(node); // Keep node alive
+    /* rclcpp::spin(node); // Keep node alive */
+    while (rclcpp::ok())
+    {
+    }
+
     return 0;
 }

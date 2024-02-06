@@ -9,7 +9,15 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 
-install(DIRECTORY config
+add_executable(global_parameter_server src/global_parameter_server_node.cpp)
+ament_target_dependencies(global_parameter_server rclcpp)
+
+install(TARGETS
+  global_parameter_server
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
 

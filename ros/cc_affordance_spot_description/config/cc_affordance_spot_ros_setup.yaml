@@ -2,17 +2,19 @@
 # ROS-related attributes pertaining to Spot #
 #############################################
 
-# --- Robot Name ---
-cca_robot: "spot" # This package must be named cc_affordance_<cca_robot>_description
+global_parameter_server:
+  ros__parameters:
+    # --- Robot Name ---
+    cca_robot: "spot" # This package must be named cc_affordance_<cca_robot>_description
 
-# --- Action Server ---
-cca_robot_as: "/arm_controller/follow_joint_trajectory"  # Follow joint trajectory action server to execute trajectory on the robot
+    # --- Action Server ---
+    cca_robot_as: "/arm_controller/follow_joint_trajectory" # Follow joint trajectory action server to execute trajectory on the robot
 
-# --- Topics ---
-cca_joint_states_topic: "/spot_driver/joint_states"  # Joint states topic name
+    # --- Topics ---
+    cca_joint_states_topic: "/spot_driver/joint_states" # Joint states topic name
 
-# --- Robot Description ---
-cca_robot_description_parameter: "robot_description"  # Robot description parameter name
+    # --- Robot Description ---
+    cca_robot_description_parameter: "robot_description" # Robot description parameter name
 
-# --- Planning Group ---
-cca_planning_group: "arm"  # MoveIt planning group name
+    # --- Planning Group ---
+    cca_planning_group: "arm" # MoveIt planning group name
