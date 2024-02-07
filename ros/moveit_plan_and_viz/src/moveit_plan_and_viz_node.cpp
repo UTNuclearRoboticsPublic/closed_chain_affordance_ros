@@ -76,21 +76,6 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         node_handle_ = this->shared_from_this();
         executor_->add_node(this->shared_from_this());
         std::thread([this]() { executor_->spin(); }).detach();
-
-        // Lookup robot_description and planning group name from the global parameter server
-        RCLCPP_INFO_STREAM(node_logger_, "Waiting on global parameter server");
-        global_parameters_client_ = std::make_shared<rclcpp::AsyncParametersClient>(this, "/global_parameter_server");
-        auto parameters =
-            global_parameters_client_->get_parameters({"cca_planning_group", "cca_robot_description_parameter"});
-        planning_group_ = parameters.get()[0].value_to_string();
-        robot_description_ = parameters.get()[1].value_to_string();
-        RCLCPP_INFO_STREAM(node_logger_, "Found global parameter server");
-        if (planning_group_ == "not set" || robot_description_ == "not set")
-        {
-            RCLCPP_ERROR(
-                node_logger_,
-                "Some parameters are not set. Ensure all parameters are set in cc_affordance_<robot>_ros_setup.yaml");
-        }
     }
 
   private:
@@ -106,29 +91,16 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr ee_traj_pub_; // publisher for EE trajectory
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
-    rclcpp::AsyncParametersClient::SharedPtr
-        global_parameters_client_; // client to get parameter values from the global parameter server
-    std::string planning_group_;
-    std::string robot_description_;
 
     // Methods
-    /* void global_parameters_client_cb_(std::shared_future<std::vector<rclcpp::Parameter>> future) */
-    /* { */
-    /*     auto result = future.get(); */
-    /*     auto param = result.at(0); */
-    /*     planning_group_ = result.at(0).as_string(); */
-    /*     robot_description_ = result.at(1).as_string(); */
-    /*     std::cout << "Planning group is " << planning_group_; */
-    /*     std::cout << "Robot description is " << robot_description_; */
-    /* } */
     void moveit_plan_and_viz_server_callback_(
         const std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Request> serv_req,
         std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Response> serv_res)
     {
         // Basic housekeeping for planning, need robot model and planning scene monitor, which observes changes in
         // planning scene
-        robot_model_loader::RobotModelLoaderPtr robot_model_loader(new robot_model_loader::RobotModelLoader(
-            node_handle_, robot_description_)); // get the robot_description parameter name from the parameter server
+        robot_model_loader::RobotModelLoaderPtr robot_model_loader(
+            new robot_model_loader::RobotModelLoader(node_handle_, serv_req->robot_description));
 
         planning_scene_monitor::PlanningSceneMonitorPtr psm(
             new planning_scene_monitor::PlanningSceneMonitor(node_handle_, robot_model_loader));
@@ -150,19 +122,13 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         namespace rvt = rviz_visual_tools;
         moveit_visual_tools::MoveItVisualTools visual_tools(node_handle_, serv_req->ref_frame, "moveit_plan_and_viz",
                                                             psm);
+        // Delete old markers and clear up screen
         visual_tools.deleteAllMarkers();
-
-        visual_tools.loadRemoteControl(); // load introspection tool so we could step through high-level scripts
-
-        // Show text in Rviz
-        Eigen::Isometry3d text_pose = Eigen::Isometry3d::Identity();
-        text_pose.translation().z() = 1.75;
-        visual_tools.publishText(text_pose, "MoveIt Plan and Viz", rvt::WHITE, rvt::XLARGE);
 
         // Create motion plan request
         planning_interface::MotionPlanRequest req;
         planning_interface::MotionPlanResponse res;
-        req.group_name = planning_group_;
+        req.group_name = serv_req->planning_group;
 
         // Moveit messages to visualize planned path and hold planning pipeline response
         moveit_msgs::msg::DisplayTrajectory display_trajectory;
@@ -178,16 +144,16 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
         // Create a JointModelGroup to keep track of the group we are planning for
         const moveit::core::JointModelGroup *joint_model_group =
-            robot_state->getJointModelGroup(planning_group_); // get the planning group name from the parameter server
+            robot_state->getJointModelGroup(serv_req->planning_group);
 
         // Extract the joint trajectory from the service request and plan and visualize for every subsequent points in
         // the trajectory
         const size_t lof_joint_traj = serv_req->joint_traj.points.size(); // length of the trajectory
 
         // EE trajectory markers
-        visualization_msgs::msg::MarkerArray ee_traj;        // entire trajectory
-        visualization_msgs::msg::Marker ee_traj_point;       // a point within trajectory
-        ee_traj_point.header.frame_id = serv_req->ref_frame; // frame of reference for markers
+        visualization_msgs::msg::MarkerArray ee_traj;               // entire trajectory
+        visualization_msgs::msg::Marker ee_traj_point;              // a point within trajectory
+        ee_traj_point.header.frame_id = serv_req->rviz_fixed_frame; // frame of reference for markers
         ee_traj_point.ns = "ee_trajectory";
         ee_traj_point.type = visualization_msgs::msg::Marker::SPHERE;
         ee_traj_point.action = visualization_msgs::msg::Marker::ADD;

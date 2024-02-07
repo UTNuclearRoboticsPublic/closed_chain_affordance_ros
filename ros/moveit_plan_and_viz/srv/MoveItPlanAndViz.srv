@@ -1,6 +1,9 @@
 # Request
 trajectory_msgs/JointTrajectory joint_traj # joint trajectory for planning and visualization
-string ref_frame # reference frame name
+string robot_description # robot_description parameter name
+string planning_group # planning group name
+string rviz_fixed_frame # fixed frame name in rviz to plot EE markers wrt to
+string ref_frame # reference frame for EE FK computation
 string tool_frame # tool frame name. The position trajectory of this frame is visualized
 ---
 # Result
