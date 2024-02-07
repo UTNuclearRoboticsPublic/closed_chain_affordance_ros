@@ -18,3 +18,6 @@ global_parameter_server:
 
     # --- Planning Group ---
     cca_planning_group: "arm" # MoveIt planning group name
+
+    # --- Rviz Fixed Frame ---
+    rviz_fixed_frame: "base_link" # Fixed frame for viewing in Rviz
