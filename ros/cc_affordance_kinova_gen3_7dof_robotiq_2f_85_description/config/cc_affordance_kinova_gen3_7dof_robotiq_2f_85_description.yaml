@@ -1,0 +1,37 @@
+# **Description of the kinova_gen3_7dof_robotiq_2f_85 robot
+# Define the reference frame, joint axes, their locations, and the tool's position.
+# Add or remove joint fields as needed to accurately represent the robot
+ref_frame:
+  - name: base_link # Reference frame name, example: arm0_base_link
+
+joints:
+  - name: joint_1 # Joint name, example: arm0_shoulder_yaw
+    w: [0, 0, -1] # Joint axis, example: [0, 0, 1]
+    q: [0, 0, 156.4] # Joint location, example: [0, 0, 0]
+
+  - name: joint_2
+    w: [0, 1, 0]
+    q: [0, -5.4, 284.8]
+
+  - name: joint_3
+    w: [0, 0, -1]
+    q: [0, -11.8, 495.2]
+
+  - name: joint_4
+    w: [0, 1, 0]
+    q: [0, -18.2, 705.6]
+
+  - name: joint_5
+    w: [0, 0, -1]
+    q: [0, -24.6, 914.0]
+
+  - name: joint_6
+    w: [0, 1, 0]
+    q: [0, -24.6, 1019.9]
+
+  - name: joint_7
+    w: [0, 0, -1]
+    q: [0, -24.6, 1125.8]
+tool:
+  - name: manual_grasp_link # Tool frame name, example: arm0_tool0. This is usually at the center of the palm
+    q: [0, -24.6, 1381] # Tool frame location, example: [0.9383, 0.0005, 0.0664]
