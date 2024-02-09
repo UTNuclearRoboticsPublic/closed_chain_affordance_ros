@@ -31,31 +31,40 @@ FIND_LIBRARY(cc_affordance_planner_LIBRARIES cc_affordance_planner /usr/local/li
 
 # Include directories for headers
 include_directories(
+  include  # Include directory for this package
   ${rclcpp_INCLUDE_DIRS}  # Include rclcpp headers
   ${Eigen3_INCLUDE_DIRS}  # Include Eigen3 headers
 )
 
-# Create executable
-add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
+# Create a library target for this package
+add_library(${PROJECT_NAME}
+  src/${PROJECT_NAME}/${PROJECT_NAME}.cpp  # Source file for the library
+)
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs)
+ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs)
 
 # Link the executable against external libraries
-target_link_libraries(${PROJECT_NAME}_node affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen
+target_link_libraries(${PROJECT_NAME} affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen
 )
 
+# Export the library target for visibility to other ROS packages
+ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
-# Install the executables
-install(TARGETS
-   ${PROJECT_NAME}_node
-   DESTINATION lib/${PROJECT_NAME}
- )
-
-install(DIRECTORY
-  # launch
-  DESTINATION share/${PROJECT_NAME}/
+install(
+	DIRECTORY include/${PROJECT_NAME}
+  DESTINATION include
 )
+
+# Install the library and its headers
+install(TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME} # Export for visibility with other CMake packages
+  ARCHIVE DESTINATION lib  # Static library installation path
+  LIBRARY DESTINATION lib  # Dynamic library installation path
+  RUNTIME DESTINATION bin  # Executable installation path
+  INCLUDES DESTINATION include # Header files
+)
+
 
 # Configure testing (if enabled)
 if(BUILD_TESTING)

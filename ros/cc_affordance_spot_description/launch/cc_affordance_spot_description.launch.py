@@ -29,13 +29,13 @@ def generate_launch_description():
     'cc_affordance_spot_ros_setup.yaml'
     )
 
-    global_param_node = Node(
+    cc_affordance_spot_description_node = Node(
     package='cc_affordance_spot_description',
-    executable='global_parameter_server',
-    name='global_parameter_server',
+    executable='cc_affordance_spot_description_node',
+    name='cc_affordance_planner_ros_node',
     parameters=[cc_affordance_robot_ros_setup]
     )
-    ld.add_action(global_param_node)
+    ld.add_action(cc_affordance_spot_description_node)
 
     # Load robot description onto the ROS parameter server
     # It is not needed to launch the robot description the following way, but the MoveIt motion planning

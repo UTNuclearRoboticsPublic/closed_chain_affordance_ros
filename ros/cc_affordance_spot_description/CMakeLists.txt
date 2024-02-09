@@ -5,15 +5,25 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+# Find and link required packages
+find_package(Eigen3 REQUIRED)  # Linear algebra library
+# ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(affordance_util_ros REQUIRED)
+find_package(cc_affordance_planner_ros REQUIRED)
 
-add_executable(global_parameter_server src/global_parameter_server_node.cpp)
-ament_target_dependencies(global_parameter_server rclcpp)
+# Specify the node executables
+add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
+
+# Specify ROS dependencies for the target
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp affordance_util_ros cc_affordance_planner_ros)
+
+# Link Eigen libraries against this project library
+target_link_libraries(${PROJECT_NAME}_node Eigen3::Eigen)
 
 install(TARGETS
-  global_parameter_server
+  ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
