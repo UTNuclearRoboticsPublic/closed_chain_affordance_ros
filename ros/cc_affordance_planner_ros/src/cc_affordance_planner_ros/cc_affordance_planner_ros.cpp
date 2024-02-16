@@ -4,6 +4,7 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const rclcpp::NodeOptions &node_o
     : Node("cc_affordance_planner_ros", node_options), // Use new class name
       node_logger_(this->get_logger()),
       plan_and_viz_ss_name_("/moveit_plan_and_viz_server")
+/* tf_buffer_(std::make_shared<rclcpp::Clock>(), tf2::Duration(1s), this->shared_from_this()) */
 {
     // Extract ros setup parameter from nodeoptions
     traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
@@ -29,12 +30,70 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const rclcpp::NodeOptions &node_o
 
     // Initialize clients and subscribers
     plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
+
+    /* // Construct buffer to lookup affordance location from apriltag using tf data */
+    /* rclcpp::Clock::SharedPtr clock = std::make_shared<rclcpp::Clock>(); */
+    /* tf2::Duration timeout(1s); */
+    /* tf_buffer_ = tf2_ros::Buffer(clock, timeout, this); */
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
 }
 
-void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::VectorXd &aff_screw, const double &aff_goal,
+void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff,
+                                                       const double &aff_goal, const double &aff_step,
+                                                       const int &gripper_control_par_tau, const double &accuracy)
+{
+    // Compute affordance screw
+    const Eigen::Matrix<double, 6, 1> aff_screw = AffordanceUtil::get_screw(w_aff, q_aff); // compute affordance screw
+
+    // Get joint states at the start configuration of the affordance
+    Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_();
+
+    // Compose cc model and affordance goal
+    Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
+
+    // Construct the CcAffordancePlanner object
+    CcAffordancePlanner ccAffordancePlanner;
+
+    // Set planner parameters
+    auto sign_of = [](double x) {
+        return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
+    }; // Helper lambda to check the sign of affordance goal
+
+    ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
+    ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step;
+
+    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau);
+
+    // Print planner result
+    std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
+    if (plannerResult.success)
+    {
+        RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with "
+                                             << plannerResult.traj_full_or_partial << " solution, and planning took "
+                                             << plannerResult.planning_time.count() << " microseconds");
+    }
+    else
+    {
+        RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution");
+    }
+
+    // Visualize and execute trajectory
+    visualize_and_execute_trajectory_(solution);
+}
+
+void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff,
+                                                       const std::string &apriltag_frame_name, const double &aff_goal,
                                                        const double &aff_step, const int &gripper_control_par_tau,
                                                        const double &accuracy)
 {
+
+    // Get affordance screw from april tag
+    const Eigen::Isometry3d tag_htm = AffordanceUtilROS::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_);
+    const Eigen::Vector3d q_aff = tag_htm.translation(); // location of the tag
+    RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame location. Ensure it's not empty and makes sense:\n"
+                                         << q_aff);
+    const Eigen::Matrix<double, 6, 1> aff_screw = AffordanceUtil::get_screw(w_aff, q_aff); // compute affordance screw
+
     // Get joint states at the start configuration of the affordance
     Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_();
 

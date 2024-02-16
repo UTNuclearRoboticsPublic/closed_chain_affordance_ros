@@ -61,9 +61,12 @@ class CcAffordancePlannerRos : public rclcpp::Node
     // Constructor
     explicit CcAffordancePlannerRos(const rclcpp::NodeOptions &options);
 
-    void run_cc_affordance_planner(const Eigen::VectorXd &aff_screw, const double &aff_goal,
+    void run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff, const double &aff_goal,
                                    const double &aff_step = 0.3, const int &gripper_control_par_tau = 1,
                                    const double &accuracy = 10.0 / 100.0);
+    void run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const std::string &apriltag_frame_name,
+                                   const double &aff_goal, const double &aff_step = 0.3,
+                                   const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0);
 
   private:
     rclcpp::Logger node_logger_; // logger associated with the node
@@ -71,6 +74,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr traj_execution_client_;
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_; // Service client to visualize joint trajectory
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    // Joint states subscriber
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                      // Buffer to lookup tf data
 
     // Robot ROS setup data
     std::string traj_execution_as_name_;
@@ -81,7 +85,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     // Robot data
     Eigen::MatrixXd robot_slist_;
     std::vector<std::string> joint_names_;
-    Eigen::MatrixXd M_;
+    Eigen::Matrix<double, 4, 4> M_;
     std::string ref_frame_;
     std::string tool_frame_;
 
