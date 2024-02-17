@@ -4,7 +4,6 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     : Node(node_name, node_options), // Use new class name
       node_logger_(this->get_logger()),
       plan_and_viz_ss_name_("/moveit_plan_and_viz_server")
-/* tf_buffer_(std::make_shared<rclcpp::Clock>(), tf2::Duration(1s), this->shared_from_this()) */
 {
     // Extract ros setup parameter from nodeoptions
     traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
@@ -32,9 +31,6 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
 
     /* // Construct buffer to lookup affordance location from apriltag using tf data */
-    /* rclcpp::Clock::SharedPtr clock = std::make_shared<rclcpp::Clock>(); */
-    /* tf2::Duration timeout(1s); */
-    /* tf_buffer_ = tf2_ros::Buffer(clock, timeout, this); */
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
 }
 
