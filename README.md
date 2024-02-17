@@ -3,13 +3,7 @@
 ## Build Instructions
 This repository contains ROS2 packages used to interface the closed-chain affordance planner with a physical robot. Follow these steps:
 
-1. Clone the `cpp` branch from this repository into a non-ROS workspace and install the planner following the instructions provided on that branch.
-   ```
-   cd ~/<some_workspace_name>/src
-   ```
-   ```
-   git clone -b cpp git@github.com:UTNuclearRobotics/closed_chain_affordance.git
-   ```
+1. Install the closed-chain affordance Cpp libraries by following instructions on the `cpp` branch of this repository:</br>
    [Cpp library installation instructions](https://github.com/UTNuclearRobotics/closed_chain_affordance/tree/cpp)
 
 2. Clone the packages from this branch into your ROS2 workspace's `src` folder and build and source them:
@@ -32,6 +26,8 @@ This repository contains ROS2 packages used to interface the closed-chain afford
 3. If using an AprilTag to detect affordance, also build and source the following package (TODO):
    ```
    colcon build --packages-select apriltag_setup
+   ```
+   ```
    source install/setup.
    ```
 
@@ -44,9 +40,9 @@ The entry point for this planner is a launch file in a package named as `cca_<ro
 
 ### Creating and Building the `cca_<robot>` Package
 
-Implementing this framework on a new robot is straightforward. All you need to do is create and build the `cca_<robot>` package that contains robot-related information for closed-chain affordance planning. To streamline this package creation, a  script is available. Navigate to the `closed_chain_affordance_planner` directory of this repository and run the script.
+Implementing this framework on a new robot is straightforward. All you need to do is create and build the `cca_<robot>` package that contains robot-related information for closed-chain affordance planning. To streamline this package creation, a  script is available. Navigate to the `closed_chain_affordance` directory of this repository and run the script.
    ```
-   cd ~/<ros_workspace_name>/src/closed_chain_affordance_planner
+   cd ~/<ros_workspace_name>/src/closed_chain_affordance
    ```
    ```
    ./cca_robot_package_creator.sh
