@@ -133,10 +133,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
 // Returns full path to the yaml file containing cc affordance robot description
 std::string CcAffordancePlannerRos::get_cc_affordance_robot_description_(const std::string &robot_name)
 {
-    const std::string package_name =
-        "cc_affordance_" + robot_name + "_description";  // get package name from the parameter server
-    const std::string rel_dir = "/config/";              // relative directory where yaml file is located
-    const std::string filename = package_name + ".yaml"; // yaml file name
+    const std::string package_name = "cca_" + robot_name;            // get package name from the parameter server
+    const std::string rel_dir = "/config/";                          // relative directory where yaml file is located
+    const std::string filename = package_name + "_description.yaml"; // yaml file name
     return AffordanceUtilROS::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 

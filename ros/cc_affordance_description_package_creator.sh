@@ -18,7 +18,7 @@ fi
 read -p "Enter robot name: " robot_name
 
 # Construct package name
-package_name="cc_affordance_${robot_name}_description"
+package_name="cca_${robot_name}"
 
 # Create package
 ros2 pkg create $package_name --build-type ament_cmake
@@ -73,7 +73,7 @@ EOF
 cat << EOF > $package_name/config/cc_affordance_${robot_name}_ros_setup.yaml
 # *** ROS-related attributes pertaining to ${robot_name} *** #
 
-global_parameter_server:
+cc_affordance_planner_ros:
   ros__parameters:
     # --- Robot Name ---
     cca_robot: "${robot_name}" # This package must be named cc_affordance_<cca_robot>_description
@@ -92,49 +92,36 @@ global_parameter_server:
 EOF
 
 # Create the launch file
-cat << EOF > $package_name/launch/cc_affordance_${robot_name}_description.launch.py
-"""
-Use this launch file to load all parameters and run all robot-related nodes for CC Affordance Planning.
-
-Three things need to be done in this file:
-1. Load cc_affordance_<robot>_ros_setup.yaml file onto the ROS parameter server.
-2. Launch robot_description onto the ROS parameter server.
-3. Run robot_state_publisher.
-"""
-
+cat << EOF > $package_name/launch/cca_${robot_name}.launch.py
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
     ld = LaunchDescription()
 
-    # Load cc_affordance_<robot>_ros_setup.yaml onto the ROS parameter server
-    #---------------------------------------------------------------#
-    cc_affordance_robot_ros_setup = os.path.join(
-    get_package_share_directory('cc_affordance_spot_description'),
-    'config',
-    'cc_affordance_spot_ros_setup.yaml'
+    # Define LaunchConfiguration arguments with clear descriptions
+    cc_afforance_spot_ros_setup = os.path.join(
+        get_package_share_directory('cc_affordance_spot_description'),
+        'config',
+        'cc_affordance_spot_ros_setup.yaml'
+        )
+
+    # Create a Node instance for the cc_affordance_spot_description node
+    cc_affordance_planner_ros_node_with_params = Node(
+        package="cc_affordance_spot_description",
+        executable="cc_affordance_spot_description_node",
+        name="cc_affordance_planner_ros",
+        emulate_tty=True,
+        output='screen',
+        prefix='xterm -e', # to receive input from user
+        parameters=[
+           cc_afforance_spot_ros_setup
+        ],
+        # Add node-specific parameters and additional launch actions if needed
     )
-
-    global_param_node = Node(
-    package='cc_affordance_spot_description',
-    executable='global_parameter_server',
-    name='global_parameter_server',
-    parameters=[cc_affordance_robot_ros_setup]
-    )
-    ld.add_action(global_param_node)
-
-    # Load robot description onto the ROS parameter server here
-    #---------------------------------------------------------------#
-
-    # Run robot state publisher here
-    #---------------------------------------------------------------#
-
+    ld.add_action(cc_affordance_planner_ros_node_with_params)
     return ld
 EOF
 
