@@ -11,7 +11,7 @@ This repository contains ROS2 packages used to interface the closed-chain afford
    cd ~/<ros_workspace_name>/src
    ```
    ```
-   git clone -b cpp git@github.com:UTNuclearRobotics/closed_chain_affordance.git
+   git clone -b ros_galactic git@github.com:UTNuclearRobotics/closed_chain_affordance.git
    ```
    ```
    cd ~/<ros_workspace_name>
