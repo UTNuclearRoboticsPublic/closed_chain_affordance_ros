@@ -20,7 +20,7 @@ This repository contains ROS2 packages used to interface the closed-chain afford
    colcon build --packages-select affordance_util_ros moveit_plan_and_viz cc_affordance_planner_ros
    ```
    ```
-   source install/setup.
+   source install/setup.bash
    ```
 
 3. If using an AprilTag to detect affordance, also build and source the following package (TODO):
@@ -28,7 +28,7 @@ This repository contains ROS2 packages used to interface the closed-chain afford
    colcon build --packages-select apriltag_setup
    ```
    ```
-   source install/setup.
+   source install/setup.bash
    ```
 
 ## Run Instructions
@@ -56,7 +56,7 @@ The package will contain two files in its `config` folder: `cca_<robot>_descript
    colcon build --packages-select cca_<robot>
    ```
    ```
-   source install/setup.
+   source install/setup.bash
    ```
 
 ### Running the Planner
