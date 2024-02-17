@@ -2,7 +2,7 @@
 # ROS-related attributes pertaining to Spot #
 #############################################
 
-global_parameter_server:
+cc_affordance_planner_ros:
   ros__parameters:
     # --- Robot Name ---
     cca_robot: "spot" # This package must be named cc_affordance_<cca_robot>_description

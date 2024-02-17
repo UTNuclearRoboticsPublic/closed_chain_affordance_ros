@@ -59,12 +59,12 @@ class CcAffordancePlannerRos : public rclcpp::Node
     using JointState = sensor_msgs::msg::JointState;
 
     // Constructor
-    explicit CcAffordancePlannerRos(const rclcpp::NodeOptions &options);
+    explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
-    void run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff, const double &aff_goal,
+    bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff, const double &aff_goal,
                                    const double &aff_step = 0.3, const int &gripper_control_par_tau = 1,
                                    const double &accuracy = 10.0 / 100.0);
-    void run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const std::string &apriltag_frame_name,
+    bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const std::string &apriltag_frame_name,
                                    const double &aff_goal, const double &aff_step = 0.3,
                                    const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0);
 
@@ -75,6 +75,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_; // Service client to visualize joint trajectory
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    // Joint states subscriber
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                      // Buffer to lookup tf data
+    bool plan_and_viz_serv_complete_ = false;
 
     // Robot ROS setup data
     std::string traj_execution_as_name_;
@@ -101,7 +102,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     Eigen::VectorXd get_aff_start_joint_states_();
 
     // Function to visualize and execute planned trajectory
-    void visualize_and_execute_trajectory_(std::vector<Eigen::VectorXd> trajectory);
+    bool visualize_and_execute_trajectory_(std::vector<Eigen::VectorXd> trajectory);
 
     // Callback to process traj_execution_as feedback
     void traj_execution_feedback_callback_(GoalHandleFollowJointTrajectory::SharedPtr,

@@ -1,7 +1,7 @@
 #include <cc_affordance_planner_ros/cc_affordance_planner_ros.hpp>
 
-CcAffordancePlannerRos::CcAffordancePlannerRos(const rclcpp::NodeOptions &node_options)
-    : Node("cc_affordance_planner_ros", node_options), // Use new class name
+CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
+    : Node(node_name, node_options), // Use new class name
       node_logger_(this->get_logger()),
       plan_and_viz_ss_name_("/moveit_plan_and_viz_server")
 /* tf_buffer_(std::make_shared<rclcpp::Clock>(), tf2::Duration(1s), this->shared_from_this()) */
@@ -38,7 +38,7 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const rclcpp::NodeOptions &node_o
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
 }
 
-void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff,
+bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff,
                                                        const double &aff_goal, const double &aff_step,
                                                        const int &gripper_control_par_tau, const double &accuracy)
 {
@@ -78,10 +78,10 @@ void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     }
 
     // Visualize and execute trajectory
-    visualize_and_execute_trajectory_(solution);
+    return visualize_and_execute_trajectory_(solution);
 }
 
-void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff,
+bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff,
                                                        const std::string &apriltag_frame_name, const double &aff_goal,
                                                        const double &aff_step, const int &gripper_control_par_tau,
                                                        const double &accuracy)
@@ -127,7 +127,7 @@ void CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     }
 
     // Visualize and execute trajectory
-    visualize_and_execute_trajectory_(solution);
+    return visualize_and_execute_trajectory_(solution);
 }
 
 // Returns full path to the yaml file containing cc affordance robot description
@@ -169,7 +169,7 @@ Eigen::VectorXd CcAffordancePlannerRos::get_aff_start_joint_states_()
 }
 
 // Function to visualize and execute planned trajectory
-void CcAffordancePlannerRos::visualize_and_execute_trajectory_(std::vector<Eigen::VectorXd> trajectory)
+bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(std::vector<Eigen::VectorXd> trajectory)
 {
     // Visualize trajectory in RVIZ
     // Convert the solution trajectory to ROS message type
@@ -186,6 +186,9 @@ void CcAffordancePlannerRos::visualize_and_execute_trajectory_(std::vector<Eigen
     plan_and_viz_serv_req->joint_traj = goal.trajectory;
     plan_and_viz_serv_req->ref_frame = ref_frame_;
     plan_and_viz_serv_req->tool_frame = tool_frame_;
+    plan_and_viz_serv_req->planning_group = planning_group_;
+    plan_and_viz_serv_req->robot_description = robot_description_parameter_;
+    plan_and_viz_serv_req->rviz_fixed_frame = rviz_fixed_frame_;
 
     // Call service to visualize
     while (!plan_and_viz_client_->wait_for_service(1s))
@@ -194,54 +197,58 @@ void CcAffordancePlannerRos::visualize_and_execute_trajectory_(std::vector<Eigen
         {
             RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.",
                          plan_and_viz_ss_name_.c_str());
-            return;
+            return false;
         }
-        RCLCPP_INFO(node_logger_, plan_and_viz_ss_name_.c_str(), " service not available, waiting again...");
+        RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", plan_and_viz_ss_name_.c_str());
     }
 
-    auto result = plan_and_viz_client_->async_send_request(plan_and_viz_serv_req);
-    // Wait for the result.
-    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), result) ==
-        rclcpp::FutureReturnCode::SUCCESS)
+    auto result_future = plan_and_viz_client_->async_send_request(plan_and_viz_serv_req);
+    RCLCPP_INFO(node_logger_, "Waiting on %s service to complete", plan_and_viz_ss_name_.c_str());
+    auto response = result_future.get(); // blocks until response is received
+
+    if (response->success)
     {
-        RCLCPP_INFO(node_logger_, plan_and_viz_ss_name_.c_str(), " service succeeded");
+        RCLCPP_INFO(node_logger_, " %s service succeeded", plan_and_viz_ss_name_.c_str());
+
+        // Execute trajectory on the real robot
+        RCLCPP_INFO_STREAM(node_logger_, "Ready to execute the trajectory? y to confirm");
+        std::string execution_conf;
+        std::cin >> execution_conf;
+
+        if (execution_conf != "y" && execution_conf != "Y")
+        {
+            RCLCPP_INFO_STREAM(node_logger_, "You canceled trajectory execution");
+            return false;
+        }
+
+        // Send the goal to follow_joint_trajectory action server for execution
+        if (!this->traj_execution_client_->wait_for_action_server())
+        {
+            RCLCPP_ERROR(node_logger_, " %s action server not available after waiting",
+                         traj_execution_as_name_.c_str());
+            return false;
+        }
+
+        RCLCPP_INFO(node_logger_, "Sending goal to %s action server", traj_execution_as_name_.c_str());
+
+        auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
+        send_goal_options.goal_response_callback =
+            std::bind(&CcAffordancePlannerRos::traj_execution_goal_response_callback_, this, std::placeholders::_1);
+        /* send_goal_options.feedback_callback =
+         * std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
+         */
+        /*                                                 this, std::placeholders::_1, std::placeholders::_2); */
+        send_goal_options.result_callback =
+            std::bind(&CcAffordancePlannerRos::traj_execution_result_callback_, this, std::placeholders::_1);
+
+        this->traj_execution_client_->async_send_goal(goal, send_goal_options);
+        return true;
     }
     else
     {
-        RCLCPP_ERROR(node_logger_, plan_and_viz_ss_name_.c_str(), "service call failed");
+        RCLCPP_ERROR(node_logger_, "%s service call failed", plan_and_viz_ss_name_.c_str());
+        return false;
     }
-
-    // Execute trajectory on the real robot
-    RCLCPP_INFO_STREAM(node_logger_, "Ready to execute the trajectory? y to confirm");
-    std::string execution_conf;
-    std::cin >> execution_conf;
-
-    if (execution_conf != "y" && execution_conf != "Y")
-    {
-        RCLCPP_INFO_STREAM(node_logger_, "You canceled trajectory execution");
-        return;
-    }
-
-    // Send the goal to follow_joint_trajectory action server for execution
-    if (!this->traj_execution_client_->wait_for_action_server())
-    {
-        RCLCPP_ERROR(node_logger_, " %s action server not available after waiting", traj_execution_as_name_.c_str());
-        rclcpp::shutdown();
-    }
-
-    RCLCPP_INFO(node_logger_, "Sending goal to %s action server", traj_execution_as_name_.c_str());
-
-    auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-    send_goal_options.goal_response_callback =
-        std::bind(&CcAffordancePlannerRos::traj_execution_goal_response_callback_, this, std::placeholders::_1);
-    /* send_goal_options.feedback_callback =
-     * std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
-     */
-    /*                                                 this, std::placeholders::_1, std::placeholders::_2); */
-    send_goal_options.result_callback =
-        std::bind(&CcAffordancePlannerRos::traj_execution_result_callback_, this, std::placeholders::_1);
-
-    this->traj_execution_client_->async_send_goal(goal, send_goal_options);
 }
 
 // Callback to process traj_execution_as feedback
@@ -269,7 +276,7 @@ void CcAffordancePlannerRos::traj_execution_result_callback_(
         RCLCPP_ERROR(node_logger_, "Unknown result code");
         return;
     }
-    RCLCPP_INFO(node_logger_, traj_execution_as_name_.c_str(), "action server call concluded");
+    RCLCPP_INFO(node_logger_, "%s action server call concluded", traj_execution_as_name_.c_str());
     rclcpp::shutdown();
 }
 
