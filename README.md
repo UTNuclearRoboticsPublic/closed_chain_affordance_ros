@@ -40,7 +40,7 @@ The entry point for this planner is a launch file in a package named as `cca_<ro
 
 ### Creating and Building the `cca_<robot>` Package
 
-Implementing this framework on a new robot is straightforward. All you need to do is create and build the `cca_<robot>` package that contains robot-related information for closed-chain affordance planning. To streamline this package creation, a  script is available. Navigate to the `closed_chain_affordance` directory of this repository and run the script.
+Implementing this framework on a new robot is straightforward. All you need to do is create and build the `cca_<robot>` package that contains robot-related information for closed-chain affordance planning. To streamline this package creation, a  script is available. Navigate to the `closed_chain_affordance` directory and run the package-creator script.
    ```
    cd ~/<ros_workspace_name>/src/closed_chain_affordance
    ```
