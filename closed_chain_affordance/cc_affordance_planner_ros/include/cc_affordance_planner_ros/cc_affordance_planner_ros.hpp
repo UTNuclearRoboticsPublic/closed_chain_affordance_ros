@@ -165,7 +165,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @return true if trajectory was successfully visualized and executed. false otherwise.
      */
-    bool visualize_and_execute_trajectory_(std::vector<Eigen::VectorXd> trajectory);
+    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory);
 
     /**
      * @brief Callback function to process the feedback from the traj_execution_as_ action server

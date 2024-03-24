@@ -164,7 +164,7 @@ Eigen::VectorXd CcAffordancePlannerRos::get_aff_start_joint_states_()
 }
 
 // Function to visualize and execute planned trajectory
-bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(std::vector<Eigen::VectorXd> trajectory)
+bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory)
 {
     // Visualize trajectory in RVIZ
     // Convert the solution trajectory to ROS message type
