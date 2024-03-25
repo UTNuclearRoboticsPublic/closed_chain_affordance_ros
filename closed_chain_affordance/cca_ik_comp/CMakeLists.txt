@@ -35,7 +35,7 @@ install(TARGETS
  )
 
 install(DIRECTORY
-  # launch
+  launch
   DESTINATION share/${PROJECT_NAME}/
 )
 
