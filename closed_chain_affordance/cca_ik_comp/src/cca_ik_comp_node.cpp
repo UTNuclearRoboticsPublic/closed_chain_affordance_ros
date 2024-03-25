@@ -1,4 +1,5 @@
 // Copied from Alex Navarro's Spot Reachability package
+#include <Eigen/Eigen>
 #include <eigen3/Eigen/Geometry>
 #include <memory>
 #include <optional>
@@ -29,10 +30,11 @@ class SpotIKSolver : public rclcpp::Node
         ROS_INFO("Loaded model for Spot robot, with model frame %s", kinematic_model_->getModelFrame().c_str());
     }
 
-    bool setRobotState(const std::unordered_map<std::string, double> &joint_values)
+    bool setRobotState(const Eigen::VectorXd &joint_positions)
     {
         try
         {
+            std::unordered_map<std::string, double> joint_values = setup_robot_state_values(joint_positions);
             for (const auto &[name, position] : joint_values)
             {
                 robot_state_->setJointPositions(name, &position);
@@ -71,10 +73,28 @@ class SpotIKSolver : public rclcpp::Node
             return {};
     }
 
+    std::unordered_map<std::string, double> setup_robot_state_values(const Eigen::VectorXd joint_positions)
+    {
+
+        std::unordered_map<std::string, double> joint_values; // result
+
+        // Populate the map from the vector (assuming order matches)
+        for (int i = 0; i < joint_names_.size(); ++i)
+        {
+            joint_values[joint_names_[i]] = joint_positions[i];
+        }
+
+        return joint_values;
+    }
+
   protected:
     robot_model_loader::RobotModelLoaderPtr model_loader_;
     moveit::core::RobotModelPtr kinematic_model_;
     moveit::core::RobotStatePtr robot_state_;
+
+  private:
+    const std::vector<std::string> joint_names_ = {"arm0_shoulder_yaw", "arm0_shoulder_pitch", "arm0_elbow_pitch",
+                                                   "arm0_elbow_roll",   "arm0_wrist_pitch",    "arm0_wrist_roll"};
 };
 
 int main(int argc, char *argv[])
@@ -83,58 +103,88 @@ int main(int argc, char *argv[])
 
     auto node = std::make_shared<SpotIKSolver>();
     node->init();
+    std::thread spinner_thread([&node]() { rclcpp::spin(node); });
 
     // Set robot state from affordance start config
-    // Define the joint names (optional)
-    std::vector<std::string> joint_names = {"arm0_shoulder_yaw", "arm0_shoulder_pitch", "arm0_elbow_pitch",
-                                            "arm0_elbow_roll",   "arm0_wrist_pitch",    "arm0_wrist_roll"};
+    Eigen::VectorXd aff_start_state(6);
+    aff_start_state << 0.5, -1.2, 1.0, 0.7, -0.3, 2.1;
 
-    // Create a sample Eigen::VectorXd (modify with your actual data)
-    Eigen::VectorXd joint_positions(6);
-    joint_positions << 0.5, -1.2, 1.0, 0.7, -0.3, 2.1; // Replace with your joint values
-
-    // Create the unordered map
-    std::unordered_map<std::string, double> joint_values;
-
-    // Check if joint names and vector size match
-    if (joint_names.size() != joint_positions.size())
-    {
-        std::cerr << "Error: Number of joint names and positions do not match!" << std::endl;
-        return 1;
-    }
-
-    // Populate the map from the vector (assuming order matches)
-    for (int i = 0; i < joint_names.size(); ++i)
-    {
-        joint_values[joint_names[i]] = joint_positions[i];
-    }
-
-    if (node->setRobotState(joint_values))
-    {
-        // Compute FK from affordance start config
-        Eigen::Isometry3d start_ee_htm = node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
-
-        // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
-        // Specify affordance screw
-        const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis
-        const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector
-                                                                // Compute affordance screw
-        const Eigen::Matrix<double, 6, 1> aff_screw =
-            AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // compute affordance screw
-        double theta_step = 0.1;
-        const Eigen::Matrix<double, 6, 1> twist = aff_screw * theta_step;
-
-        Eigen::Matrix4d new_ee_htm = AffordanceUtil::MatrixExp6(AffordanceUtil::VecTose3(twist));
-
-        // Solve IK for the cartesian trajectory updating the seed sequentially
-
-        // Call moveit_plan_and_viz trajectory to visualize the plan
-    }
-    else
+    if (node->setRobotState(aff_start_state))
     {
         std::cerr << "Error: Could not set robot state" << std::endl;
         return 1;
     }
 
+    // Compute EE pose at start config
+    Eigen::Isometry3d start_ee_htm_iso = node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
+    Eigen::Matrix4d start_ee_htm;
+    start_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
+    start_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
+
+    // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
+    // Compute affordance screw
+    const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis
+    const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector
+    const Eigen::Matrix<double, 6, 1> aff_screw =
+        AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
+
+    // Define affordance goal and step
+    const double aff_goal = 0.5 * M_PI;
+    double aff_step = 0.1;
+
+    // Compute affordance twist
+    Eigen::Matrix<double, 6, 1> aff_twist = aff_screw * aff_step;
+
+    // Compute of max number of loop iterations based on affordance goal and affordance step
+    const int stepper_max_itr_m = aff_goal / aff_step + 1;
+
+    // Initialize loop condition parameters
+    int loop_counter_k = 0;
+    bool success = true;
+
+    // Initialize solution
+    std::vector<Eigen::VectorXd> solution;
+
+    while ((loop_counter_k < stepper_max_itr_m) && success)
+    {
+        // If last iteration, adjust affordance twist accordingly
+        if (loop_counter_k == (stepper_max_itr_m))
+        {
+            aff_step = aff_goal - aff_step * (stepper_max_itr_m - 1);
+            aff_twist = aff_screw * aff_step;
+        }
+
+        // Compute cartesian pose
+        Eigen::Matrix4d se3mat = AffordanceUtil::VecTose3(aff_twist);
+        Eigen::Matrix4d ee_htm = AffordanceUtil::MatrixExp6(se3mat) * start_ee_htm;
+        Eigen::Isometry3d ee_htm_iso;
+        ee_htm_iso.linear() = ee_htm.block<3, 3>(0, 0);
+        ee_htm_iso.translation() = ee_htm.block<3, 1>(0, 3);
+
+        // Solve IK for the cartesian trajectory updating the seed sequentially
+        std::optional<std::vector<double>> ik_result = node->inverseKinematics("arm", ee_htm_iso);
+
+        if (ik_result.has_value())
+        {
+            Eigen::VectorXd point = Eigen::Map<Eigen::VectorXd>(ik_result.value().data(), ik_result.value().size());
+            solution.push_back(point);
+
+            // Update robot state
+            success = node->setRobotState(point);
+
+            // Update the start ee htm
+            start_ee_htm = ee_htm;
+        }
+        else
+        {
+            std::cerr << "Error: IK wasn't successful." << std::endl;
+            break;
+        }
+    }
+
+    // Call moveit_plan_and_viz trajectory to visualize the plan
+
+    rclcpp::shutdown();    // shutdown ROS
+    spinner_thread.join(); // join the spinner thread
     return 0;
 }
