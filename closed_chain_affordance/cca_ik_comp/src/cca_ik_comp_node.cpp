@@ -9,6 +9,7 @@
 
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
+#include <chrono>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
@@ -173,9 +174,10 @@ int main(int argc, char *argv[])
     node->init();
     std::thread spinner_thread([&node]() { rclcpp::spin(node); });
 
+    auto start_time = std::chrono::high_resolution_clock::now(); // Monitor clock to track planning time
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
-    aff_start_state << 0.5, -1.2, 1.0, 0.7, -0.3, 2.1;
+    aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool
 
     if (node->setRobotState(aff_start_state))
     {
@@ -191,14 +193,15 @@ int main(int argc, char *argv[])
 
     // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
     // Compute affordance screw
+    // moving a stool
     const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis
     const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector
     const Eigen::Matrix<double, 6, 1> aff_screw =
         AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
 
     // Define affordance goal and step
-    const double aff_goal = 0.5 * M_PI;
-    double aff_step = 0.1;
+    const double aff_goal = 0.5 * M_PI; // moving a stool
+    double aff_step = 0.15;             // moving a stool
 
     // Compute affordance twist
     Eigen::Matrix<double, 6, 1> aff_twist = aff_screw * aff_step;
@@ -249,6 +252,11 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto planning_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+
+    std::cout << "Planning time: " << planning_time.count() << " microseconds" << std::endl;
 
     // Call moveit_plan_and_viz trajectory to visualize the plan
     bool viz_success = node->visualize_trajectory(solution);
