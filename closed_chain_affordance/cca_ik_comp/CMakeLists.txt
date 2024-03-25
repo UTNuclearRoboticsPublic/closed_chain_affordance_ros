@@ -8,10 +8,23 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(Eigen3 REQUIRED)  # Linear algebra library
+find_package(yaml-cpp REQUIRED ) # To parse yaml files
+
 find_package(moveit_ros_planning REQUIRED)
+FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
+
+# Include directories for headers
+include_directories(
+  include  # Include directory for this package
+  ${rclcpp_INCLUDE_DIRS}  # Include rclcpp headers
+  ${Eigen3_INCLUDE_DIRS}  # Include Eigen3 headers
+)
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_ros_planning)
+target_link_libraries(${PROJECT_NAME}_node affordance_util yaml-cpp Eigen3::Eigen
+)
 
 # Install the executables
 install(TARGETS
