@@ -12,6 +12,8 @@ find_package(Eigen3 REQUIRED)  # Linear algebra library
 find_package(yaml-cpp REQUIRED ) # To parse yaml files
 
 find_package(moveit_ros_planning REQUIRED)
+find_package(affordance_util_ros REQUIRED)
+find_package(moveit_plan_and_viz REQUIRED)
 FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
 
 # Include directories for headers
@@ -22,7 +24,7 @@ include_directories(
 )
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_ros_planning)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_ros_planning affordance_util_ros moveit_plan_and_viz)
 target_link_libraries(${PROJECT_NAME}_node affordance_util yaml-cpp Eigen3::Eigen
 )
 

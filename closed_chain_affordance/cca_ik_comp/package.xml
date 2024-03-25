@@ -11,6 +11,8 @@
 
   <depend>rclcpp</depend>
   <depend>moveit_ros_planning</depend>
+  <depend>moveit_plan_and_viz</depend>
+  <depend>affordance_util_ros</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

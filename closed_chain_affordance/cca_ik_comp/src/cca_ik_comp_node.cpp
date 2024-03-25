@@ -1,4 +1,4 @@
-// Copied from Alex Navarro's Spot Reachability package
+// Some class functions Copied from Alex Navarro's Spot Reachability package
 #include <Eigen/Eigen>
 #include <eigen3/Eigen/Geometry>
 #include <memory>
@@ -8,9 +8,11 @@
 #include <vector>
 
 #include <affordance_util/affordance_util.hpp>
+#include <affordance_util_ros/affordance_util_ros.hpp>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
+#include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #define ROS_INFO(...) RCLCPP_INFO(this->get_logger(), __VA_ARGS__)
@@ -18,7 +20,15 @@
 class SpotIKSolver : public rclcpp::Node
 {
   public:
-    SpotIKSolver() : rclcpp::Node("spot_ik_node") {}
+    // Namespaces
+    using MoveItPlanAndViz = moveit_plan_and_viz::srv::MoveItPlanAndViz;
+
+    SpotIKSolver()
+        : rclcpp::Node("spot_ik_node"),
+          node_logger_(this->get_logger()),
+          plan_and_viz_ss_name_("/moveit_plan_and_viz_server")
+    {
+    }
 
     void init()
     {
@@ -26,6 +36,9 @@ class SpotIKSolver : public rclcpp::Node
         kinematic_model_ = model_loader_->getModel();
         robot_state_ = std::make_shared<moveit::core::RobotState>(kinematic_model_);
         robot_state_->setToDefaultValues();
+
+        // Initialize visualization client
+        plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
 
         ROS_INFO("Loaded model for Spot robot, with model frame %s", kinematic_model_->getModelFrame().c_str());
     }
@@ -87,12 +100,67 @@ class SpotIKSolver : public rclcpp::Node
         return joint_values;
     }
 
+    // Function to visualize and execute planned trajectory
+    bool visualize_trajectory(std::vector<Eigen::VectorXd> trajectory)
+    {
+        // Visualize trajectory in RVIZ
+        // Convert the solution trajectory to ROS message type
+        const double traj_time_step = 0.3;
+        const control_msgs::action::FollowJointTrajectory_Goal goal =
+            AffordanceUtilROS::follow_joint_trajectory_msg_builder(
+                trajectory, Eigen::VectorXd::Zero(6), joint_names_,
+                traj_time_step); // this function takes care of extracting the right
+                                 // number of joint_states although solution
+                                 // contains qs data too
+
+        // Fill out service request
+        auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
+        plan_and_viz_serv_req->joint_traj = goal.trajectory;
+        plan_and_viz_serv_req->ref_frame = "arm0_base_link";
+        plan_and_viz_serv_req->tool_frame = "arm0_tool0";
+        plan_and_viz_serv_req->planning_group = "arm";
+        plan_and_viz_serv_req->robot_description = "robot_description";
+        plan_and_viz_serv_req->rviz_fixed_frame = "base_link";
+
+        using namespace std::chrono_literals;
+        // Call service to visualize
+        while (!plan_and_viz_client_->wait_for_service(1s))
+        {
+            if (!rclcpp::ok())
+            {
+                RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.",
+                             plan_and_viz_ss_name_.c_str());
+                return false;
+            }
+            RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", plan_and_viz_ss_name_.c_str());
+        }
+
+        auto result_future = plan_and_viz_client_->async_send_request(plan_and_viz_serv_req);
+        RCLCPP_INFO(node_logger_, "Waiting on %s service to complete", plan_and_viz_ss_name_.c_str());
+        auto response = result_future.get(); // blocks until response is received
+
+        if (response->success)
+        {
+            RCLCPP_INFO(node_logger_, " %s service succeeded", plan_and_viz_ss_name_.c_str());
+            // Execute trajectory on the real robot
+            return true;
+        }
+        else
+        {
+            RCLCPP_ERROR(node_logger_, "%s service call failed", plan_and_viz_ss_name_.c_str());
+            return false;
+        }
+    }
+
   protected:
     robot_model_loader::RobotModelLoaderPtr model_loader_;
     moveit::core::RobotModelPtr kinematic_model_;
     moveit::core::RobotStatePtr robot_state_;
 
   private:
+    rclcpp::Logger node_logger_; // logger associated with the node
+    rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_;
+    std::string plan_and_viz_ss_name_; // name of the planning visualization server
     const std::vector<std::string> joint_names_ = {"arm0_shoulder_yaw", "arm0_shoulder_pitch", "arm0_elbow_pitch",
                                                    "arm0_elbow_roll",   "arm0_wrist_pitch",    "arm0_wrist_roll"};
 };
@@ -183,6 +251,7 @@ int main(int argc, char *argv[])
     }
 
     // Call moveit_plan_and_viz trajectory to visualize the plan
+    bool viz_success = node->visualize_trajectory(solution);
 
     rclcpp::shutdown();    // shutdown ROS
     spinner_thread.join(); // join the spinner thread
