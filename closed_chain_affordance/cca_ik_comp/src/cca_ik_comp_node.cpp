@@ -243,9 +243,10 @@ int main(int argc, char *argv[])
 
     // Compute EE pose at start config
     Eigen::Isometry3d start_ee_htm_iso = node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
-    Eigen::Matrix4d start_ee_htm;
+    Eigen::Matrix4d start_ee_htm = Eigen::Matrix4d::Identity();
     start_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
     start_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
+    std::cout << "The start EE pose at start is \n" << start_ee_htm << std::endl;
 
     // Solve IK for the cartesian trajectory updating the seed sequentially
     std::optional<std::vector<double>> start_ik_result = node->inverseKinematics("arm", start_ee_htm_iso);
