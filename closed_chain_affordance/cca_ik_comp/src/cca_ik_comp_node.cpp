@@ -10,6 +10,8 @@
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <chrono>
+#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
@@ -37,6 +39,15 @@ class SpotIKSolver : public rclcpp::Node
         kinematic_model_ = model_loader_->getModel();
         robot_state_ = std::make_shared<moveit::core::RobotState>(kinematic_model_);
         robot_state_->setToDefaultValues();
+        joint_group = kinematic_model_->getJointModelGroup("arm");
+
+        auto joint_group_names = kinematic_model_->getJointModelGroupNames();
+        std::cout << "Here are the joint group names: \n";
+        for (const auto &name : joint_group_names)
+        {
+            std::cout << name << std::endl;
+        }
+        std::cout << std::endl;
 
         // Initialize visualization client
         plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
@@ -77,7 +88,36 @@ class SpotIKSolver : public rclcpp::Node
     std::optional<std::vector<double>> inverseKinematics(const std::string &group, const Eigen::Isometry3d &ee_pose)
     {
         std::vector<double> result;
-        const moveit::core::JointModelGroup *const joint_group = kinematic_model_->getJointModelGroup(group);
+        /* const moveit::core::JointModelGroup *const joint_group = kinematic_model_->getJointModelGroup(group); */
+        /* moveit::core::JointModelGroup *const joint_group = kinematic_model_->getJointModelGroup(group); */
+        /* std::cout << "\n\nEE name is " << joint_group->getEndEffectorName() << std::endl << std::endl; */
+        std::cout << "Has an end-effector? " << (kinematic_model_->hasEndEffector("tool_ee") ? "true" : "false")
+                  << std::endl;
+
+        // attach end-effector
+        /* joint_group->attachEndEffector("arm0_tool0"); */
+        auto attached_ee_names = joint_group->getAttachedEndEffectorNames();
+
+        auto joint_names = joint_group->getJointModelNames();
+        auto link_names = joint_group->getLinkModelNames();
+        std::cout << "Here are the joint names: \n";
+        for (const auto &name : joint_names)
+        {
+            std::cout << name << std::endl;
+        }
+        std::cout << std::endl;
+        std::cout << "Here are the link names: \n";
+        for (const auto &name : link_names)
+        {
+            std::cout << name << std::endl;
+        }
+        std::cout << std::endl;
+        std::cout << "Here are the attached EE names: \n";
+        for (const auto &name : attached_ee_names)
+        {
+            std::cout << name << std::endl;
+        }
+        std::cout << std::endl;
         if (robot_state_->setFromIK(joint_group, ee_pose, 0.1))
         {
             robot_state_->copyJointGroupPositions(joint_group, result);
@@ -123,6 +163,21 @@ class SpotIKSolver : public rclcpp::Node
         plan_and_viz_serv_req->robot_description = "robot_description";
         plan_and_viz_serv_req->rviz_fixed_frame = "base_link";
 
+        // Print the message
+        // Loop through each trajectory point
+        std::cout << "\nTrajectory Points:\n";
+        for (const auto &point : goal.trajectory.points)
+        {
+            std::cout << "  Point " << (point.time_from_start.sec + point.time_from_start.nanosec * 1e-9)
+                      << "s:" << std::endl;
+            std::cout << "    Positions: [";
+            for (double pos : point.positions)
+            {
+                std::cout << pos << ", ";
+            }
+            std::cout << "\b\b]\n"; // Remove trailing comma and space
+        }
+
         using namespace std::chrono_literals;
         // Call service to visualize
         while (!plan_and_viz_client_->wait_for_service(1s))
@@ -157,6 +212,7 @@ class SpotIKSolver : public rclcpp::Node
     robot_model_loader::RobotModelLoaderPtr model_loader_;
     moveit::core::RobotModelPtr kinematic_model_;
     moveit::core::RobotStatePtr robot_state_;
+    moveit::core::JointModelGroup *joint_group;
 
   private:
     rclcpp::Logger node_logger_; // logger associated with the node
@@ -179,7 +235,7 @@ int main(int argc, char *argv[])
     Eigen::VectorXd aff_start_state(6);
     aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool
 
-    if (node->setRobotState(aff_start_state))
+    if (!node->setRobotState(aff_start_state))
     {
         std::cerr << "Error: Could not set robot state" << std::endl;
         return 1;
@@ -191,6 +247,28 @@ int main(int argc, char *argv[])
     start_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
     start_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
 
+    // Solve IK for the cartesian trajectory updating the seed sequentially
+    std::optional<std::vector<double>> start_ik_result = node->inverseKinematics("arm", start_ee_htm_iso);
+    if (start_ik_result.has_value())
+    {
+        Eigen::VectorXd start_point =
+            Eigen::Map<Eigen::VectorXd>(start_ik_result.value().data(), start_ik_result.value().size());
+
+        std::cout << "The start solution is \n" << start_point << std::endl;
+
+        // Update robot state
+        bool start_success = node->setRobotState(start_point);
+
+        // Verify forward kinematics makes sense
+        // Compute EE pose at start config
+        Eigen::Isometry3d start_check_ee_htm_iso =
+            node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
+        Eigen::Matrix4d start_check_ee_htm;
+        start_check_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
+        start_check_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
+
+        std::cout << "The check EE pose at start is \n" << start_check_ee_htm << std::endl;
+    }
     // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
     // Compute affordance screw
     // moving a stool
@@ -228,6 +306,7 @@ int main(int argc, char *argv[])
         // Compute cartesian pose
         Eigen::Matrix4d se3mat = AffordanceUtil::VecTose3(aff_twist);
         Eigen::Matrix4d ee_htm = AffordanceUtil::MatrixExp6(se3mat) * start_ee_htm;
+        std::cout << "The EE pose at step " << loop_counter_k << " is \n" << ee_htm << std::endl;
         Eigen::Isometry3d ee_htm_iso;
         ee_htm_iso.linear() = ee_htm.block<3, 3>(0, 0);
         ee_htm_iso.translation() = ee_htm.block<3, 1>(0, 3);
@@ -240,17 +319,31 @@ int main(int argc, char *argv[])
             Eigen::VectorXd point = Eigen::Map<Eigen::VectorXd>(ik_result.value().data(), ik_result.value().size());
             solution.push_back(point);
 
+            std::cout << "The solution at step " << loop_counter_k << " is \n" << point << std::endl;
+
             // Update robot state
             success = node->setRobotState(point);
+
+            // Verify forward kinematics makes sense
+            // Compute EE pose at start config
+            Eigen::Isometry3d check_ee_htm_iso =
+                node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
+            Eigen::Matrix4d check_ee_htm;
+            check_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
+            check_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
+
+            std::cout << "The check EE pose at step " << loop_counter_k << " is \n" << check_ee_htm << std::endl;
 
             // Update the start ee htm
             start_ee_htm = ee_htm;
         }
         else
         {
-            std::cerr << "Error: IK wasn't successful." << std::endl;
+            std::cerr << "Error: IK wasn't successful at iteration " << loop_counter_k << std::endl;
+            success = false;
             break;
         }
+        loop_counter_k += 1;
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -259,7 +352,10 @@ int main(int argc, char *argv[])
     std::cout << "Planning time: " << planning_time.count() << " microseconds" << std::endl;
 
     // Call moveit_plan_and_viz trajectory to visualize the plan
+    /* if (success) */
+    /* { */
     bool viz_success = node->visualize_trajectory(solution);
+    /* } */
 
     rclcpp::shutdown();    // shutdown ROS
     spinner_thread.join(); // join the spinner thread
