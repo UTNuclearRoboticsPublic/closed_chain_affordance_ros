@@ -230,6 +230,14 @@ int main(int argc, char *argv[])
     node->init();
     std::thread spinner_thread([&node]() { rclcpp::spin(node); });
 
+    // Extract robot config info
+    const std::string robot_config_file_path = "/home/crasun/ws_moveit2/src/cca_spot/config/cca_spot_description.yaml";
+    const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
+    Eigen::MatrixXd robot_slist = robotConfig.Slist;
+    std::cout << "Here is the robot slist: \n" << robot_slist;
+    Eigen::Matrix4d M = robotConfig.M;
+
+    const std::string tool_frame = "arm0_tool0";
     auto start_time = std::chrono::high_resolution_clock::now(); // Monitor clock to track planning time
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
@@ -237,38 +245,62 @@ int main(int argc, char *argv[])
 
     if (!node->setRobotState(aff_start_state))
     {
-        std::cerr << "Error: Could not set robot state" << std::endl;
+        std::cerr << "Error: Could not set affordance start config robot state" << std::endl;
         return 1;
     }
 
     // Compute EE pose at start config
-    Eigen::Isometry3d start_ee_htm_iso = node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
-    Eigen::Matrix4d start_ee_htm = Eigen::Matrix4d::Identity();
-    start_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
-    start_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
-    std::cout << "The start EE pose at start is \n" << start_ee_htm << std::endl;
+    /* Eigen::Isometry3d start_ee_htm_iso = node->forwardKinematics(tool_frame); */
+    /* Eigen::Matrix4d start_ee_htm = Eigen::Matrix4d::Identity(); */
+    /* start_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear(); */
+    /* start_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation(); */
+    Eigen::Matrix4d start_ee_htm = AffordanceUtil::FKinSpace(M, robot_slist, aff_start_state);
+    Eigen::Isometry3d start_ee_htm_iso;
+    start_ee_htm_iso.linear() = start_ee_htm.block<3, 3>(0, 0);
+    start_ee_htm_iso.translation() = start_ee_htm.block<3, 1>(0, 3);
+    std::cout << "\n\nThe FK using the AffordanceUtil library is: \n" << start_ee_htm;
+    Eigen::Isometry3d cstart_ee_htm_iso = node->forwardKinematics(tool_frame);
+    Eigen::Matrix4d cstart_ee_htm = Eigen::Matrix4d::Identity();
+    cstart_ee_htm.block<3, 3>(0, 0) = cstart_ee_htm_iso.linear();
+    cstart_ee_htm.block<3, 1>(0, 3) = cstart_ee_htm_iso.translation();
+    std::cout << "\n\nThe FK using MoveIt is: \n" << cstart_ee_htm;
 
     // Solve IK for the cartesian trajectory updating the seed sequentially
-    std::optional<std::vector<double>> start_ik_result = node->inverseKinematics("arm", start_ee_htm_iso);
-    if (start_ik_result.has_value())
+    std::optional<std::vector<double>> start_state_from_ik = node->inverseKinematics("arm", start_ee_htm_iso);
+    if (start_state_from_ik.has_value())
     {
-        Eigen::VectorXd start_point =
-            Eigen::Map<Eigen::VectorXd>(start_ik_result.value().data(), start_ik_result.value().size());
+        Eigen::VectorXd start_state =
+            Eigen::Map<Eigen::VectorXd>(start_state_from_ik.value().data(), start_state_from_ik.value().size());
 
-        std::cout << "The start solution is \n" << start_point << std::endl;
+        // Update robot state and compute FK
+        if (node->setRobotState(start_state))
+        {
 
-        // Update robot state
-        bool start_success = node->setRobotState(start_point);
+            Eigen::Isometry3d start_ee_htm_from_ik = node->forwardKinematics("arm0_tool0");
+            /* std::cout << "\n The FK rot using affordance start state is, FK_aff_rot: \n" <<
+             * start_ee_htm_iso.linear(); */
+            /* std::cout << "\n The FK rot from first computing IK using FK_aff_rot, updating robot state using this "
+             */
+            /*              "solution and then, computing FK is , FK_check_rot: \n" */
+            /*           << start_ee_htm_from_ik.linear(); */
+            /* std::cout << "\n The FK trans using affordance start state is, FK_aff_trans: \n" */
+            /*           << start_ee_htm_iso.translation(); */
+            /* std::cout << "\n The FK trans from first computing IK using FK_aff_trans, updating robot state using this
+             * " */
+            /*              "solution and then, computing FK is , FK_check_trans: \n" */
+            /*           << start_ee_htm_from_ik.translation(); */
+            std::cout << "\n The FK rot from first computing IK using FK_aff_rot, updating robot state using this "
+                         "solution and then, computing FK is , FK_check_rot: \n"
+                      << start_ee_htm_from_ik.linear();
+            std::cout << "\n The FK trans from first computing IK using FK_aff_trans, updating robot state using this "
+                         "solution and then, computing FK is , FK_check_trans: \n"
+                      << start_ee_htm_from_ik.translation();
+        }
+    }
 
-        // Verify forward kinematics makes sense
-        // Compute EE pose at start config
-        Eigen::Isometry3d start_check_ee_htm_iso =
-            node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
-        Eigen::Matrix4d start_check_ee_htm;
-        start_check_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
-        start_check_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
-
-        std::cout << "The check EE pose at start is \n" << start_check_ee_htm << std::endl;
+    else
+    {
+        std::cerr << "Error: Could not compute start config IK to check the setup\n ";
     }
     // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
     // Compute affordance screw
