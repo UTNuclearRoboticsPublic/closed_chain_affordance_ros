@@ -241,7 +241,8 @@ int main(int argc, char *argv[])
     auto start_time = std::chrono::high_resolution_clock::now(); // Monitor clock to track planning time
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
-    aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool
+    /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
+    aff_start_state = Eigen::VectorXd::Zero(6);
 
     if (!node->setRobotState(aff_start_state))
     {
@@ -259,11 +260,17 @@ int main(int argc, char *argv[])
     start_ee_htm_iso.linear() = start_ee_htm.block<3, 3>(0, 0);
     start_ee_htm_iso.translation() = start_ee_htm.block<3, 1>(0, 3);
     std::cout << "\n\nThe FK using the AffordanceUtil library is: \n" << start_ee_htm;
+    std::cout << "\n\nM is: \n" << start_ee_htm;
     Eigen::Isometry3d cstart_ee_htm_iso = node->forwardKinematics(tool_frame);
+    Eigen::Isometry3d T_s_wr = node->forwardKinematics("arm0_wrist_roll");
+    Eigen::Isometry3d correction;
+    correction.matrix() = T_s_wr.inverse().matrix() * start_ee_htm;
+
     Eigen::Matrix4d cstart_ee_htm = Eigen::Matrix4d::Identity();
     cstart_ee_htm.block<3, 3>(0, 0) = cstart_ee_htm_iso.linear();
     cstart_ee_htm.block<3, 1>(0, 3) = cstart_ee_htm_iso.translation();
     std::cout << "\n\nThe FK using MoveIt is: \n" << cstart_ee_htm;
+    std::cout << "\n\nThe correction matrix is : \n" << correction.matrix();
 
     // Solve IK for the cartesian trajectory updating the seed sequentially
     std::optional<std::vector<double>> start_state_from_ik = node->inverseKinematics("arm", start_ee_htm_iso);

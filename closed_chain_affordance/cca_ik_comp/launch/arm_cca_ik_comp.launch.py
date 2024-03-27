@@ -66,7 +66,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "description_package",
-            default_value="spot_description",
+            default_value="spot_arm_moveit_config",
             description="Description package with robot URDF/XACRO files. Usually the argument \
         is not set, it enables use of a custom description.",
         )
@@ -81,7 +81,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "moveit_config_package",
-            default_value="spot_moveit_config",
+            default_value="spot_arm_moveit_config",
             description="MoveIt config package with robot SRDF/XACRO files. Usually the argument \
         is not set, it enables use of a custom moveit config.",
         )
@@ -132,7 +132,7 @@ def generate_launch_description():
             PathJoinSubstitution([FindExecutable(name="xacro")]),
             " ",
             PathJoinSubstitution(
-                [FindPackageShare(description_package), "urdf", description_file]
+                [FindPackageShare(description_package), "config", description_file]
             ),
             " ",
             "safety_limits:=",
@@ -158,13 +158,13 @@ def generate_launch_description():
     robot_description = {"robot_description": robot_description_content}
 
     # MoveIt Configuration
-    srdf_file = get_package_file("spot_moveit_config", "config/spot.srdf")
+    srdf_file = get_package_file("spot_arm_moveit_config", "config/spot.srdf")
     robot_description_semantic_file = load_file(srdf_file)
     robot_description_semantic = {
         "robot_description_semantic": robot_description_semantic_file
     }
 
-    kinematics_yaml = load_yaml("spot_moveit_config", "config/kinematics.yaml")
+    kinematics_yaml = load_yaml("spot_arm_moveit_config", "config/kinematics.yaml")
     robot_description_kinematics = {"robot_description_kinematics": kinematics_yaml}
 
     # Start the actual move_group node/action server
