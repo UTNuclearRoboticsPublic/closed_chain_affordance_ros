@@ -211,7 +211,8 @@ int main(int argc, char *argv[])
     auto start_time = std::chrono::high_resolution_clock::now(); // Monitor clock to track planning time
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
-    aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool
+    /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
+    aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
 
     if (!node->setRobotState(aff_start_state))
@@ -230,14 +231,18 @@ int main(int argc, char *argv[])
     /* // Solve IK for the cartesian trajectory updating the seed sequentially */
     // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
     // Compute affordance screw
-    const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis - moving a stool
-    const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool
-    const Eigen::Matrix<double, 6, 1> aff_screw =
-        AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
+    /* const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis - moving a stool */
+    /* const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool */
+    /* const Eigen::Matrix<double, 6, 1> aff_screw = */
+    /*     AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw */
+    Eigen::VectorXd aff_screw(6);
+    aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer
 
     // Define affordance goal and step
-    const double aff_goal = 0.5 * M_PI; // moving a stool
-    double aff_step = 0.15;             // moving a stool
+    /* const double aff_goal = 0.5 * M_PI; // moving a stool */
+    /* double aff_step = 0.15;             // moving a stool */
+    const double aff_goal = 0.2; // moving a stool
+    double aff_step = 0.05;      // moving a stool
 
     // Compute affordance twist
     Eigen::Matrix<double, 6, 1> aff_twist = aff_screw * aff_step;
@@ -251,6 +256,7 @@ int main(int argc, char *argv[])
 
     // Initialize solution
     std::vector<Eigen::VectorXd> solution;
+    solution.push_back(aff_start_state); // store start config as first point in the solution
 
     while ((loop_counter_k < stepper_max_itr_m) && success)
     {
