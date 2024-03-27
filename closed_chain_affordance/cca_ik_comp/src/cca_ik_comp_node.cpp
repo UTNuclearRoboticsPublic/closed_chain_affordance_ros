@@ -39,7 +39,6 @@ class SpotIKSolver : public rclcpp::Node
         kinematic_model_ = model_loader_->getModel();
         robot_state_ = std::make_shared<moveit::core::RobotState>(kinematic_model_);
         robot_state_->setToDefaultValues();
-        joint_group = kinematic_model_->getJointModelGroup("arm");
 
         auto joint_group_names = kinematic_model_->getJointModelGroupNames();
         std::cout << "Here are the joint group names: \n";
@@ -88,36 +87,7 @@ class SpotIKSolver : public rclcpp::Node
     std::optional<std::vector<double>> inverseKinematics(const std::string &group, const Eigen::Isometry3d &ee_pose)
     {
         std::vector<double> result;
-        /* const moveit::core::JointModelGroup *const joint_group = kinematic_model_->getJointModelGroup(group); */
-        /* moveit::core::JointModelGroup *const joint_group = kinematic_model_->getJointModelGroup(group); */
-        /* std::cout << "\n\nEE name is " << joint_group->getEndEffectorName() << std::endl << std::endl; */
-        std::cout << "Has an end-effector? " << (kinematic_model_->hasEndEffector("tool_ee") ? "true" : "false")
-                  << std::endl;
-
-        // attach end-effector
-        /* joint_group->attachEndEffector("arm0_tool0"); */
-        auto attached_ee_names = joint_group->getAttachedEndEffectorNames();
-
-        auto joint_names = joint_group->getJointModelNames();
-        auto link_names = joint_group->getLinkModelNames();
-        std::cout << "Here are the joint names: \n";
-        for (const auto &name : joint_names)
-        {
-            std::cout << name << std::endl;
-        }
-        std::cout << std::endl;
-        std::cout << "Here are the link names: \n";
-        for (const auto &name : link_names)
-        {
-            std::cout << name << std::endl;
-        }
-        std::cout << std::endl;
-        std::cout << "Here are the attached EE names: \n";
-        for (const auto &name : attached_ee_names)
-        {
-            std::cout << name << std::endl;
-        }
-        std::cout << std::endl;
+        const moveit::core::JointModelGroup *const joint_group = kinematic_model_->getJointModelGroup(group);
         if (robot_state_->setFromIK(joint_group, ee_pose, 0.1))
         {
             robot_state_->copyJointGroupPositions(joint_group, result);
@@ -212,7 +182,6 @@ class SpotIKSolver : public rclcpp::Node
     robot_model_loader::RobotModelLoaderPtr model_loader_;
     moveit::core::RobotModelPtr kinematic_model_;
     moveit::core::RobotStatePtr robot_state_;
-    moveit::core::JointModelGroup *joint_group;
 
   private:
     rclcpp::Logger node_logger_; // logger associated with the node
@@ -234,15 +203,16 @@ int main(int argc, char *argv[])
     const std::string robot_config_file_path = "/home/crasun/ws_moveit2/src/cca_spot/config/cca_spot_description.yaml";
     const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
     Eigen::MatrixXd robot_slist = robotConfig.Slist;
-    std::cout << "Here is the robot slist: \n" << robot_slist;
     Eigen::Matrix4d M = robotConfig.M;
+    std::cout << "Here is the robot slist: \n" << robot_slist;
+    std::cout << "\n and M: \n" << M;
 
     const std::string tool_frame = "arm0_tool0";
     auto start_time = std::chrono::high_resolution_clock::now(); // Monitor clock to track planning time
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
-    /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
-    aff_start_state = Eigen::VectorXd::Zero(6);
+    aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool
+    /* aff_start_state = Eigen::VectorXd::Zero(6); */
 
     if (!node->setRobotState(aff_start_state))
     {
@@ -250,70 +220,18 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Compute EE pose at start config
-    /* Eigen::Isometry3d start_ee_htm_iso = node->forwardKinematics(tool_frame); */
-    /* Eigen::Matrix4d start_ee_htm = Eigen::Matrix4d::Identity(); */
-    /* start_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear(); */
-    /* start_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation(); */
-    Eigen::Matrix4d start_ee_htm = AffordanceUtil::FKinSpace(M, robot_slist, aff_start_state);
-    Eigen::Isometry3d start_ee_htm_iso;
-    start_ee_htm_iso.linear() = start_ee_htm.block<3, 3>(0, 0);
-    start_ee_htm_iso.translation() = start_ee_htm.block<3, 1>(0, 3);
-    std::cout << "\n\nThe FK using the AffordanceUtil library is: \n" << start_ee_htm;
-    std::cout << "\n\nM is: \n" << start_ee_htm;
-    Eigen::Isometry3d cstart_ee_htm_iso = node->forwardKinematics(tool_frame);
-    Eigen::Isometry3d T_s_wr = node->forwardKinematics("arm0_wrist_roll");
-    Eigen::Isometry3d correction;
-    correction.matrix() = T_s_wr.inverse().matrix() * start_ee_htm;
+    // Verify FK computation at the start computation using an independent method, i.e. using AffordanceUtil library
+    /* Eigen::Matrix4d start_ee_htm_au = AffordanceUtil::FKinSpace(M, robot_slist, aff_start_state); */
+    /* std::cout << "\n\nThe FK using the AffordanceUtil library is: \n" << start_ee_htm_au; */
+    // Compute FK
+    Eigen::Isometry3d start_ee_htm = node->forwardKinematics(tool_frame);
+    /* std::cout << "\n\nThe FK using MoveIt is: \n" << start_ee_htm.matrix(); */
 
-    Eigen::Matrix4d cstart_ee_htm = Eigen::Matrix4d::Identity();
-    cstart_ee_htm.block<3, 3>(0, 0) = cstart_ee_htm_iso.linear();
-    cstart_ee_htm.block<3, 1>(0, 3) = cstart_ee_htm_iso.translation();
-    std::cout << "\n\nThe FK using MoveIt is: \n" << cstart_ee_htm;
-    std::cout << "\n\nThe correction matrix is : \n" << correction.matrix();
-
-    // Solve IK for the cartesian trajectory updating the seed sequentially
-    std::optional<std::vector<double>> start_state_from_ik = node->inverseKinematics("arm", start_ee_htm_iso);
-    if (start_state_from_ik.has_value())
-    {
-        Eigen::VectorXd start_state =
-            Eigen::Map<Eigen::VectorXd>(start_state_from_ik.value().data(), start_state_from_ik.value().size());
-
-        // Update robot state and compute FK
-        if (node->setRobotState(start_state))
-        {
-
-            Eigen::Isometry3d start_ee_htm_from_ik = node->forwardKinematics("arm0_tool0");
-            /* std::cout << "\n The FK rot using affordance start state is, FK_aff_rot: \n" <<
-             * start_ee_htm_iso.linear(); */
-            /* std::cout << "\n The FK rot from first computing IK using FK_aff_rot, updating robot state using this "
-             */
-            /*              "solution and then, computing FK is , FK_check_rot: \n" */
-            /*           << start_ee_htm_from_ik.linear(); */
-            /* std::cout << "\n The FK trans using affordance start state is, FK_aff_trans: \n" */
-            /*           << start_ee_htm_iso.translation(); */
-            /* std::cout << "\n The FK trans from first computing IK using FK_aff_trans, updating robot state using this
-             * " */
-            /*              "solution and then, computing FK is , FK_check_trans: \n" */
-            /*           << start_ee_htm_from_ik.translation(); */
-            std::cout << "\n The FK rot from first computing IK using FK_aff_rot, updating robot state using this "
-                         "solution and then, computing FK is , FK_check_rot: \n"
-                      << start_ee_htm_from_ik.linear();
-            std::cout << "\n The FK trans from first computing IK using FK_aff_trans, updating robot state using this "
-                         "solution and then, computing FK is , FK_check_trans: \n"
-                      << start_ee_htm_from_ik.translation();
-        }
-    }
-
-    else
-    {
-        std::cerr << "Error: Could not compute start config IK to check the setup\n ";
-    }
+    /* // Solve IK for the cartesian trajectory updating the seed sequentially */
     // Compute cartesian trajectory from affordance start Pose using affordance screw exponential map
     // Compute affordance screw
-    // moving a stool
-    const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis
-    const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector
+    const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis - moving a stool
+    const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool
     const Eigen::Matrix<double, 6, 1> aff_screw =
         AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
 
@@ -345,34 +263,30 @@ int main(int argc, char *argv[])
 
         // Compute cartesian pose
         Eigen::Matrix4d se3mat = AffordanceUtil::VecTose3(aff_twist);
-        Eigen::Matrix4d ee_htm = AffordanceUtil::MatrixExp6(se3mat) * start_ee_htm;
-        std::cout << "The EE pose at step " << loop_counter_k << " is \n" << ee_htm << std::endl;
-        Eigen::Isometry3d ee_htm_iso;
-        ee_htm_iso.linear() = ee_htm.block<3, 3>(0, 0);
-        ee_htm_iso.translation() = ee_htm.block<3, 1>(0, 3);
+        Eigen::Matrix4d ee_htm_matrix = AffordanceUtil::MatrixExp6(se3mat) * start_ee_htm.matrix();
+        /* std::cout << "The EE pose at step " << loop_counter_k << " is \n" << ee_htm << std::endl; */
+        Eigen::Isometry3d ee_htm(ee_htm_matrix);
 
         // Solve IK for the cartesian trajectory updating the seed sequentially
-        std::optional<std::vector<double>> ik_result = node->inverseKinematics("arm", ee_htm_iso);
+        std::optional<std::vector<double>> ik_result = node->inverseKinematics("arm", ee_htm);
 
         if (ik_result.has_value())
         {
             Eigen::VectorXd point = Eigen::Map<Eigen::VectorXd>(ik_result.value().data(), ik_result.value().size());
             solution.push_back(point);
 
-            std::cout << "The solution at step " << loop_counter_k << " is \n" << point << std::endl;
+            // Print IK solution
+            /* std::cout << "\nThe solution at step " << loop_counter_k << " is \n" << point << std::endl; */
 
             // Update robot state
             success = node->setRobotState(point);
 
             // Verify forward kinematics makes sense
-            // Compute EE pose at start config
-            Eigen::Isometry3d check_ee_htm_iso =
-                node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this?
-            Eigen::Matrix4d check_ee_htm;
-            check_ee_htm.block<3, 3>(0, 0) = start_ee_htm_iso.linear();
-            check_ee_htm.block<3, 1>(0, 3) = start_ee_htm_iso.translation();
+            /* Eigen::Isometry3d check_ee_htm_iso = */
+            /*     node->forwardKinematics("arm0_tool0"); // Where is the base frame set for this? */
 
-            std::cout << "The check EE pose at step " << loop_counter_k << " is \n" << check_ee_htm << std::endl;
+            /* std::cout << "\nThe check EE pose at step " << loop_counter_k << " is \n" */
+            /*           << check_ee_htm_iso.matrix() << std::endl; */
 
             // Update the start ee htm
             start_ee_htm = ee_htm;
@@ -392,10 +306,10 @@ int main(int argc, char *argv[])
     std::cout << "Planning time: " << planning_time.count() << " microseconds" << std::endl;
 
     // Call moveit_plan_and_viz trajectory to visualize the plan
-    /* if (success) */
-    /* { */
-    bool viz_success = node->visualize_trajectory(solution);
-    /* } */
+    if (success)
+    {
+        bool viz_success = node->visualize_trajectory(solution);
+    }
 
     rclcpp::shutdown();    // shutdown ROS
     spinner_thread.join(); // join the spinner thread
