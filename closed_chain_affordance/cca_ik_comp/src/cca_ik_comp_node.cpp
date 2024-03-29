@@ -212,7 +212,8 @@ int main(int argc, char *argv[])
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
     /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
-    aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer
+    /* aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer */
+    aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
 
     if (!node->setRobotState(aff_start_state))
@@ -236,13 +237,16 @@ int main(int argc, char *argv[])
     /* const Eigen::Matrix<double, 6, 1> aff_screw = */
     /*     AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw */
     Eigen::VectorXd aff_screw(6);
-    aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer
+    /* aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer */
+    aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer
 
     // Define affordance goal and step
     /* const double aff_goal = 0.5 * M_PI; // moving a stool */
     /* double aff_step = 0.15;             // moving a stool */
-    const double aff_goal = 0.2; // moving a stool
-    double aff_step = 0.05;      // moving a stool
+    /* const double aff_goal = 0.2; // pushing a drawer */
+    /* double aff_step = 0.05;      // pushing a drawer */
+    const double aff_goal = -0.29; // pulling a drawer
+    double aff_step = -0.05;       // pulling a drawer
 
     // Compute affordance twist
     Eigen::Matrix<double, 6, 1> aff_twist = aff_screw * aff_step;
