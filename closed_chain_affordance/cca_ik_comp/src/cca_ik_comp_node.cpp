@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include << cc_affordance_planner / cc_affordance_planner.hpp>
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <chrono>
@@ -247,6 +248,40 @@ int main(int argc, char *argv[])
     /* double aff_step = 0.05;      // pushing a drawer */
     const double aff_goal = -0.29; // pulling a drawer
     double aff_step = -0.05;       // pulling a drawer
+
+    /********************************************************************************************/
+    /* // Call cc affordance planner */
+    /* const Eigen::MatrixXd cc_slist = */
+    /*     AffordanceUtil::compose_cc_model_slist(robot_slist_, aff_start_state, M, aff_screw); */
+    /* // Construct the CcAffordancePlanner object */
+    /* CcAffordancePlanner ccAffordancePlanner; */
+
+    /* // Set planner parameters */
+    /* auto sign_of = [](double x) { */
+    /*     return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0; */
+    /* }; // Helper lambda to check the sign of affordance goal */
+
+    /* ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step); */
+    /* const double accuracy = 10.0 / 100.0; */
+    /* ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step; */
+
+    /* PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal,
+     * gripper_control_par_tau); */
+
+    /* // Print planner result */
+    /* std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj; */
+    /* if (plannerResult.success) */
+    /* { */
+    /*     RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with " */
+    /*                                          << plannerResult.traj_full_or_partial << " solution, and planning took "
+     */
+    /*                                          << plannerResult.planning_time.count() << " microseconds"); */
+    /* } */
+    /* else */
+    /* { */
+    /*     RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution"); */
+    /* } */
+    /********************************************************************************************/
 
     // Compute affordance twist
     Eigen::Matrix<double, 6, 1> aff_twist = aff_screw * aff_step;

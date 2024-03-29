@@ -16,6 +16,7 @@ find_package(moveit_ros_planning_interface REQUIRED)
 find_package(affordance_util_ros REQUIRED)
 find_package(moveit_plan_and_viz REQUIRED)
 FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
+FIND_LIBRARY(cc_affordance_planner_LIBRARIES cc_affordance_planner /usr/local/lib)
 
 # Include directories for headers
 include_directories(
@@ -26,7 +27,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_ros_planning moveit_ros_planning_interface affordance_util_ros moveit_plan_and_viz)
-target_link_libraries(${PROJECT_NAME}_node affordance_util yaml-cpp Eigen3::Eigen
+target_link_libraries(${PROJECT_NAME}_node affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen
 )
 
 # Install the executables
