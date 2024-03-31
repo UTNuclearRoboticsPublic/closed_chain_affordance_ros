@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include << cc_affordance_planner / cc_affordance_planner.hpp>
+#include "cc_affordance_planner/cc_affordance_planner.hpp"
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <chrono>
@@ -26,6 +26,7 @@ class SpotIKSolver : public rclcpp::Node
   public:
     // Namespaces
     using MoveItPlanAndViz = moveit_plan_and_viz::srv::MoveItPlanAndViz;
+    rclcpp::Logger node_logger_; // logger associated with the node
 
     SpotIKSolver()
         : rclcpp::Node("spot_ik_node"),
@@ -185,7 +186,6 @@ class SpotIKSolver : public rclcpp::Node
     moveit::core::RobotStatePtr robot_state_;
 
   private:
-    rclcpp::Logger node_logger_; // logger associated with the node
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_;
     std::string plan_and_viz_ss_name_; // name of the planning visualization server
     const std::vector<std::string> joint_names_ = {"arm0_shoulder_yaw", "arm0_shoulder_pitch", "arm0_elbow_pitch",
@@ -213,8 +213,9 @@ int main(int argc, char *argv[])
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
     /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
+    aff_start_state << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // turning a valve2
     /* aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer */
-    aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer
+    /* aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer */
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
 
     if (!node->setRobotState(aff_start_state))
@@ -235,52 +236,79 @@ int main(int argc, char *argv[])
     // Compute affordance screw
     /* const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis - moving a stool */
     /* const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool */
-    /* const Eigen::Matrix<double, 6, 1> aff_screw = */
-    /*     AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw */
-    Eigen::VectorXd aff_screw(6);
+    const Eigen::Vector3d aff_screw_axis(-1, 0, 0); // screw axis - turning a valve 2
+    const Eigen::Vector3d aff_screw_axis_location(0.597133, -0.0887238,
+                                                  0.170599); // location vector - turning a valve 2
+    const Eigen::Matrix<double, 6, 1> aff_screw =
+        AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
+    /* Eigen::VectorXd aff_screw(6); */
     /* aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer */
-    aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer
+    /* aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer */
 
     // Define affordance goal and step
     /* const double aff_goal = 0.5 * M_PI; // moving a stool */
     /* double aff_step = 0.15;             // moving a stool */
-    /* const double aff_goal = 0.2; // pushing a drawer */
+    const double aff_goal = -1.5 * M_PI; // turning a valve2
+    double aff_step = 0.2;               // turning a valve2
+    /* const double aff_goal = 0.2;        // pushing a drawer */
     /* double aff_step = 0.05;      // pushing a drawer */
-    const double aff_goal = -0.29; // pulling a drawer
-    double aff_step = -0.05;       // pulling a drawer
+    /* const double aff_goal = -0.29; // pulling a drawer */
+    /* double aff_step = -0.05;       // pulling a drawer */
+    /* const int gripper_control_par_tau = 1; // moving a stool */
+    const int gripper_control_par_tau = 3; // turning a valve2
 
     /********************************************************************************************/
-    /* // Call cc affordance planner */
-    /* const Eigen::MatrixXd cc_slist = */
-    /*     AffordanceUtil::compose_cc_model_slist(robot_slist_, aff_start_state, M, aff_screw); */
-    /* // Construct the CcAffordancePlanner object */
-    /* CcAffordancePlanner ccAffordancePlanner; */
+    // Call cc affordance planner
+    const Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
+    std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl;
 
-    /* // Set planner parameters */
-    /* auto sign_of = [](double x) { */
-    /*     return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0; */
-    /* }; // Helper lambda to check the sign of affordance goal */
+    const Eigen::Matrix4d M_new = AffordanceUtil::FKinSpace(M, robot_slist, aff_start_state);
+    Eigen::Matrix4d M_aff = Eigen::Matrix4d::Identity();
+    M_aff.block<3, 1>(0, 3) = aff_screw_axis_location;
+    std::cout << "\nHere is M_aff: \n" << M_aff << std::endl;
 
-    /* ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step); */
-    /* const double accuracy = 10.0 / 100.0; */
-    /* ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step; */
+    // Convert to body frame
+    /* Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M_new.inverse()) * cc_slist; */
+    /* Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M.inverse()) * cc_slist; */
+    Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M_aff.inverse()) * cc_slist;
+    /* cc_slist_body.col(6) << 1, 0, 0, 0, 0, 0; */
+    /* cc_slist_body.col(7) << 0, 1, 0, 0, 0, 0; */
+    /* cc_slist_body.col(8) << 0, 0, 1, 0, 0, 0; */
+    std::cout << "\nHere is the body-frame screw list: \n" << cc_slist_body << std::endl;
+    Eigen::MatrixXd robot_blist = AffordanceUtil::Adjoint(M.inverse()) * robot_slist;
+    Eigen::MatrixXd robot_jac_body = AffordanceUtil::JacobianBody(robot_blist, aff_start_state);
+    std::cout << "\nHere is the body-frame robot jacobian: \n" << robot_jac_body << std::endl;
+
+    // Construct the CcAffordancePlanner object
+    CcAffordancePlanner ccAffordancePlanner;
+
+    // Set planner parameters
+    auto sign_of = [](double x) {
+        return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
+    }; // Helper lambda to check the sign of affordance goal
+
+    ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
+    const double accuracy = 10.0 / 100.0;
+    ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step;
 
     /* PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal,
      * gripper_control_par_tau); */
+    PlannerResult plannerResult =
+        ccAffordancePlanner.affordance_stepper(cc_slist_body, aff_goal, gripper_control_par_tau);
 
-    /* // Print planner result */
-    /* std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj; */
-    /* if (plannerResult.success) */
-    /* { */
-    /*     RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with " */
-    /*                                          << plannerResult.traj_full_or_partial << " solution, and planning took "
-     */
-    /*                                          << plannerResult.planning_time.count() << " microseconds"); */
-    /* } */
-    /* else */
-    /* { */
-    /*     RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution"); */
-    /* } */
+    // Print planner result
+    std::vector<Eigen::VectorXd> cca_solution = plannerResult.joint_traj;
+    if (plannerResult.success)
+    {
+        RCLCPP_INFO_STREAM(node->node_logger_, "Planner succeeded with " << plannerResult.traj_full_or_partial
+                                                                         << " solution, and planning took "
+                                                                         << plannerResult.planning_time.count()
+                                                                         << " microseconds");
+    }
+    else
+    {
+        RCLCPP_INFO_STREAM(node->node_logger_, "Planner did not find a solution");
+    }
     /********************************************************************************************/
 
     // Compute affordance twist

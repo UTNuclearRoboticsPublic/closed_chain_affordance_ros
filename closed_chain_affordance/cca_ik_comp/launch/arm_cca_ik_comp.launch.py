@@ -171,8 +171,8 @@ def generate_launch_description():
     cca_ik_comp_node = Node(
         package="cca_ik_comp",
         executable="cca_ik_comp_node",
-        prefix=["xterm -e gdb -ex run --args"],
-        emulate_tty=True,
+        # prefix=["xterm -e gdb -ex run --args"],
+        # emulate_tty=True,
         output="screen",
         parameters=[
             robot_description,

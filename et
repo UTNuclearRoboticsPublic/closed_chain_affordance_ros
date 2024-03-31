@@ -1,0 +1,229 @@
+[33m1ef6b7d[m[33m ([m[1;36mHEAD -> [m[1;32mik_comp[m[33m)[m backup progress
+[33m1cf761c[m[33m ([m[1;31morigin/ik_comp[m[33m)[m add cc affordance call
+[33m5f87c1d[m add pulling a drawer data
+[33mf89a3c6[m add pushing a drawer data
+[33mcc8839f[m cleanup code
+[33mf31b8a1[m fix reference frame issue for setup check
+[33mf4b68c4[m add functionality to compute FK using the AffordanceUtil library
+[33m173ce1a[m ensure FK and IK make sense
+[33mcd324cf[m backup progress
+[33me877d6d[m add file to launch cca_ik_comp node
+[33m4bcc13c[m add moving_a_stool data and track planning time
+[33m2448bd2[m add trajectory visualization function
+[33m09374ff[m refine comp ik algorithm
+[33mda45398[m backup progress
+[33m9ccdb64[m backup successfully building cca_ik_comp pkg setup
+[33m5ca78cd[m[33m ([m[1;31morigin/ros_galactic[m[33m, [m[1;32mros_galactic[m[33m)[m pass parameter by const ref to visualize_and_execute_traj
+[33m6d80c59[m[33m ([m[1;32mmoveit_ik_comp[m[33m)[m update README.md
+[33m3aa1d27[m add Doxygen documentation
+[33mb3527cf[m remove commented-out code
+[33m646e053[m update README.md
+[33m8cbbce3[m update README.md
+[33m5cbb55f[m update README.md
+[33m16f82b4[m update README.md
+[33m5eb7d1e[m update README.md
+[33m44dbba5[m remove cca_<robot> package for kinova
+[33m2aa01d7[m remove cca_<robot> package for kinova
+[33mfb5ebd0[m remove cca_spot package
+[33mdd8adef[m update README.md
+[33m59ebada[m update README.md
+[33m983eeba[m rename ros directory to closed_chain_affordance
+[33m4f27b1e[m update README.md
+[33mee381e2[m update README.md
+[33m4581b86[m rename cca_<robot> package creator script
+[33m297e047[m rename cc_affordance_spot_description as cca_spot
+[33m66011c6[m encapsulate irrelevant code from cc_affordance_<robot>description
+[33mfd741a9[m remove dependency on affordance_util_ros
+[33m9c2fb1b[m remove affordance apriltag read from here
+[33me492612[m move affordance apriltag read from cc_affordance_<robot>_description pkg to here
+[33m885f140[m add line to export ROS dependencies for downstream ROS packages
+[33mc2b6c83[m start work on encapsulating cc_affordance_planner_ros
+[33m3da3c87[m add cc affordance description for kinova
+[33m2841f22[m fill out robot info for visualization in srv
+[33m33fc4e4[m modify code to send robot info via srv and not global parameter server
+[33m5466194[m add parameter retrieval from global parameter server
+[33mf7e566c[m add bash script to automate cc_affordance_robot_description package creation
+[33m43984dc[m fill out service request with frame names
+[33maecb585[m add ros_setup.yaml and launch files for cc_affordance_spot_description
+[33mdf60c4d[m add tool and ref frame names to the service request
+[33m88782f1[m setup code to receive robot-specific info from the parameter server
+[33m37c61e1[m update README.md
+[33m42ed7a0[m update README.md
+[33m4bbec5b[m add package.xml dependencies to specify build order
+[33mb971c2d[m remove superfluous print statements
+[33m4354b06[m backup for the day
+[33m07a6efe[m backup progress
+[33mcc68966[m fix ROS info printing and logger declaration issue
+[33m4e93403[m add custom srv dependency on trajectory_msgs
+[33mccb6975[m add installation call for config directory
+[33m1958264[m make callback names more descriptive
+[33m893d4e1[m remove superfluous directories
+[33m75f18d2[m convert cc_affordance_spot_description package to ROS2
+[33mcbd67ae[m backup successfully compiling code
+[33m452b468[m backup progress
+[33mfb2d7dc[m backup cc_affordance_planner housekeeping setup
+[33mcfb91b0[m cleanup moveit plan and viz node
+[33mdbf4af1[m cleanup moveit plan and viz node
+[33mb3d0198[m clean up moveit plan and viz node
+[33m36212fe[m backup successfully compiling code
+[33maa67042[m backup progress for the day
+[33m54a9071[m add ament dependencies to moveit source packages
+[33mf1ec8ec[m end of day backup
+[33mb5b1500[m backup successful cmake setup for message generation
+[33mcc3ece2[m backup successful translation of affordance_util_ros
+[33mdd8ff68[m link project library against Eigen library
+[33m2ca738b[m translate to ROS2 and change timestamp type in JointTrajPoint
+[33maff2f59[m translate affordance_util_ros housekeeping setup to ROS2
+[33m72d9ebb[m[33m ([m[1;31morigin/ros_noetic[m[33m, [m[1;32mros_noetic[m[33m)[m update README.md
+[33m88ae809[m initial commit
+[33mfae411b[m update task planner parameters and start config thetalist per new experiments
+[33m2621d8b[m add turning a valve4 planner data
+[33m2c9f335[m add turning a valve2 planner data
+[33md6cadbf[m add moving a stool planner data
+[33m2a22df4[m add pulling a drawer planner data
+[33m64b3c6b[m add cc spot description and remove old cc_affordance_planner ROS pkg
+[33m0a65c15[m backup for the day
+[33m61246d9[m add header
+[33m632d175[m backup working planning time testing code
+[33mef49ead[m make server names variables
+[33mb5f9352[m update joint_traj_and_tf_recorder to be compatible with AffordanceUtilROS update
+[33m27de4d6[m backup successfully compiling code
+[33mfefc703[m backup changes to cc_affordance_planner_ros
+[33m0319c1f[m add try catch block inside get_filepath_inside_pkg function
+[33m93c18d8[m remove superfluous header
+[33ma05d9ac[m add get_filepath_inside_pkg function and custom exception class
+[33me0296f8[m add runtime error exception for bad yaml file
+[33m146a48b[m add compose_cc_model_slist and get_screw functions and modify robot_build to only return robot screws
+[33ma9c4775[m add minor updates to comments
+[33md806f10[m add Doxygen documentation
+[33m6facf84[m add header
+[33m75d097a[m move affordance_util.cpp inside affordance_util folder
+[33mfa037cb[m update tester to have 1% accuracy
+[33m93cbd79[m add header
+[33md80c995[m add planning time print statement
+[33m704b25b[m update algorithm 2 and return planning time as planner result
+[33m60eec3e[m Add planning time to planning result and update doxygen doc
+[33m8ba070a[m fix syntax convention
+[33m677db04[m Update Doxygen documentation
+[33mf5b55f7[m backup progress
+[33mc66e6ac[m backup successful modification test
+[33ma41f34a[m modify per paper algorithm
+[33m80f98cf[m update README.md
+[33m1e0e545[m place Matlab code inside an src folder
+[33m441a27b[m delete spring24_paper data from main
+[33m0984516[m crop setup images
+[33m5e89b79[m add experiment photographs
+[33m0ede9d3[m add task-specific plotting script and modify plot images to look visually better in Overleaf
+[33m44ad2f6[m add video to turning_a_valve4 data collection
+[33meb65e8a[m add turning a valve data
+[33m54ff06b[m add pushing_a_drawer data
+[33m615b24e[m routine backup
+[33m1327bc2[m fix intermittent client-server connection issue by moving client's init to the constructor, major bug fix
+[33m4006e23[m add missing last point in the cartesian trajectory marker array
+[33md29e699[m backup for the day
+[33mcaec9eb[m add moving_a_stool data
+[33me7affbb[m increase lookup transform time
+[33m1abad59[m update free_pure_rotation data
+[33m4a6bf6f[m update free_pure_translation data
+[33m9e74f9b[m update moveit pipeline request start state
+[33m88380db[m add additional info to pull_drawer data record
+[33m6b42553[m remove superfluous lines of code
+[33m3b1f007[m modify script to start timestamp at 0
+[33m2086554[m backup pure rotation data
+[33md68b7c1[m modify follow_joint_trajectory_msg_builder to have first point as the offset point itself
+[33m01a1758[m set precision for writing to file
+[33ma9c77ba[m add script to plot joint states along with ee position
+[33mae6ceed[m save pulling_a_drawer task data
+[33m983055b[m Move threshold calculation back into the constructor and change accuracy to 10%
+[33m0b591f3[m make accuracy accessible post constructor and print planning time
+[33md8257cd[m save free pure translation data and backup for the day
+[33me66678a[m backup free pure rotation data
+[33m56feb03[m update script to show equal aspect ratio: requires matplotlib>3.6
+[33m1cdfb70[m some changes to ensure joint_traj topic is properly listened to and ctrl+c is heard
+[33m3a0ba6e[m update cc robot description path
+[33m304f8e1[m backup working code
+[33m9199651[m backup for the day
+[33m7215bf4[m add functionality to find cc_description based on package name
+[33mbb788ec[m Extract and implement the ROS part for cc_affordance_planner
+[33mde51b78[m change config_offset type from std::vector to Eigen::Vector type
+[33m7bf0db4[m implement cc_affordance_planner as a separate cpp package
+[33m41b9685[m ignore build folders
+[33mb7afded[m extract moveit_plan_and_viz from cc_affordance_planner as separate ros pkg
+[33mb6abafb[m remove superflous CMakeList calls
+[33m1f83dcb[m minor syntax fix
+[33m21dc693[m remove superfluous thread declaration
+[33mb43a63e[m streamline code
+[33m1d3e42e[m implement successful ctrl+c signal handling
+[33md22a3f2[m make minor code improvement
+[33me71253e[m implement std::thread and condition variables and clean up code
+[33mb8a9f9e[m remove tf2_ros
+[33mb8e9935[m link affordance_util_ros against catkin_libraries
+[33ma57005a[m fix CMakeLists.txt to build with affordance_util_ros
+[33m48e6480[m include affordance_util_ros library and header for use
+[33md845148[m add installation calls
+[33m4979cd7[m start work on affordance_util_ros library
+[33m7932c8d[m link data_recorder node against yaml-cpp
+[33m2eec3dc[m backup fully working code
+[33ma8810c3[m backup for the day
+[33mfd22028[m fix discrepancy between actual and predicted data recording
+[33m6ab0327[m add python script and data folder and backup for the day
+[33m307ca00[m backup compiling package
+[33mfd4a79c[m add joint_traj_and_tf_recorder ros package
+[33mbd772f3[m get robot_config from yaml file using affordance_util library
+[33m94f1420[m update README.md with info about linking the affordance_util library
+[33m3d7b861[m link libraries in correct order
+[33mf3b7a5e[m change to adopt new affordance_util structure
+[33mb044021[m add the PIC flag info for shared objects to README.md
+[33me9b6171[m update README.md
+[33m20b081e[m add YAML encoder for Eigen::VectorXd type
+[33mb63129a[m fix tool name
+[33m99a96d6[m change AffordanceUtil from class to namespace and add robot_builder
+[33m3b03d46[m backup working code
+[33m8d75371[m fix wrong predicted path plotting issue
+[33m36aee50[m streamline data recording
+[33m992d2a6[m fix last iteration dangling qsd issue and remove print statements
+[33m38b2607[m backup before cuda install
+[33mb02ad35[m add intermediary configs to the valve turning demo
+[33mb09b54c[m fix minor issues with taskOffset and update current guesses from the last IK soln
+[33m372c9c8[m backup minor changes
+[33m1d0cf10[m change detection camera to hand_color and change tag name to affordance_frame
+[33md3cd817[m add a way to build robot from yaml file
+[33m94794f5[m add visualization of tool
+[33mb6b9b7a[m add gitignore to ignore swap files
+[33mf932f37[m furnish moveit_plan_and_viz_server code
+[33m6bf3148[m add moveit plan and viz server skeleton and its custom srv
+[33m3cbf1fd[m update code such that screw axis origin is with detected tag
+[33md185bf1[m add initial april tag detection setup
+[33m56f03ab[m add screw data extraction at the right place
+[33mc49c65e[m add data_recorder script
+[33m28003f7[m add virtual joints to initial jacobian calculation
+[33m1c91c14[m add start config for stool moving task
+[33mddfa097[m add direct action client for follow_joint_trajectory as
+[33md53f10f[m add start config joint state for testing moving a stool
+[33mcf9762e[m streamline code
+[33mb00e4c4[m add Matlab result image for tester comparison
+[33m8c8397d[m add closure error threshold
+[33m81dd94b[m modify per streamlined cc planner library
+[33mccca83a[m document and streamline code
+[33m0a1a111[m backup working code: pure rot and trans both working
+[33m2f9c5fa[m add moveit planning and execution: working demo on spot
+[33m04490df[m add Spot arm info and have planner successfully give a solution
+[33m6a14737[m add planner library tester and confirm it's working as in Matlab
+[33m7cec048[m backup for the day
+[33m58da587[m streamline code and add affordance_util library
+[33m79400c9[m update README.md
+[33me8b8bef[m add installation info
+[33me7746f7[m add nearZero and test it along with log functions
+[33mb54baa7[m translate more code from Matlab
+[33m84b5457[m add log functions
+[33md0e2f88[m fix tf lookup issue
+[33mb82b731[m start planner code
+[33m6e900ca[m add extraction of screw axes from tf data
+[33m57aab62[m backup for the day
+[33mb1356aa[m add tester, fix library functions, and add gitignore
+[33m8273b52[m rename files
+[33m0b71a47[m start cpp translation work
+[33m53d486a[m Fix manipulator animation initial view issue
+[33mb97c0e9[m streamline code
+[33mc12ab47[m initial commit
+[33ma02dd1e[m Initial commit
