@@ -42,25 +42,56 @@ class SpotIKSolver : public rclcpp::Node
         robot_state_ = std::make_shared<moveit::core::RobotState>(kinematic_model_);
         robot_state_->setToDefaultValues();
 
-        auto joint_group_names = kinematic_model_->getJointModelGroupNames();
-        std::cout << "Here are the joint group names: \n";
-        for (const auto &name : joint_group_names)
-        {
-            std::cout << name << std::endl;
-        }
-        std::cout << std::endl;
-
         // Initialize visualization client
         plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
 
-        ROS_INFO("Loaded model for Spot robot, with model frame %s", kinematic_model_->getModelFrame().c_str());
+        // Print robot info
+        print_robot_info();
     }
 
-    bool setRobotState(const Eigen::VectorXd &joint_positions)
+    void print_robot_info()
+    {
+        ROS_INFO("Loaded model for %s robot, with model frame %s", kinematic_model_->getName().c_str(),
+                 kinematic_model_->getModelFrame().c_str());
+        auto joint_group_names = kinematic_model_->getJointModelGroupNames();
+        ROS_INFO("The robot has the following joint groups and joints:");
+        for (const auto &joint_group_name : joint_group_names)
+        {
+            const moveit::core::JointModelGroup *const joint_group =
+                kinematic_model_->getJointModelGroup(joint_group_name);
+            std::ostringstream oss;
+            for (const auto &joint_name : joint_group->getJointModelNames())
+            {
+                oss << joint_name << ", ";
+            }
+            // Remove the trailing comma and space
+            std::string joint_names = oss.str();
+            if (!joint_names.empty())
+            {
+                joint_names = joint_names.substr(0, joint_names.size() - 2);
+            }
+            ROS_INFO("Joint group \"%s\" with joint names: %s", joint_group_name.c_str(), joint_names.c_str());
+        }
+    }
+    std::unordered_map<std::string, double> setup_robot_state_values(const Eigen::VectorXd joint_positions)
+    {
+
+        std::unordered_map<std::string, double> joint_values; // result
+
+        // Populate the map from the vector (assuming order matches)
+        for (int i = 0; i < joint_names_.size(); ++i)
+        {
+            joint_values[joint_names_[i]] = joint_positions[i];
+        }
+
+        return joint_values;
+    }
+
+    bool setRobotState(const std::unordered_map<std::string, double> &joint_values)
     {
         try
         {
-            std::unordered_map<std::string, double> joint_values = setup_robot_state_values(joint_positions);
+            /* std::unordered_map<std::string, double> joint_values = setup_robot_state_values(joint_positions); */
             for (const auto &[name, position] : joint_values)
             {
                 robot_state_->setJointPositions(name, &position);
@@ -97,20 +128,6 @@ class SpotIKSolver : public rclcpp::Node
         }
         else
             return {};
-    }
-
-    std::unordered_map<std::string, double> setup_robot_state_values(const Eigen::VectorXd joint_positions)
-    {
-
-        std::unordered_map<std::string, double> joint_values; // result
-
-        // Populate the map from the vector (assuming order matches)
-        for (int i = 0; i < joint_names_.size(); ++i)
-        {
-            joint_values[joint_names_[i]] = joint_positions[i];
-        }
-
-        return joint_values;
     }
 
     // Function to create a shifted goal from FollowJointTrajectory_Goal
@@ -262,8 +279,18 @@ int main(int argc, char *argv[])
     /* aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer */
     aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
+    const std::unordered_map<std::string, double> start_joint_state = {
+        {"arm0_shoulder_yaw", aff_start_state[0]},
+        {"arm0_shoulder_pitch", aff_start_state[1]},
+        {"arm0_elbow_pitch", aff_start_state[2]},
+        {"arm0_elbow_roll", aff_start_state[3]},
+        {"arm0_wrist_pitch", aff_start_state[4]},
+        {"arm0_wrist_roll", aff_start_state[5]}}; // assuming states are in that order
+    /* const std::vector<std::string> joint_names_ = {"arm0_shoulder_yaw", {"arm0_shoulder_pitch",},
+     * {"arm0_elbow_pitch",}, */
+    /* {"arm0_elbow_roll",},   {"arm0_wrist_pitch",},     {"arm0_wrist_roll"}}; */
 
-    if (!node->setRobotState(aff_start_state))
+    if (!node->setRobotState(start_joint_state))
     {
         std::cerr << "Error: Could not set affordance start config robot state" << std::endl;
         return 1;
@@ -414,7 +441,11 @@ int main(int argc, char *argv[])
             /* std::cout << "\nThe solution at step " << loop_counter_k << " is \n" << point << std::endl; */
 
             // Update robot state
-            success = node->setRobotState(point);
+            std::unordered_map<std::string, double> joint_state = {
+                {"arm0_shoulder_yaw", point[0]}, {"arm0_shoulder_pitch", point[1]},
+                {"arm0_elbow_pitch", point[2]},  {"arm0_elbow_roll", point[3]},
+                {"arm0_wrist_pitch", point[4]},  {"arm0_wrist_roll", point[5]}}; // assuming states are in that order
+            success = node->setRobotState(joint_state);
 
             // Verify forward kinematics makes sense
             /* Eigen::Isometry3d check_ee_htm_iso = */
