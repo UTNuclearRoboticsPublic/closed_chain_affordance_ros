@@ -113,28 +113,62 @@ class SpotIKSolver : public rclcpp::Node
         return joint_values;
     }
 
+    // Function to create a shifted goal from FollowJointTrajectory_Goal
+    std::unique_ptr<control_msgs::action::FollowJointTrajectory_Goal> createShiftedGoal(
+        const control_msgs::action::FollowJointTrajectory_Goal &goal)
+    {
+        if (goal.trajectory.points.empty())
+        {
+            return nullptr; // Handle empty goal case
+        }
+
+        std::unique_ptr<control_msgs::action::FollowJointTrajectory_Goal> shifted_goal(
+            new control_msgs::action::FollowJointTrajectory_Goal);
+
+        // Copy points starting at the second point in the trajectory
+        auto it = std::next(goal.trajectory.points.begin());
+        for (; it != goal.trajectory.points.end(); ++it)
+        {
+            shifted_goal->trajectory.points.push_back(*it);
+        }
+
+        // Reset time_from_start as before
+        for (size_t i = 0; i <= shifted_goal->trajectory.points.size(); ++i)
+        {
+            shifted_goal->trajectory.points[i].time_from_start = goal.trajectory.points[i].time_from_start;
+        }
+        // Print corrected message
+        // Loop through each trajectory point
+        std::cout << "\nCorrected Trajectory Points:\n";
+        for (const auto &point : shifted_goal->trajectory.points)
+        {
+            std::cout << "  Point " << (point.time_from_start.sec + point.time_from_start.nanosec * 1e-9)
+                      << "s:" << std::endl;
+            std::cout << "    Positions: [";
+            for (double pos : point.positions)
+            {
+                std::cout << pos << ", ";
+            }
+            std::cout << "\b\b]\n"; // Remove trailing comma and space
+        }
+        std::cout << std::flush;
+
+        return shifted_goal;
+    }
+
     // Function to visualize and execute planned trajectory
-    bool visualize_trajectory(std::vector<Eigen::VectorXd> trajectory)
+    bool visualize_trajectory(std::vector<Eigen::VectorXd> trajectory,
+                              const Eigen::VectorXd &aff_start_state = Eigen::VectorXd::Zero(6),
+                              const bool moveit_flag = false)
     {
         // Visualize trajectory in RVIZ
         // Convert the solution trajectory to ROS message type
         const double traj_time_step = 0.3;
-        const control_msgs::action::FollowJointTrajectory_Goal goal =
-            AffordanceUtilROS::follow_joint_trajectory_msg_builder(
-                trajectory, Eigen::VectorXd::Zero(6), joint_names_,
-                traj_time_step); // this function takes care of extracting the right
-                                 // number of joint_states although solution
-                                 // contains qs data too
-
-        // Fill out service request
-        auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
-        plan_and_viz_serv_req->joint_traj = goal.trajectory;
-        plan_and_viz_serv_req->ref_frame = "arm0_base_link";
-        plan_and_viz_serv_req->tool_frame = "arm0_tool0";
-        plan_and_viz_serv_req->planning_group = "arm";
-        plan_and_viz_serv_req->robot_description = "robot_description";
-        plan_and_viz_serv_req->rviz_fixed_frame = "base_link";
-
+        control_msgs::action::FollowJointTrajectory_Goal goal = AffordanceUtilROS::follow_joint_trajectory_msg_builder(
+            trajectory, aff_start_state, joint_names_,
+            traj_time_step); // this function takes care of extracting the right
+                             // number of joint_states although solution
+                             // contains qs data too
         // Print the message
         // Loop through each trajectory point
         std::cout << "\nTrajectory Points:\n";
@@ -149,6 +183,17 @@ class SpotIKSolver : public rclcpp::Node
             }
             std::cout << "\b\b]\n"; // Remove trailing comma and space
         }
+        if (moveit_flag)
+            goal = *createShiftedGoal(goal);
+
+        // Fill out service request
+        auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
+        plan_and_viz_serv_req->joint_traj = goal.trajectory;
+        plan_and_viz_serv_req->ref_frame = "arm0_base_link";
+        plan_and_viz_serv_req->tool_frame = "arm0_tool0";
+        plan_and_viz_serv_req->planning_group = "arm";
+        plan_and_viz_serv_req->robot_description = "robot_description";
+        plan_and_viz_serv_req->rviz_fixed_frame = "base_link";
 
         using namespace std::chrono_literals;
         // Call service to visualize
@@ -213,9 +258,9 @@ int main(int argc, char *argv[])
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
     /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
-    aff_start_state << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // turning a valve2
+    /* aff_start_state << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // turning a valve2 */
     /* aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer */
-    /* aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer */
+    aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
 
     if (!node->setRobotState(aff_start_state))
@@ -236,48 +281,48 @@ int main(int argc, char *argv[])
     // Compute affordance screw
     /* const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis - moving a stool */
     /* const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool */
-    const Eigen::Vector3d aff_screw_axis(-1, 0, 0); // screw axis - turning a valve 2
-    const Eigen::Vector3d aff_screw_axis_location(0.597133, -0.0887238,
-                                                  0.170599); // location vector - turning a valve 2
-    const Eigen::Matrix<double, 6, 1> aff_screw =
-        AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
-    /* Eigen::VectorXd aff_screw(6); */
+    /* const Eigen::Vector3d aff_screw_axis(-1, 0, 0); // screw axis - turning a valve 2 */
+    /* const Eigen::Vector3d aff_screw_axis_location(0.597133, -0.0887238, */
+    /*                                               0.170599); // location vector - turning a valve 2 */
+    /* const Eigen::Matrix<double, 6, 1> aff_screw = */
+    /* AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw */
+    Eigen::VectorXd aff_screw(6);
     /* aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer */
-    /* aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer */
+    aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer
 
     // Define affordance goal and step
     /* const double aff_goal = 0.5 * M_PI; // moving a stool */
     /* double aff_step = 0.15;             // moving a stool */
-    const double aff_goal = -1.5 * M_PI; // turning a valve2
-    double aff_step = 0.2;               // turning a valve2
-    /* const double aff_goal = 0.2;        // pushing a drawer */
+    /* const double aff_goal = -1.5 * M_PI; // turning a valve2 */
+    /* double aff_step = 0.2;               // turning a valve2 */
+    /* const double aff_goal = 0.2; // pushing a drawer */
     /* double aff_step = 0.05;      // pushing a drawer */
-    /* const double aff_goal = -0.29; // pulling a drawer */
-    /* double aff_step = -0.05;       // pulling a drawer */
-    /* const int gripper_control_par_tau = 1; // moving a stool */
-    const int gripper_control_par_tau = 3; // turning a valve2
+    const double aff_goal = -0.29;         // pulling a drawer
+    double aff_step = 0.05;                // pulling a drawer
+    const int gripper_control_par_tau = 1; // moving a stool
+    /* const int gripper_control_par_tau = 3; // turning a valve2 */
 
     /********************************************************************************************/
     // Call cc affordance planner
     const Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
     std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl;
 
-    const Eigen::Matrix4d M_new = AffordanceUtil::FKinSpace(M, robot_slist, aff_start_state);
-    Eigen::Matrix4d M_aff = Eigen::Matrix4d::Identity();
-    M_aff.block<3, 1>(0, 3) = aff_screw_axis_location;
-    std::cout << "\nHere is M_aff: \n" << M_aff << std::endl;
+    /* const Eigen::Matrix4d M_new = AffordanceUtil::FKinSpace(M, robot_slist, aff_start_state); */
+    /* Eigen::Matrix4d M_aff = Eigen::Matrix4d::Identity(); */
+    /* M_aff.block<3, 1>(0, 3) = aff_screw_axis_location; */
+    /* std::cout << "\nHere is M_aff: \n" << M_aff << std::endl; */
 
     // Convert to body frame
     /* Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M_new.inverse()) * cc_slist; */
     /* Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M.inverse()) * cc_slist; */
-    Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M_aff.inverse()) * cc_slist;
+    /* Eigen::MatrixXd cc_slist_body = AffordanceUtil::Adjoint(M_aff.inverse()) * cc_slist; */
     /* cc_slist_body.col(6) << 1, 0, 0, 0, 0, 0; */
     /* cc_slist_body.col(7) << 0, 1, 0, 0, 0, 0; */
     /* cc_slist_body.col(8) << 0, 0, 1, 0, 0, 0; */
-    std::cout << "\nHere is the body-frame screw list: \n" << cc_slist_body << std::endl;
-    Eigen::MatrixXd robot_blist = AffordanceUtil::Adjoint(M.inverse()) * robot_slist;
-    Eigen::MatrixXd robot_jac_body = AffordanceUtil::JacobianBody(robot_blist, aff_start_state);
-    std::cout << "\nHere is the body-frame robot jacobian: \n" << robot_jac_body << std::endl;
+    /* std::cout << "\nHere is the body-frame screw list: \n" << cc_slist_body << std::endl; */
+    /* Eigen::MatrixXd robot_blist = AffordanceUtil::Adjoint(M.inverse()) * robot_slist; */
+    /* Eigen::MatrixXd robot_jac_body = AffordanceUtil::JacobianBody(robot_blist, aff_start_state); */
+    /* std::cout << "\nHere is the body-frame robot jacobian: \n" << robot_jac_body << std::endl; */
 
     // Construct the CcAffordancePlanner object
     CcAffordancePlanner ccAffordancePlanner;
@@ -291,10 +336,10 @@ int main(int argc, char *argv[])
     const double accuracy = 10.0 / 100.0;
     ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step;
 
-    /* PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal,
-     * gripper_control_par_tau); */
-    PlannerResult plannerResult =
-        ccAffordancePlanner.affordance_stepper(cc_slist_body, aff_goal, gripper_control_par_tau);
+    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau);
+    aff_step = -0.05; // pulling a drawer
+    /* PlannerResult plannerResult = */
+    /*     ccAffordancePlanner.affordance_stepper(cc_slist_body, aff_goal, gripper_control_par_tau); */
 
     // Print planner result
     std::vector<Eigen::VectorXd> cca_solution = plannerResult.joint_traj;
@@ -304,6 +349,23 @@ int main(int argc, char *argv[])
                                                                          << " solution, and planning took "
                                                                          << plannerResult.planning_time.count()
                                                                          << " microseconds");
+
+        // Convert the solution trajectory to ROS message type
+        const std::vector<std::string> joint_names_ = {"arm0_shoulder_yaw", "arm0_shoulder_pitch", "arm0_elbow_pitch",
+                                                       "arm0_elbow_roll",   "arm0_wrist_pitch",    "arm0_wrist_roll"};
+        const double traj_time_step = 0.3;
+        const control_msgs::action::FollowJointTrajectory_Goal goal =
+            AffordanceUtilROS::follow_joint_trajectory_msg_builder(
+                cca_solution, aff_start_state, joint_names_,
+                traj_time_step); // this function takes care of extracting the right
+                                 // number of joint_states although solution
+                                 // contains qs data too
+        std::cout << "\nThe solution from the CCA planner is:\n";
+        for (const auto &point : goal.trajectory.points)
+        {
+            std::cout << point.positions[0] << "," << point.positions[1] << "," << point.positions[2] << ","
+                      << point.positions[3] << "," << point.positions[4] << "," << point.positions[5] << std::endl;
+        }
     }
     else
     {
@@ -381,7 +443,8 @@ int main(int argc, char *argv[])
     // Call moveit_plan_and_viz trajectory to visualize the plan
     if (success)
     {
-        bool viz_success = node->visualize_trajectory(solution);
+        /* bool viz_success = node->visualize_trajectory(solution, true); */
+        bool viz_success = node->visualize_trajectory(cca_solution, aff_start_state);
     }
 
     rclcpp::shutdown();    // shutdown ROS
