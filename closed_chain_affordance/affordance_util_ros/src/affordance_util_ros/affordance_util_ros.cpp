@@ -201,40 +201,67 @@ control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_bui
 {
     control_msgs::action::FollowJointTrajectory_Goal fjtg_msg;
 
+    const double tolerance = 1e-6; // tolerace for zero
+
     // Set the joint names
     fjtg_msg.trajectory.joint_names = joint_names;
 
-    fjtg_msg.trajectory.points.resize(bare_trajectory.size() +
-                                      1); // Resize points array before filling to bare_trajectory.size()+1
-                                          // since the first point will be the config_offset itself
-
-    // Add the first point with config_offset
-    trajectory_msgs::msg::JointTrajectoryPoint &first_point = fjtg_msg.trajectory.points[0];
-    first_point.time_from_start = rclcpp::Duration::from_seconds(0.0);
-    ; // Start time is 0
-    first_point.positions.resize(joint_names.size());
-    for (size_t i = 0; i < joint_names.size(); i++)
+    if (config_offset.isMuchSmallerThan(tolerance)) // If offset is 0 then, just fill out message without adjustments
     {
-        first_point.positions[i] = config_offset[i];
+        fjtg_msg.trajectory.points.resize(bare_trajectory.size());
+        // Fill out the trajectory with bare_trajectory
+        size_t j = 0;
+        for (const Eigen::VectorXd &point : bare_trajectory)
+        {
+            trajectory_msgs::msg::JointTrajectoryPoint &trajectory_point = fjtg_msg.trajectory.points[j];
+
+            // Fill out point times
+            trajectory_point.time_from_start = rclcpp::Duration::from_seconds(j * time_step);
+
+            // Fill out position values
+            trajectory_point.positions.resize(joint_names.size()); // resize positions array before filling
+            for (size_t i = 0; i < joint_names.size(); i++)
+            {
+                trajectory_point.positions[i] = point[i];
+            }
+
+            j++;
+        }
     }
-
-    // Fill out the rest of the trajectory with bare_trajectory
-    size_t j = 1; // Start with 1 to skip the first point
-    for (const Eigen::VectorXd &point : bare_trajectory)
+    else // If offset is non-zero then, make offset the first point and the rest shifted by the offset. Time starts from
+         // the first point.
     {
-        trajectory_msgs::msg::JointTrajectoryPoint &trajectory_point = fjtg_msg.trajectory.points[j];
-
-        // Fill out point times
-        trajectory_point.time_from_start = rclcpp::Duration::from_seconds(j * time_step);
-
-        // Fill out position values
-        trajectory_point.positions.resize(joint_names.size()); // resize positions array before filling
+        fjtg_msg.trajectory.points.resize(bare_trajectory.size() +
+                                          1); // Resize points array before filling to bare_trajectory.size()+1
+                                              // since the first point will be the config_offset itself
+        // Add the first point with config_offset
+        trajectory_msgs::msg::JointTrajectoryPoint &first_point = fjtg_msg.trajectory.points[0];
+        first_point.time_from_start = rclcpp::Duration::from_seconds(0.0);
+        // Start time is 0
+        first_point.positions.resize(joint_names.size());
         for (size_t i = 0; i < joint_names.size(); i++)
         {
-            trajectory_point.positions[i] = point[i] + config_offset[i];
+            first_point.positions[i] = config_offset[i];
         }
 
-        j++;
+        // Fill out the rest of the trajectory with bare_trajectory
+        size_t j = 1;
+        for (const Eigen::VectorXd &point : bare_trajectory)
+        {
+            trajectory_msgs::msg::JointTrajectoryPoint &trajectory_point = fjtg_msg.trajectory.points[j];
+
+            // Fill out point times
+            trajectory_point.time_from_start = rclcpp::Duration::from_seconds(j * time_step);
+
+            // Fill out position values
+            trajectory_point.positions.resize(joint_names.size()); // resize positions array before filling
+            for (size_t i = 0; i < joint_names.size(); i++)
+            {
+                trajectory_point.positions[i] = point[i] + config_offset[i];
+            }
+
+            j++;
+        }
     }
 
     return fjtg_msg;
