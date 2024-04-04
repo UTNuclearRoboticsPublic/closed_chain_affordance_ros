@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "cc_affordance_planner/cc_affordance_planner.hpp"
+#include "control_msgs/action/follow_joint_trajectory.hpp"
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <chrono>
@@ -117,20 +118,13 @@ class SpotIKSolver : public rclcpp::Node
             return {};
     }
 
-    std::optional<control_msgs::action::FollowJointTrajectory_Goal> call_cca_planner(
-        const std::string &robot_description, const Eigen::VectorXd aff_start_state,
-        const Eigen::Matrix<double, 6, 1> &aff_screw, const double &aff_goal, const int &gripper_control_par_tau = 1,
-        const double &aff_step, const double &accuracy = 10.0 / 100.0)
+    std::optional<std::vector<Eigen::VectorXd>> call_cca_planner(const Eigen::MatrixXd &cc_slist,
+                                                                 const Eigen::VectorXd aff_start_state,
+                                                                 const Eigen::Matrix<double, 6, 1> &aff_screw,
+                                                                 const double &aff_goal, const double &aff_step,
+                                                                 const int &gripper_control_par_tau = 1,
+                                                                 const double &accuracy = 10.0 / 100.0)
     {
-        const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
-        const Eigen::MatrixXd robot_slist = robotConfig.Slist;
-        const Eigen::Matrix4d M = robotConfig.M;
-        const std::string joint_names = robotConfig.joint_names;
-
-        // Create closed-chain screws
-        const Eigen::MatrixXd cc_slist =
-            AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
-        std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl;
 
         // Construct the CcAffordancePlanner object
         CcAffordancePlanner ccAffordancePlanner;
@@ -153,61 +147,50 @@ class SpotIKSolver : public rclcpp::Node
         std::vector<Eigen::VectorXd> cca_solution = plannerResult.joint_traj;
         if (plannerResult.success)
         {
-            RCLCPP_INFO_STREAM(node->node_logger_, "Planner succeeded with " << plannerResult.traj_full_or_partial
-                                                                             << " solution, and planning took "
-                                                                             << plannerResult.planning_time.count()
-                                                                             << " microseconds");
-
-            // Convert the solution trajectory to ROS message type
-            const std::vector<std::string> joint_names_ = {"arm0_shoulder_yaw", "arm0_shoulder_pitch",
-                                                           "arm0_elbow_pitch",  "arm0_elbow_roll",
-                                                           "arm0_wrist_pitch",  "arm0_wrist_roll"};
-            const double traj_time_step = 0.3;
-            const control_msgs::action::FollowJointTrajectory_Goal goal =
-                AffordanceUtilROS::follow_joint_trajectory_msg_builder(
-                    cca_solution, aff_start_state, joint_names_,
-                    traj_time_step); // this function takes care of extracting the right
-                                     // number of joint_states although solution
-                                     // contains qs data too
-            std::cout << "\nThe solution from the CCA planner is:\n";
-            for (const auto &point : goal.trajectory.points)
-            {
-                std::cout << point.positions[0] << "," << point.positions[1] << "," << point.positions[2] << ","
-                          << point.positions[3] << "," << point.positions[4] << "," << point.positions[5] << std::endl;
-            }
-            return goal;
+            RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with " << plannerResult.traj_full_or_partial
+                                                                       << " solution, and planning took "
+                                                                       << plannerResult.planning_time.count()
+                                                                       << " microseconds");
+            return cca_solution;
         }
         else
         {
-            RCLCPP_INFO_STREAM(node->node_logger_, "Planner did not find a solution");
+            RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution");
             return {};
         }
     }
 
-    std::optional<control_msgs::action::FollowJointTrajectory_Goal> call_standard_planner(
-        const std::string &planning_group, const std::string &joint_names, const std::string &tool_frame,
-        const Eigen::VectorXd aff_start_state, const Eigen::Matrix<double, 6, 1> &aff_screw,
-        const double &aff_goal const double &aff_step, const double &accuracy = 10.0 / 100.0)
+    std::optional<std::vector<Eigen::VectorXd>> call_standard_planner(
+        const std::string &planning_group, const std::vector<std::string> &joint_names, const std::string &tool_frame,
+        const Eigen::VectorXd aff_start_state, const Eigen::Matrix<double, 6, 1> &aff_screw, const double &aff_goal,
+        double aff_step, const double &accuracy = 10.0 / 100.0)
     {
+
+        // Set planner parameters
+        auto sign_of = [](double x) {
+            return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
+        }; // Helper lambda to check the sign of affordance goal
+
+        aff_step = sign_of(aff_goal) * abs(aff_step);
         auto start_time = std::chrono::high_resolution_clock::now(); // Monitor clock to track planning time
 
         // Set start state
-        const std::unordered_map<std::string, double> start_joint_state;
+        std::unordered_map<std::string, double> start_joint_state;
 
-        for (size_t = 0; i < joint_names.size(); ++i)
+        for (size_t i = 0; i < joint_names.size(); ++i)
         {
             start_joint_state[joint_names[i]] =
                 aff_start_state[i]; // assuming joint_names and aff_start_state elements are in the same order
         }
 
-        if (!node->setRobotState(start_joint_state))
+        if (!this->setRobotState(start_joint_state))
         {
-            RCLCPP_ERROR("Could not set affordance start config robot state")
+            RCLCPP_ERROR(node_logger_, "Could not set affordance start config robot state");
             return {};
         }
 
         // Compute FK
-        Eigen::Isometry3d start_ee_htm = node->forwardKinematics(tool_frame);
+        Eigen::Isometry3d start_ee_htm = this->forwardKinematics(tool_frame);
 
         // Compute affordance twist
         Eigen::Matrix<double, 6, 1> aff_twist = aff_screw * aff_step;
@@ -215,13 +198,15 @@ class SpotIKSolver : public rclcpp::Node
         // Compute of max number of loop iterations based on affordance goal and affordance step
         const int stepper_max_itr_m = aff_goal / aff_step + 1;
 
+        std::cout << "MAX ITER:" << stepper_max_itr_m << std::endl;
+
         // Initialize loop condition parameters
         int loop_counter_k = 0;
         bool success = true;
 
         // Initialize solution
         std::vector<Eigen::VectorXd> trajectory;
-        solution.push_back(aff_start_state); // store start config as first point in the solution
+        trajectory.push_back(aff_start_state); // store start config as first point in the solution
 
         while ((loop_counter_k < stepper_max_itr_m) && success)
         {
@@ -239,21 +224,23 @@ class SpotIKSolver : public rclcpp::Node
             Eigen::Isometry3d ee_htm(ee_htm_matrix);
 
             // Solve IK for the cartesian trajectory updating the seed sequentially
-            std::optional<std::vector<double>> ik_result = node->inverseKinematics(planning_group, ee_htm);
+            std::optional<std::vector<double>> ik_result = this->inverseKinematics(planning_group, ee_htm);
+            std::cout << "Here is the start ee htm: \n" << ee_htm_matrix << std::endl;
 
             if (ik_result.has_value())
             {
                 Eigen::VectorXd point = Eigen::Map<Eigen::VectorXd>(ik_result.value().data(), ik_result.value().size());
                 trajectory.push_back(point);
 
+                std::cout << "IK solution is: \n" << point << std::endl;
                 // Update robot state
                 std::unordered_map<std::string, double> joint_state;
-                for (size_t = 0; i < joint_names.size(); ++i)
+                for (size_t i = 0; i < joint_names.size(); ++i)
                 {
                     joint_state[joint_names[i]] =
                         point[i]; // assuming joint_names and point elements are in the same order
                 }
-                success = node->setRobotState(joint_state);
+                success = this->setRobotState(joint_state);
 
                 // Update the start ee htm
                 start_ee_htm = ee_htm;
@@ -272,68 +259,39 @@ class SpotIKSolver : public rclcpp::Node
 
         std::cout << "Standard stepper planning time: " << planning_time.count() << " microseconds" << std::endl;
 
-        if (!trajectory.empty())
+        if (success) // If it is 1 then, it just pushed the aff start state
         {
-            // Convert the solution trajectory to ROS message type
-            const double traj_time_step = 0.3;
-            control_msgs::action::FollowJointTrajectory_Goal goal =
-                AffordanceUtilROS::follow_joint_trajectory_msg_builder(
-                    trajectory, aff_start_state, joint_names_,
-                    traj_time_step); // this function takes care of extracting the right
-                                     // number of joint_states although solution
-                                     // contains qs data too
-            // Print the message
-            // Loop through each trajectory point
-            std::cout << "\nTrajectory Points:\n";
-            for (const auto &point : goal.trajectory.points)
+            std::cout << "Trajectory before visualization:\n";
+            for (const auto &point : trajectory)
             {
-                std::cout << "  Point " << (point.time_from_start.sec + point.time_from_start.nanosec * 1e-9)
-                          << "s:" << std::endl;
-                std::cout << "    Positions: [";
-                for (double pos : point.positions)
-                {
-                    std::cout << pos << ", ";
-                }
-                std::cout << "\b\b]\n"; // Remove trailing comma and space
+                std::cout << point.transpose() << std::endl;
             }
-            goal = *createShiftedGoal(goal);
-            return goal
+            return trajectory;
         }
         else
         {
+            std::cerr << "IK wasn't successful" << std::endl;
 
-            return {}
+            return {};
         }
     }
 
-    // Function to create a shifted goal from FollowJointTrajectory_Goal
-    std::unique_ptr<control_msgs::action::FollowJointTrajectory_Goal> createShiftedGoal(
-        const control_msgs::action::FollowJointTrajectory_Goal &goal)
+    // Function to visualize planned trajectory
+    bool visualize_trajectory(const std::vector<Eigen::VectorXd> &trajectory,
+                              const std::vector<std::string> joint_names, const Eigen::VectorXd &config_offset)
     {
-        if (goal.trajectory.points.empty())
-        {
-            return nullptr; // Handle empty goal case
-        }
 
-        std::unique_ptr<control_msgs::action::FollowJointTrajectory_Goal> shifted_goal(
-            new control_msgs::action::FollowJointTrajectory_Goal);
-
-        // Copy points starting at the second point in the trajectory
-        auto it = std::next(goal.trajectory.points.begin());
-        for (; it != goal.trajectory.points.end(); ++it)
-        {
-            shifted_goal->trajectory.points.push_back(*it);
-        }
-
-        // Reset time_from_start as before
-        for (size_t i = 0; i <= shifted_goal->trajectory.points.size(); ++i)
-        {
-            shifted_goal->trajectory.points[i].time_from_start = goal.trajectory.points[i].time_from_start;
-        }
-        // Print corrected message
+        // Convert the solution trajectory to ROS message type
+        const double traj_time_step = 0.3;
+        control_msgs::action::FollowJointTrajectory_Goal goal = AffordanceUtilROS::follow_joint_trajectory_msg_builder(
+            trajectory, config_offset, joint_names,
+            traj_time_step); // this function takes care of extracting the right
+                             // number of joint_states although solution
+                             // contains qs data too
+        // Print the message
         // Loop through each trajectory point
-        std::cout << "\nCorrected Trajectory Points:\n";
-        for (const auto &point : shifted_goal->trajectory.points)
+        std::cout << "\nTrajectory Points:\n";
+        for (const auto &point : goal.trajectory.points)
         {
             std::cout << "  Point " << (point.time_from_start.sec + point.time_from_start.nanosec * 1e-9)
                       << "s:" << std::endl;
@@ -345,14 +303,6 @@ class SpotIKSolver : public rclcpp::Node
             std::cout << "\b\b]\n"; // Remove trailing comma and space
         }
         std::cout << std::flush;
-
-        return shifted_goal;
-    }
-
-    // Function to visualize planned trajectory
-    bool visualize_trajectory(const control_msgs::FollowJointTrajectory_Goal &goal)
-    {
-
         // Fill out service request
         auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
         plan_and_viz_serv_req->joint_traj = goal.trajectory;
@@ -408,10 +358,17 @@ int main(int argc, char *argv[])
     node->init();
     std::thread spinner_thread([&node]() { rclcpp::spin(node); });
 
+    const std::string planner = "standard";
+    /* const std::string planner = "cca"; */
+
     // Extract robot config info
     const std::string robot_config_file_path = "/home/crasun/ws_moveit2/src/cca_spot/config/cca_spot_description.yaml";
     const std::string planning_group = "arm";
-    const std::string tool_frame = "arm0_tool0";
+    const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
+    const Eigen::MatrixXd robot_slist = robotConfig.Slist;
+    const Eigen::Matrix4d M = robotConfig.M;
+    const std::vector<std::string> joint_names = robotConfig.joint_names;
+    const std::string tool_frame = robotConfig.tool_name;
 
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
@@ -445,14 +402,37 @@ int main(int argc, char *argv[])
     const int gripper_control_par_tau = 1; // moving a stool
     /* const int gripper_control_par_tau = 3; // turning a valve2 */
 
-    // Call CCA planner
-    std::optional<control_msgs::action::FollowJointTrajectory_Goal> planner_result = node->call_standard_planner(
-        planning_group, joint_names, tool_frame, aff_start_state, aff_screw, aff_goal, aff_step);
-
-    if (planner_result.has_value())
+    if (planner == "cca")
     {
-        node->visualize_trajectory(planner_result.value());
+        // Call CCA planner
+        // Create closed-chain screws
+        const Eigen::MatrixXd cc_slist =
+            AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
+        std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl;
+        std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner(
+            cc_slist, aff_start_state, aff_screw, aff_goal, aff_step, gripper_control_par_tau, 10.0 / 100.0);
+        if (planner_result.has_value())
+        {
+            const Eigen::VectorXd config_offset = aff_start_state;
+            node->visualize_trajectory(planner_result.value(), joint_names, config_offset);
+        }
     }
+    else if (planner == "standard")
+    {
+        // Call standard planner
+        std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_standard_planner(
+            planning_group, joint_names, tool_frame, aff_start_state, aff_screw, aff_goal, aff_step, 10.0 / 100.0);
+        if (planner_result.has_value())
+        {
+            const Eigen::VectorXd config_offset = Eigen::VectorXd::Zero(aff_start_state.size());
+            node->visualize_trajectory(planner_result.value(), joint_names, config_offset);
+        }
+    }
+    else
+    {
+        RCLCPP_ERROR(node->node_logger_, "Wrong planner name");
+    }
+
     rclcpp::shutdown();    // shutdown ROS
     spinner_thread.join(); // join the spinner thread
     return 0;

@@ -15,6 +15,7 @@ find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(affordance_util_ros REQUIRED)
 find_package(moveit_plan_and_viz REQUIRED)
+find_package(control_msgs REQUIRED)
 FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
 FIND_LIBRARY(cc_affordance_planner_LIBRARIES cc_affordance_planner /usr/local/lib)
 
