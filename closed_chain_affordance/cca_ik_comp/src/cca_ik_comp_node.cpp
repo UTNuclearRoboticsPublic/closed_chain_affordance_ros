@@ -157,10 +157,11 @@ class SpotIKSolver : public rclcpp::Node
         std::vector<Eigen::VectorXd> cca_solution = plannerResult.joint_traj;
         if (plannerResult.success)
         {
-            RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with " << plannerResult.traj_full_or_partial
-                                                                       << " solution, and planning took "
-                                                                       << plannerResult.planning_time.count()
-                                                                       << " microseconds");
+            RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with "
+                                                 << plannerResult.traj_full_or_partial << " solution, planning took "
+                                                 << plannerResult.planning_time.count() << " microseconds, and "
+                                                 << plannerResult.update_method << " update method was used."
+                                                 << std::endl;);
             std::cout << "\nHere is the entire trajectory:\n";
             for (const auto &point : cca_solution)
             {
@@ -409,19 +410,19 @@ int main(int argc, char *argv[])
     // Define affordance goal and step
     /* const double aff_goal = 0.5 * M_PI; // moving a stool */
     /* double aff_step = 0.15;             // moving a stool */
-    const double aff_goal = 4.0 * M_PI; // turning a valve2
+    const double aff_goal = 1.5 * M_PI; // turning a valve2
     double aff_step = 0.2;              // turning a valve2
     /* const double aff_goal = 0.2; // pushing a drawer */
     /* double aff_step = 0.05;      // pushing a drawer */
     /* const double aff_goal = 0.29; // pulling a drawer */
     /* double aff_step = 0.05;       // pulling a drawer */
     /* const int gripper_control_par_tau = 1; // moving a stool */
-    const int gripper_control_par_tau = 2; // turning a valve2
-    /* const int gripper_control_par_tau = 3; // turning a valve2 */
+    /* const int gripper_control_par_tau = 2; // turning a valve2 */
+    const int gripper_control_par_tau = 3; // turning a valve2
     /* const int gripper_control_par_tau = 4; // turning a valve2 */
     /* const Eigen::Matrix<double, 1, 1> sec_goal(aff_goal); */
-    const Eigen::Matrix<double, 2, 1> sec_goal(-0.2, aff_goal);
-    /* const Eigen::Matrix<double, 3, 1> sec_goal(0.0, 0.0, aff_goal); */
+    /* const Eigen::Matrix<double, 2, 1> sec_goal(-0.2, aff_goal); */
+    const Eigen::Matrix<double, 3, 1> sec_goal(0.0, 0.0, aff_goal);
     /* const Eigen::Matrix<double, 4, 1> sec_goal(0.0, 0.0, 0.0, aff_goal); */
 
     if (planner == "cca")
@@ -448,7 +449,7 @@ int main(int argc, char *argv[])
         /* std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner( */
         /*     cc_slist, aff_start_state, aff_screw, aff_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
         std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner(
-            cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0);
+            cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 10.0 / 100.0);
         /* std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner( */
         /*     new_cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
         if (planner_result.has_value())
