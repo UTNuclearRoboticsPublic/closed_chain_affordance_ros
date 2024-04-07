@@ -76,6 +76,23 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         node_handle_ = this->shared_from_this();
         executor_->add_node(this->shared_from_this());
         std::thread([this]() { executor_->spin(); }).detach();
+
+        // Initialize planning parameters
+        robot_model_loader = std::make_shared<robot_model_loader::RobotModelLoader>(node_handle_);
+        psm = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle_, robot_model_loader);
+        robot_model = robot_model_loader->getModel();
+        /* robot_state = std::make_shared<moveit::core::RobotState>(robot_model); */
+        planning_pipeline = std::make_shared<planning_pipeline::PlanningPipeline>(
+            robot_model, node_handle_, "planning_plugin", "request_adapters");
+        robot_state = std::make_shared<moveit::core::RobotState>(
+            planning_scene_monitor::LockedPlanningSceneRO(psm)
+                ->getCurrentState()); // planning scene is locked while reading robot
+        joint_model_group = robot_model->getJointModelGroup("arm");
+        psm->startSceneMonitor();
+        psm->startWorldGeometryMonitor(); // listens to world geometry, collision objects and (optionally) octomap
+                                          // changes
+        psm->startStateMonitor(
+            "/spot_driver/joint_states"); // listens to joint state updates and attached collision object changes
     }
 
   private:
@@ -92,6 +109,13 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
 
+    robot_model_loader::RobotModelLoaderPtr robot_model_loader;
+    planning_scene_monitor::PlanningSceneMonitorPtr psm;
+    moveit::core::RobotModelPtr robot_model;
+    planning_pipeline::PlanningPipelinePtr planning_pipeline;
+    moveit::core::RobotStatePtr robot_state;
+    moveit::core::JointModelGroup *joint_model_group;
+
     // Methods
     void moveit_plan_and_viz_server_callback_(
         const std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Request> serv_req,
@@ -99,32 +123,54 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     {
         // Basic housekeeping for planning, need robot model and planning scene monitor, which observes changes in
         // planning scene
-        robot_model_loader::RobotModelLoaderPtr robot_model_loader(
-            new robot_model_loader::RobotModelLoader(node_handle_, serv_req->robot_description));
+        /* robot_model_loader::RobotModelLoaderPtr robot_model_loader( */
+        /*     new robot_model_loader::RobotModelLoader(node_handle_, serv_req->robot_description)); */
 
-        planning_scene_monitor::PlanningSceneMonitorPtr psm(
-            new planning_scene_monitor::PlanningSceneMonitor(node_handle_, robot_model_loader));
+        /* planning_scene_monitor::PlanningSceneMonitorPtr psm( */
+        /*     new planning_scene_monitor::PlanningSceneMonitor(node_handle_, robot_model_loader)); */
 
         // Start listening to changes in the planning scene
-        psm->startSceneMonitor();
-        psm->startWorldGeometryMonitor(); // listens to world geometry, collision objects and (optionally) octomap
-                                          // changes
-        psm->startStateMonitor();         // listens to joint state updates and attached collision object changes
+        /* psm->startSceneMonitor(); */
+        /* psm->startWorldGeometryMonitor(); // listens to world geometry, collision objects and (optionally) octomap */
+        // changes
+        /* psm->startStateMonitor();         // listens to joint state updates and attached collision object changes */
 
         // Get robot model
-        moveit::core::RobotModelPtr robot_model = robot_model_loader->getModel();
+        /* moveit::core::RobotModelPtr robot_model = robot_model_loader->getModel(); */
 
         // Create planning pipeline object using the robot model
-        planning_pipeline::PlanningPipelinePtr planning_pipeline(
-            new planning_pipeline::PlanningPipeline(robot_model, node_handle_, "planning_plugin", "request_adapters"));
+        /* planning_pipeline::PlanningPipelinePtr planning_pipeline( */
+        /*     new planning_pipeline::PlanningPipeline(robot_model, node_handle_, "planning_plugin",
+         * "request_adapters")); */
 
         // Visualization using MoveIt Visual Tools
         namespace rvt = rviz_visual_tools;
+        rvt::RvizVisualToolsPtr visual_tools_;
         moveit_visual_tools::MoveItVisualTools visual_tools(node_handle_, serv_req->ref_frame, "moveit_plan_and_viz",
                                                             psm);
-        // Delete old markers and clear up screen
-        visual_tools.deleteAllMarkers();
 
+        visual_tools_.reset(
+            new rvt::RvizVisualTools("base_link", "/rviz_visual_tools", dynamic_cast<rclcpp::Node *>(this)));
+        // create publisher before waiting
+        visual_tools_->loadMarkerPub();
+        bool has_sub = visual_tools_->waitForMarkerSub(1.0);
+        if (!has_sub)
+            RCLCPP_INFO(get_logger(), "/rviz_visual_tools does not have a subscriber after 10s. "
+                                      "Visualizations may be lost");
+
+        // Create pose
+        Eigen::Isometry3d pose;
+        pose = Eigen::AngleAxisd(M_PI / 4, Eigen::Vector3d::UnitY()); // rotate along X axis by 45 degrees
+        pose.translation() = Eigen::Vector3d(0.1, 0.1, 0.1);          // translate x,y,z
+
+        // Clear messages
+        visual_tools_->deleteAllMarkers();
+        visual_tools_->enableBatchPublishing();
+        // Publish arrow vector of pose
+        visual_tools_->publishArrow(pose, rviz_visual_tools::RED, rviz_visual_tools::LARGE);
+
+        // Don't forget to trigger the publisher!
+        visual_tools_->trigger();
         // Create motion plan request
         planning_interface::MotionPlanRequest req;
         planning_interface::MotionPlanResponse res;
@@ -135,16 +181,16 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         moveit_msgs::msg::MotionPlanResponse response;
 
         // To ensure we plan from the current state of the robot, get the most up-to-date state
-        moveit::core::RobotStatePtr robot_state(new moveit::core::RobotState(
-            planning_scene_monitor::LockedPlanningSceneRO(psm)
-                ->getCurrentState())); // planning scene is locked while reading robot
-                                       // state to ensure no changes happen during the reading
+        /* moveit::core::RobotStatePtr robot_state(new moveit::core::RobotState( */
+        /*     planning_scene_monitor::LockedPlanningSceneRO(psm) */
+        /*         ->getCurrentState())); // planning scene is locked while reading robot */
+        // state to ensure no changes happen during the reading
         moveit::core::robotStateToRobotStateMsg(
             *robot_state, req.start_state); // update the planning request start state to be this current state
 
         // Create a JointModelGroup to keep track of the group we are planning for
-        const moveit::core::JointModelGroup *joint_model_group =
-            robot_state->getJointModelGroup(serv_req->planning_group);
+        /* const moveit::core::JointModelGroup *joint_model_group = */
+        /* robot_state->getJointModelGroup(serv_req->planning_group); */
 
         // Extract the joint trajectory from the service request and plan and visualize for every subsequent points in
         // the trajectory
@@ -154,7 +200,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         visualization_msgs::msg::MarkerArray ee_traj;               // entire trajectory
         visualization_msgs::msg::Marker ee_traj_point;              // a point within trajectory
         ee_traj_point.header.frame_id = serv_req->rviz_fixed_frame; // frame of reference for markers
-        ee_traj_point.ns = "ee_trajectory";
+        ee_traj_point.ns = "ee_origin";
         ee_traj_point.type = visualization_msgs::msg::Marker::SPHERE;
         ee_traj_point.action = visualization_msgs::msg::Marker::ADD;
         ee_traj_point.scale.x = 0.01;
@@ -165,6 +211,44 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         ee_traj_point.color.g = 1.0;
         ee_traj_point.color.b = 0.0;
 
+        visualization_msgs::msg::Marker ee_traj_arrow_x;
+        ee_traj_arrow_x.header.frame_id = serv_req->rviz_fixed_frame;
+        ee_traj_arrow_x.ns = "ee_x_axis";
+        ee_traj_arrow_x.type = visualization_msgs::msg::Marker::ARROW;
+        ee_traj_arrow_x.action = visualization_msgs::msg::Marker::ADD;
+        ee_traj_arrow_x.scale.x = 0.1;
+        ee_traj_arrow_x.scale.y = 0.01;
+        ee_traj_arrow_x.scale.z = 0.01;
+        ee_traj_arrow_x.color.a = 1.0;
+        ee_traj_arrow_x.color.r = 1.0;
+        ee_traj_arrow_x.color.g = 0.0;
+        ee_traj_arrow_x.color.b = 0.0;
+
+        visualization_msgs::msg::Marker ee_traj_arrow_y;
+        ee_traj_arrow_y.header.frame_id = serv_req->rviz_fixed_frame;
+        ee_traj_arrow_y.ns = "ee_y_axis";
+        ee_traj_arrow_y.type = visualization_msgs::msg::Marker::ARROW;
+        ee_traj_arrow_y.action = visualization_msgs::msg::Marker::ADD;
+        ee_traj_arrow_y.scale.x = 0.1;
+        ee_traj_arrow_y.scale.y = 0.01;
+        ee_traj_arrow_y.scale.z = 0.01;
+        ee_traj_arrow_y.color.a = 1.0;
+        ee_traj_arrow_y.color.r = 0.0;
+        ee_traj_arrow_y.color.g = 1.0;
+        ee_traj_arrow_y.color.b = 0.0;
+
+        visualization_msgs::msg::Marker ee_traj_arrow_z;
+        ee_traj_arrow_z.header.frame_id = serv_req->rviz_fixed_frame;
+        ee_traj_arrow_z.ns = "ee_z_axis";
+        ee_traj_arrow_z.type = visualization_msgs::msg::Marker::ARROW;
+        ee_traj_arrow_z.action = visualization_msgs::msg::Marker::ADD;
+        ee_traj_arrow_z.scale.x = 0.1;
+        ee_traj_arrow_z.scale.y = 0.01;
+        ee_traj_arrow_z.scale.z = 0.01;
+        ee_traj_arrow_z.color.a = 1.0;
+        ee_traj_arrow_z.color.r = 0.0;
+        ee_traj_arrow_z.color.g = 0.0;
+        ee_traj_arrow_z.color.b = 1.0;
         for (size_t j = 0; j < lof_joint_traj; j++)
         {
             // Extract the next joint trajectory point from the service request for planning
@@ -220,13 +304,94 @@ class MoveItPlanAndVizServer : public rclcpp::Node
             waypoint.orientation.z = ee_quat.z();
             waypoint.orientation.w = ee_quat.w();
 
-            // Update EE trajectory marker characteristics
+            // Update EE trajectory origin marker characteristics
             ee_traj_point.header.stamp = this->get_clock()->now();
             ee_traj_point.id = j;
             ee_traj_point.pose = waypoint; // Assuming waypoints contain Pose information
 
+            /* // Update EE trajectory x-axis marker characteristics */
+            /* Eigen::Vector3d axis_direction; */
+            /* std::cout << "Here is ee_htm.linear\n" << ee_htm.linear() << std::endl; */
+            /* Eigen::Vector3d x_axis = ee_htm * Eigen::Vector4d(1, 0, 0, 1).head<3>(); */
+            /* Eigen::Vector3d y_axis = ee_htm * Eigen::Vector4d(0, 1, 0, 1).head<3>(); */
+            /* Eigen::Vector3d z_axis = ee_htm * Eigen::Vector4d(0, 0, 1, 1).head<3>(); */
+            /* std::cout << "Here is ee_htm.linear.col(0)\n" << x_axis << std::endl; */
+            /* std::cout << "Here is ee_htm.linear.col(1)\n" << y_axis << std::endl; */
+            /* std::cout << "Here is ee_htm.linear.col(2)\n" << z_axis << std::endl; */
+            /* /1* Eigen::Quaterniond ee_orientation(waypoint.orientation.w, waypoint.orientation.x,
+             * waypoint.orientation.y, */
+            /*  *1/ */
+            /* /1*                                   waypoint.orientation.z); *1/ */
+            ee_traj_arrow_x.header.stamp = this->get_clock()->now();
+            ee_traj_arrow_x.id = j * 2;
+            /* /1* ee_traj_arrow_x.pose.position.x = ee_htm.translation().x(); *1/ */
+            /* /1* ee_traj_arrow_x.pose.position.y = ee_htm.translation().y(); *1/ */
+            /* /1* ee_traj_arrow_x.pose.position.z = ee_htm.translation().z(); *1/ */
+            /* /1* Eigen::Vector3d x_axis(1, 0, 0); *1/ */
+            /* /1* axis_direction = (ee_orientation * x_axis).normalized(); *1/ */
+            /* /1* ee_traj_arrow_x.pose.orientation.w = 1.0; *1/ */
+            /* /1* ee_traj_arrow_x.pose.orientation.x = axis_direction.x(); *1/ */
+            /* /1* ee_traj_arrow_x.pose.orientation.y = axis_direction.y(); *1/ */
+            /* /1* ee_traj_arrow_x.pose.orientation.z = axis_direction.z(); *1/ */
+            /* std::cout << "waypoint.position.x" << waypoint.position.x << std::endl; */
+            /* std::cout << "waypoint.position.y" << waypoint.position.y << std::endl; */
+            /* ee_traj_arrow_x.points.resize(2); */
+            /* std::cout << "waypoint.position.z" << waypoint.position.z << std::endl; */
+            /* ee_traj_arrow_x.points[0].x = waypoint.position.x; */
+            /* ee_traj_arrow_x.points[0].y = waypoint.position.y; */
+            /* ee_traj_arrow_x.points[0].z = waypoint.position.z; */
+            /* ee_traj_arrow_x.points[1].x = x_axis[0]; */
+            /* ee_traj_arrow_x.points[1].y = x_axis[1]; */
+            /* ee_traj_arrow_x.points[1].z = x_axis[2]; */
+
+            /* // Update EE trajectory y-axis marker characteristics */
+            ee_traj_arrow_y.header.stamp = this->get_clock()->now();
+            ee_traj_arrow_y.id = j * 3;
+            /* /1* ee_traj_arrow_y.pose.position.x = ee_htm.translation().x(); *1/ */
+            /* /1* ee_traj_arrow_y.pose.position.y = ee_htm.translation().y(); *1/ */
+            /* /1* ee_traj_arrow_y.pose.position.z = ee_htm.translation().z(); *1/ */
+            /* /1* Eigen::Vector3d y_axis(0, 1, 0); *1/ */
+            /* /1* axis_direction = (ee_orientation * y_axis).normalized(); *1/ */
+            /* /1* ee_traj_arrow_y.pose.orientation.w = 1.0; *1/ */
+            /* /1* ee_traj_arrow_y.pose.orientation.x = axis_direction.x(); *1/ */
+            /* /1* ee_traj_arrow_y.pose.orientation.y = axis_direction.y(); *1/ */
+            /* /1* ee_traj_arrow_y.pose.orientation.z = axis_direction.z(); *1/ */
+            /* ee_traj_arrow_y.points.resize(2); */
+            /* ee_traj_arrow_y.points[0].x = waypoint.position.x; */
+            /* ee_traj_arrow_y.points[0].y = waypoint.position.y; */
+            /* ee_traj_arrow_y.points[0].z = waypoint.position.z; */
+            /* ee_traj_arrow_y.points[1].x = y_axis[0]; */
+            /* ee_traj_arrow_y.points[1].y = y_axis[1]; */
+            /* ee_traj_arrow_y.points[1].z = y_axis[2]; */
+
+            /* // Update EE trajectory y-axis marker characteristics */
+            ee_traj_arrow_z.header.stamp = this->get_clock()->now();
+            ee_traj_arrow_z.id = j * 4;
+            /* /1* ee_traj_arrow_z.pose.position.x = ee_htm.translation().x(); *1/ */
+            /* /1* ee_traj_arrow_z.pose.position.y = ee_htm.translation().y(); *1/ */
+            /* /1* ee_traj_arrow_z.pose.position.z = ee_htm.translation().z(); *1/ */
+            /* /1* Eigen::Vector3d z_axis(0, 0, 1); *1/ */
+            /* /1* axis_direction = (ee_orientation * z_axis).normalized(); *1/ */
+            /* /1* ee_traj_arrow_z.pose.orientation.w = 1.0; *1/ */
+            /* /1* ee_traj_arrow_z.pose.orientation.x = axis_direction.x(); *1/ */
+            /* /1* ee_traj_arrow_z.pose.orientation.y = axis_direction.y(); *1/ */
+            /* /1* ee_traj_arrow_z.pose.orientation.z = axis_direction.z(); *1/ */
+            /* ee_traj_arrow_z.points.resize(2); */
+            /* ee_traj_arrow_z.points[0].x = waypoint.position.x; */
+            /* ee_traj_arrow_z.points[0].y = waypoint.position.y; */
+            /* ee_traj_arrow_z.points[0].z = waypoint.position.z; */
+            /* ee_traj_arrow_z.points[1].x = z_axis[0]; */
+            /* ee_traj_arrow_z.points[1].y = z_axis[1]; */
+            /* ee_traj_arrow_z.points[1].z = z_axis[2]; */
+
             // Store the marker
             ee_traj.markers.push_back(ee_traj_point);
+            visual_tools_->publishAxis(ee_htm);
+            /* ee_traj.markers.push_back(ee_traj_arrow_x); */
+            /* ee_traj.markers.push_back(ee_traj_arrow_y); */
+            /* ee_traj.markers.push_back(ee_traj_arrow_z); */
+            /* std::cout << "DEBUG:AFTER PUSHING" << std::endl; */
+            visual_tools_->trigger();
         }
 
         // Publish EE trajectory marker array

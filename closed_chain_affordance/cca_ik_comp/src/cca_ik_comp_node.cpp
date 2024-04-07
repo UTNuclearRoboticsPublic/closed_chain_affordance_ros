@@ -118,14 +118,19 @@ class SpotIKSolver : public rclcpp::Node
             return {};
     }
 
-    std::optional<std::vector<Eigen::VectorXd>> call_cca_planner(const Eigen::MatrixXd &cc_slist,
-                                                                 const Eigen::VectorXd aff_start_state,
-                                                                 const Eigen::Matrix<double, 6, 1> &aff_screw,
-                                                                 const double &aff_goal, const double &aff_step,
-                                                                 const int &gripper_control_par_tau = 1,
-                                                                 const double &accuracy = 10.0 / 100.0)
+    /* std::optional<std::vector<Eigen::VectorXd>> call_cca_planner(const Eigen::MatrixXd &cc_slist, */
+    /*                                                              const Eigen::VectorXd aff_start_state, */
+    /*                                                              const Eigen::Matrix<double, 6, 1> &aff_screw, */
+    /*                                                              const double &aff_goal, const double &aff_step, */
+    /*                                                              const int &gripper_control_par_tau = 1, */
+    /*                                                              const double &accuracy = 10.0 / 100.0) */
+    std::optional<std::vector<Eigen::VectorXd>> call_cca_planner(
+        const Eigen::MatrixXd &cc_slist, const Eigen::VectorXd aff_start_state,
+        const Eigen::Matrix<double, 6, 1> &aff_screw, const Eigen::VectorXd &sec_goal, const double &aff_step,
+        const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0)
     {
 
+        const double aff_goal = sec_goal.tail(1)(0);
         // Construct the CcAffordancePlanner object
         CcAffordancePlanner ccAffordancePlanner;
 
@@ -135,11 +140,16 @@ class SpotIKSolver : public rclcpp::Node
         }; // Helper lambda to check the sign of affordance goal
 
         ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
-        ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step;
+        /* ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step; */
+        ccAffordancePlanner.p_accuracy = accuracy;
+        std::cout << "Planner param aff step: " << ccAffordancePlanner.p_aff_step_deltatheta_a << std::endl;
+        std::cout << "Planner param err accuracy: " << ccAffordancePlanner.p_accuracy << std::endl;
 
         // Call the planner
+        /* PlannerResult plannerResult = */
+        /*     ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau); */
         PlannerResult plannerResult =
-            ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau);
+            ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
         /* PlannerResult plannerResult = */
         /*     ccAffordancePlanner.affordance_stepper(cc_slist_body, aff_goal, gripper_control_par_tau); */
 
@@ -151,6 +161,11 @@ class SpotIKSolver : public rclcpp::Node
                                                                        << " solution, and planning took "
                                                                        << plannerResult.planning_time.count()
                                                                        << " microseconds");
+            std::cout << "\nHere is the entire trajectory:\n";
+            for (const auto &point : cca_solution)
+            {
+                std::cout << point.transpose() << std::endl;
+            }
             return cca_solution;
         }
         else
@@ -358,8 +373,8 @@ int main(int argc, char *argv[])
     node->init();
     std::thread spinner_thread([&node]() { rclcpp::spin(node); });
 
-    const std::string planner = "standard";
-    /* const std::string planner = "cca"; */
+    /* const std::string planner = "standard"; */
+    const std::string planner = "cca";
 
     // Extract robot config info
     const std::string robot_config_file_path = "/home/crasun/ws_moveit2/src/cca_spot/config/cca_spot_description.yaml";
@@ -369,52 +384,80 @@ int main(int argc, char *argv[])
     const Eigen::Matrix4d M = robotConfig.M;
     const std::vector<std::string> joint_names = robotConfig.joint_names;
     const std::string tool_frame = robotConfig.tool_name;
+    std::cout << "Here is the robot screw list: \n" << robot_slist << std::endl;
 
     // Set robot state from affordance start config
     Eigen::VectorXd aff_start_state(6);
     /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
-    /* aff_start_state << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // turning a valve2 */
+    aff_start_state << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // turning a valve2
     /* aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer */
-    aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer
+    /* aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer */
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
 
     // Compute affordance screw
-    /* const Eigen::Vector3d aff_screw_axis(0, 0, 1);          // screw axis - moving a stool */
+    /* const Eigen::Vector3d aff_screw_axis(0, 0, -1);         // screw axis - moving a stool */
     /* const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool */
-    /* const Eigen::Vector3d aff_screw_axis(-1, 0, 0); // screw axis - turning a valve 2 */
-    /* const Eigen::Vector3d aff_screw_axis_location(0.597133, -0.0887238, */
-    /*                                               0.170599); // location vector - turning a valve 2 */
-    /* const Eigen::Matrix<double, 6, 1> aff_screw = */
-    /* AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw */
-    Eigen::VectorXd aff_screw(6);
+    const Eigen::Vector3d aff_screw_axis(-1, 0, 0); // screw axis - turning a valve 2
+    const Eigen::Vector3d aff_screw_axis_location(0.597133, -0.0887238,
+                                                  0.170599); // location vector - turning a valve 2
+    const Eigen::Matrix<double, 6, 1> aff_screw =
+        AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
+    /* Eigen::VectorXd aff_screw(6); */
     /* aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer */
-    aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer
+    /* aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer */
 
     // Define affordance goal and step
     /* const double aff_goal = 0.5 * M_PI; // moving a stool */
     /* double aff_step = 0.15;             // moving a stool */
-    /* const double aff_goal = -1.5 * M_PI; // turning a valve2 */
-    /* double aff_step = 0.2;               // turning a valve2 */
+    const double aff_goal = 4.0 * M_PI; // turning a valve2
+    double aff_step = 0.2;              // turning a valve2
     /* const double aff_goal = 0.2; // pushing a drawer */
     /* double aff_step = 0.05;      // pushing a drawer */
-    const double aff_goal = -0.29;         // pulling a drawer
-    double aff_step = 0.05;                // pulling a drawer
-    const int gripper_control_par_tau = 1; // moving a stool
+    /* const double aff_goal = 0.29; // pulling a drawer */
+    /* double aff_step = 0.05;       // pulling a drawer */
+    /* const int gripper_control_par_tau = 1; // moving a stool */
+    const int gripper_control_par_tau = 2; // turning a valve2
     /* const int gripper_control_par_tau = 3; // turning a valve2 */
+    /* const int gripper_control_par_tau = 4; // turning a valve2 */
+    /* const Eigen::Matrix<double, 1, 1> sec_goal(aff_goal); */
+    const Eigen::Matrix<double, 2, 1> sec_goal(-0.2, aff_goal);
+    /* const Eigen::Matrix<double, 3, 1> sec_goal(0.0, 0.0, aff_goal); */
+    /* const Eigen::Matrix<double, 4, 1> sec_goal(0.0, 0.0, 0.0, aff_goal); */
 
     if (planner == "cca")
     {
         // Call CCA planner
         // Create closed-chain screws
-        const Eigen::MatrixXd cc_slist =
-            AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
-        std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl;
+        Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
+        /* cc_slist.col(6) = -cc_slist.col(6); */
+        /* std::cout << "\nHere is the space-frame screw list before swap: \n" << cc_slist << std::endl; */
+        /* Eigen::VectorXd swapper_x = cc_slist.col(6); */
+        /* Eigen::VectorXd swapper_y = cc_slist.col(7); */
+        /* Eigen::VectorXd swapper_z = cc_slist.col(8); */
+        /* std::cout << "swapper_x: " << swapper_x.transpose() << std::endl; */
+        /* std::cout << "swapper_y: " << swapper_y.transpose() << std::endl; */
+        /* std::cout << "swapper_z: " << swapper_z.transpose() << std::endl; */
+        /* cc_slist.col(6) = swapper_y; */
+        /* cc_slist.col(7) = swapper_z; */
+        /* cc_slist.col(8) = swapper_x; */
+        /* Eigen::MatrixXd new_cc_slist(cc_slist.rows(), cc_slist.cols() - 1); */
+        /* new_cc_slist << cc_slist.leftCols(6), cc_slist.rightCols(3); */
+
+        /* std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl; */
+        /* std::cout << "\nHere is the new space-frame screw list: \n" << new_cc_slist << std::endl; */
+        /* std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner( */
+        /*     cc_slist, aff_start_state, aff_screw, aff_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
         std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner(
-            cc_slist, aff_start_state, aff_screw, aff_goal, aff_step, gripper_control_par_tau, 10.0 / 100.0);
+            cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0);
+        /* std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner( */
+        /*     new_cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
         if (planner_result.has_value())
         {
             const Eigen::VectorXd config_offset = aff_start_state;
+            /* auto planner_part_result = */
+            /* std::vector<Eigen::VectorXd>(planner_result.value().begin(), planner_result.value().begin() + 7); */
             node->visualize_trajectory(planner_result.value(), joint_names, config_offset);
+            /* node->visualize_trajectory(planner_part_result, joint_names, config_offset); */
         }
     }
     else if (planner == "standard")
@@ -422,6 +465,7 @@ int main(int argc, char *argv[])
         // Call standard planner
         std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_standard_planner(
             planning_group, joint_names, tool_frame, aff_start_state, aff_screw, aff_goal, aff_step, 10.0 / 100.0);
+
         if (planner_result.has_value())
         {
             const Eigen::VectorXd config_offset = Eigen::VectorXd::Zero(aff_start_state.size());
