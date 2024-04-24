@@ -10,9 +10,8 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
-  <depend>control_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>actionlib_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>sensor_msgs</depend>
   <depend>affordance_util_ros</depend>
 
   <test_depend>ament_lint_auto</test_depend>

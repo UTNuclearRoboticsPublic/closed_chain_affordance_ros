@@ -8,9 +8,8 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(control_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(actionlib_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(affordance_util_ros REQUIRED)
 
 # Non-ROS libraries
@@ -25,8 +24,16 @@ include_directories(
 )
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp control_msgs geometry_msgs actionlib_msgs affordance_util_ros)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp trajectory_msgs sensor_msgs affordance_util_ros)
 target_link_libraries(${PROJECT_NAME}_node affordance_util  yaml-cpp Eigen3::Eigen)
+install(TARGETS
+  ${PROJECT_NAME}_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# install(DIRECTORY config launch
+#   DESTINATION share/${PROJECT_NAME}
+# )
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
