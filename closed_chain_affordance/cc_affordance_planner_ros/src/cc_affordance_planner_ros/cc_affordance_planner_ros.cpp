@@ -30,12 +30,13 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     // Initialize clients and subscribers
     plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
 
-    /* // Construct buffer to lookup affordance location from apriltag using tf data */
+    // Construct buffer to lookup affordance location from apriltag using tf data
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff,
-                                                       const double &aff_goal, const double &aff_step,
+                                                       const Eigen::VectorXd &sec_goal, const double &aff_step,
                                                        const int &gripper_control_par_tau, const double &accuracy)
 {
     // Compute affordance screw
@@ -55,10 +56,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
         return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
     }; // Helper lambda to check the sign of affordance goal
 
+    const double aff_goal = sec_goal.tail(1)(0);
     ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
-    ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step;
+    ccAffordancePlanner.p_accuracy = accuracy;
 
-    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau);
+    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
@@ -78,9 +80,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
 }
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_aff,
-                                                       const std::string &apriltag_frame_name, const double &aff_goal,
-                                                       const double &aff_step, const int &gripper_control_par_tau,
-                                                       const double &accuracy)
+                                                       const std::string &apriltag_frame_name,
+                                                       const Eigen::VectorXd &sec_goal, const double &aff_step,
+                                                       const int &gripper_control_par_tau, const double &accuracy)
 {
 
     // Get affordance screw from april tag
@@ -104,10 +106,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
         return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
     }; // Helper lambda to check the sign of affordance goal
 
+    const double aff_goal = sec_goal.tail(1)(0);
     ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
-    ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step;
+    ccAffordancePlanner.p_accuracy = accuracy;
 
-    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau);
+    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;

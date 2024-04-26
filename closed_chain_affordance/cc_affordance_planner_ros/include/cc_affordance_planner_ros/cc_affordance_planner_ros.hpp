@@ -35,6 +35,7 @@
 #include "control_msgs/action/follow_joint_trajectory.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "tf2_ros/transform_listener.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
@@ -72,7 +73,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @param w_aff Affordance screw axis
      * @param q_aff 3-vector location of the screw axis from the reference frame
-     * @param aff_goal Desired affordance goal in radians for rotational screws and meters for pure-translational screws
+     * @param sec_goal Desired affordance and gripper orientation goals. Affordance part is in radians for rotational
+     * screws and meters for pure-translational screws
      * @param aff_step Desired step for the affordance trajectory. This determines how dense you want the trajectory to
      * be. For instance, for a 0.5rad affordance goal, you might choose a 0.1rad step. Units are radians or meters
      * depending on affordance
@@ -81,9 +83,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @return true denoting execution success, false denoting failure
      */
-    bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff, const double &aff_goal,
-                                   const double &aff_step = 0.3, const int &gripper_control_par_tau = 1,
-                                   const double &accuracy = 10.0 / 100.0);
+    bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff,
+                                   const Eigen::VectorXd &sec_goal, const double &aff_step = 0.3,
+                                   const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0);
 
     /**
      * @brief Given affordance screw information, affordance goal, and closed-chain planner parameters, generates,
@@ -92,7 +94,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @param w_aff Affordance screw axis
      * @param apriltag_frame_name Name of the AprilTag frame from which to retrieve the 3-vector location of the screw
      * axis
-     * @param aff_goal Desired affordance goal in radians for rotational screws and meters for pure-translational screws
+     * @param sec_goal Desired affordance and gripper orientation goals. Affordance part is in radians for rotational
+     * screws and meters for pure-translational screws
      * @param aff_step Desired step for the affordance trajectory. This determines how dense you want the trajectory to
      * be. For instance, for a 0.5rad affordance goal, you might choose a 0.1rad step. Units are radians or meters
      * depending on affordance
@@ -103,7 +106,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
      */
 
     bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const std::string &apriltag_frame_name,
-                                   const double &aff_goal, const double &aff_step = 0.3,
+                                   const Eigen::VectorXd &sec_goal, const double &aff_step = 0.3,
                                    const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0);
 
   private:
@@ -114,6 +117,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_; // service client to visualize joint trajectory
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    // joint states subscriber
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                      // buffer to lookup tf data
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 
     // Robot ROS setup data
     std::string traj_execution_as_name_;      // trajectory execution action server name
