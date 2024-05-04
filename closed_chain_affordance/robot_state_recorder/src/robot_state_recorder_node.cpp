@@ -172,7 +172,8 @@ class JointTrajAndTfRecorder : public rclcpp::Node
             csvFile << joint_name << ",";
         }
         // EE position and timestamp
-        csvFile << "Pred EE x,Pred EE y,Pred EE z,"; // CSV header
+        csvFile << "Pred EE x,Pred EE y,Pred EE z,";                       // CSV header
+        csvFile << "Pred EE x_or,Pred EE y_or,Pred EE z_or,Pred EE_w_or,"; // CSV header
         csvFile << "Timestamp"
                 << "\n";
 
@@ -187,7 +188,9 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
             // EE position
             Eigen::MatrixXd ee_htm = AffordanceUtil::FKinSpace(M_, slist_, pred_traj_point.positions);
+            Eigen::Quaterniond ee_htm_or(ee_htm.block<3, 3>(0, 0));
             csvFile << ee_htm(0, 3) << "," << ee_htm(1, 3) << "," << ee_htm(2, 3) << ",";
+            csvFile << ee_htm_or.x() << "," << ee_htm_or.y() << "," << ee_htm_or.z() << "," << ee_htm_or.w() << ",";
 
             // Timestamp
             csvFile << pred_traj_point.timestamp << "\n";
@@ -241,7 +244,8 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         {
             csvFile << joint_name << ",";
         }
-        csvFile << "Act EE x,Act EE y,Act EE z,"; // CSV header
+        csvFile << "Act EE x,Act EE y,Act EE z,";                      // CSV header
+        csvFile << "Act EE x_or,Act EE y_or,Act EE z_or,Act EE_w_or,"; // CSV header
         csvFile << "Timestamp"
                 << "\n";
 
@@ -269,8 +273,10 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
             // Write EE position to file
             Eigen::MatrixXd ee_htm = AffordanceUtil::FKinSpace(M_, slist_, joint_states_copy.positions);
+            Eigen::Quaterniond ee_htm_or(ee_htm.block<3, 3>(0, 0));
 
             csvFile << ee_htm(0, 3) << "," << ee_htm(1, 3) << "," << ee_htm(2, 3) << ",";
+            csvFile << ee_htm_or.x() << "," << ee_htm_or.y() << "," << ee_htm_or.z() << "," << ee_htm_or.w() << ",";
 
             // Write timestamp to file
             csvFile << joint_states_copy.timestamp << "\n";
