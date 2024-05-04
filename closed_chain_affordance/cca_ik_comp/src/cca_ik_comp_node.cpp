@@ -1,6 +1,7 @@
 // Some class functions Copied from Alex Navarro's Spot Reachability package
 #include <Eigen/Eigen>
 #include <eigen3/Eigen/Geometry>
+#include <math.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -144,6 +145,9 @@ class SpotIKSolver : public rclcpp::Node
         ccAffordancePlanner.p_accuracy = accuracy;
         std::cout << "Planner param aff step: " << ccAffordancePlanner.p_aff_step_deltatheta_a << std::endl;
         std::cout << "Planner param err accuracy: " << ccAffordancePlanner.p_accuracy << std::endl;
+        std::cout << "\nFinal cc_slist: \n" << cc_slist << std::endl;
+        std::cout << "\nFinal goal: \n" << sec_goal << std::endl;
+        std::cout << "\nFinal gripper control par: \n" << gripper_control_par_tau << std::endl;
 
         // Call the planner
         /* PlannerResult plannerResult = */
@@ -365,6 +369,53 @@ class SpotIKSolver : public rclcpp::Node
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_;
     std::string plan_and_viz_ss_name_; // name of the planning visualization server
 };
+Eigen::MatrixXd compose_cc_model_slist(const Eigen::MatrixXd &robot_slist, const Eigen::VectorXd &thetalist,
+                                       const Eigen::Matrix4d &M, const Eigen::Matrix<double, 6, 1> &aff_screw)
+{
+
+    const size_t screw_length = 6;                    // Length of the screw vector
+    const size_t screw_axis_length = 3;               // Length of the screw axis
+    const size_t nof_vir_ee_joints = 3;               // Number of virtual ee joints
+    const size_t nof_sjoints = nof_vir_ee_joints + 1; // Number of joints to be appended, + 1 for one affordance
+
+    // Compute robot Jacobian
+    Eigen::MatrixXd robot_jacobian = AffordanceUtil::JacobianSpace(robot_slist, thetalist);
+
+    // Append virtual EE screw axes as well as the affordance screw.
+    // Note: In the future it might be desired to append the virtual EE screws as Jacobians as well. This would allow
+    // one to track the orientation of the gripper as the magnitudes (joint angles) of these screws. Currently, we model
+    // the Virtual EE screws as aligned with the space frame at the start pose of the affordance. An advantage of this
+    // is physical intuition in controlling the gripper.
+    Eigen::MatrixXd app_slist(screw_length, nof_sjoints);
+
+    // Extract robot palm location
+    const Eigen::Matrix4d ee_htm = AffordanceUtil::FKinSpace(M, robot_slist, thetalist);
+    const Eigen::Vector3d q_vir = ee_htm.block<3, 1>(0, 3); // Translation part of the HTM
+
+    // Virtual EE screw axes
+    Eigen::Matrix<double, screw_axis_length, nof_vir_ee_joints> w_vir; // Virtual EE screw axes
+    /* w_vir.col(0) << 1, 0, 0;                                           // x */
+    const double alpha = 0.0;
+    w_vir.col(0) << cos(alpha), 0, -sin(alpha); // x
+    w_vir.col(1) << 0, 1, 0;                    // y
+    w_vir.col(2) << 0, 0, 1;                    // z
+
+    for (size_t i = 0; i < nof_vir_ee_joints; ++i)
+    {
+        app_slist.col(i) = AffordanceUtil::get_screw(w_vir.col(i), q_vir);
+    }
+
+    // Affordance screw
+    app_slist.col(3) =
+        -aff_screw; // The motion of the last closed-chain joint is in the opposite direction of the affordance since
+                    // the ground link is fixed and it is the affordance link that moves instead
+
+    // Altogether
+    Eigen::MatrixXd slist(robot_slist.rows(), (robot_slist.cols() + app_slist.cols()));
+    slist << robot_jacobian, app_slist;
+
+    return slist;
+}
 
 int main(int argc, char *argv[])
 {
@@ -391,6 +442,7 @@ int main(int argc, char *argv[])
     Eigen::VectorXd aff_start_state(6);
     /* aff_start_state << 0.20841, -0.52536, 1.85988, 0.18575, -1.37188, -0.07426; // moving a stool */
     aff_start_state << 0.08788, -1.33410, 2.14567, 0.19725, -0.79857, 0.46613; // turning a valve2
+    /* aff_start_state << 0.03456, -1.40627, 2.10997, 0.13891, -0.66079, 0.76027; // turning a valve4 */
     /* aff_start_state << 0.00795, -1.18220, 2.46393, 0.02025, -1.32321, -0.00053; // pushing a drawer */
     /* aff_start_state << -0.00076, -0.87982, 1.73271, 0.01271, -1.13217, -0.00273; // pulling a drawer */
     /* aff_start_state = Eigen::VectorXd::Zero(6); */
@@ -400,7 +452,9 @@ int main(int argc, char *argv[])
     /* const Eigen::Vector3d aff_screw_axis_location(0, 0, 0); // location vector - moving a stool */
     const Eigen::Vector3d aff_screw_axis(-1, 0, 0); // screw axis - turning a valve 2
     const Eigen::Vector3d aff_screw_axis_location(0.597133, -0.0887238,
-                                                  0.170599); // location vector - turning a valve 2
+                                                  0.170599); // location vector - turning a valve2
+    /* const Eigen::Vector3d aff_screw_axis_location(0.602653, -0.119387, 0.16575); // location vector - turning a valve
+     * 4 */
     const Eigen::Matrix<double, 6, 1> aff_screw =
         AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
     /* Eigen::VectorXd aff_screw(6); */
@@ -411,47 +465,52 @@ int main(int argc, char *argv[])
     /* const double aff_goal = 0.5 * M_PI; // moving a stool */
     /* double aff_step = 0.15;             // moving a stool */
     const double aff_goal = 1.5 * M_PI; // turning a valve2
-    double aff_step = 0.2;              // turning a valve2
+    /* const double aff_goal = 0.2; // turning a valve2 */
+    double aff_step = 0.2; // turning a valve2
     /* const double aff_goal = 0.2; // pushing a drawer */
     /* double aff_step = 0.05;      // pushing a drawer */
     /* const double aff_goal = 0.29; // pulling a drawer */
     /* double aff_step = 0.05;       // pulling a drawer */
     /* const int gripper_control_par_tau = 1; // moving a stool */
-    /* const int gripper_control_par_tau = 2; // turning a valve2 */
-    const int gripper_control_par_tau = 3; // turning a valve2
+    const int gripper_control_par_tau = 2; // turning a valve2
+    /* const int gripper_control_par_tau = 3; // turning a valve2 */
     /* const int gripper_control_par_tau = 4; // turning a valve2 */
     /* const Eigen::Matrix<double, 1, 1> sec_goal(aff_goal); */
-    /* const Eigen::Matrix<double, 2, 1> sec_goal(-0.2, aff_goal); */
-    const Eigen::Matrix<double, 3, 1> sec_goal(0.0, 0.0, aff_goal);
+    const Eigen::Matrix<double, 2, 1> sec_goal(0.0, aff_goal);
+    /* const Eigen::Matrix<double, 3, 1> sec_goal(0.0, 0.0, aff_goal); */
+    /* const Eigen::Matrix<double, 3, 1> sec_goal(-aff_goal, -aff_goal, aff_goal); */
     /* const Eigen::Matrix<double, 4, 1> sec_goal(0.0, 0.0, 0.0, aff_goal); */
 
     if (planner == "cca")
     {
         // Call CCA planner
         // Create closed-chain screws
-        Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
+        /* Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M,
+         * aff_screw); */
+        std::cout << std::fixed << std::setprecision(4); // Display up to 4 decimal places
+        Eigen::MatrixXd cc_slist = compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);
         /* cc_slist.col(6) = -cc_slist.col(6); */
-        /* std::cout << "\nHere is the space-frame screw list before swap: \n" << cc_slist << std::endl; */
-        /* Eigen::VectorXd swapper_x = cc_slist.col(6); */
-        /* Eigen::VectorXd swapper_y = cc_slist.col(7); */
-        /* Eigen::VectorXd swapper_z = cc_slist.col(8); */
-        /* std::cout << "swapper_x: " << swapper_x.transpose() << std::endl; */
-        /* std::cout << "swapper_y: " << swapper_y.transpose() << std::endl; */
-        /* std::cout << "swapper_z: " << swapper_z.transpose() << std::endl; */
-        /* cc_slist.col(6) = swapper_y; */
-        /* cc_slist.col(7) = swapper_z; */
-        /* cc_slist.col(8) = swapper_x; */
-        /* Eigen::MatrixXd new_cc_slist(cc_slist.rows(), cc_slist.cols() - 1); */
-        /* new_cc_slist << cc_slist.leftCols(6), cc_slist.rightCols(3); */
+        std::cout << "\nHere is the space-frame screw list before swap: \n" << cc_slist << std::endl;
+        Eigen::VectorXd swapper_x = cc_slist.col(6);
+        Eigen::VectorXd swapper_y = cc_slist.col(7);
+        Eigen::VectorXd swapper_z = cc_slist.col(8);
+        std::cout << "swapper_x: " << swapper_x.transpose() << std::endl;
+        std::cout << "swapper_y: " << swapper_y.transpose() << std::endl;
+        std::cout << "swapper_z: " << swapper_z.transpose() << std::endl;
+        cc_slist.col(6) = swapper_y;
+        cc_slist.col(7) = swapper_z;
+        cc_slist.col(8) = swapper_x;
+        Eigen::MatrixXd new_cc_slist(cc_slist.rows(), cc_slist.cols() - 2);
+        new_cc_slist << cc_slist.leftCols(6), cc_slist.rightCols(2);
 
-        /* std::cout << "\nHere is the space-frame screw list: \n" << cc_slist << std::endl; */
+        std::cout << "\nHere is the space-frame screw list after swap: \n" << cc_slist << std::endl;
         /* std::cout << "\nHere is the new space-frame screw list: \n" << new_cc_slist << std::endl; */
         /* std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner( */
         /*     cc_slist, aff_start_state, aff_screw, aff_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
-        std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner(
-            cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 10.0 / 100.0);
         /* std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner( */
-        /*     new_cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
+        /*     cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 1.0 / 100.0); */
+        std::optional<std::vector<Eigen::VectorXd>> planner_result = node->call_cca_planner(
+            new_cc_slist, aff_start_state, aff_screw, sec_goal, aff_step, gripper_control_par_tau, 10.0 / 100.0);
         if (planner_result.has_value())
         {
             const Eigen::VectorXd config_offset = aff_start_state;
