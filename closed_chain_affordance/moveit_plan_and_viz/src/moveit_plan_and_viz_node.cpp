@@ -149,6 +149,34 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
+        if (!(serv_req->aff_screw_axis).empty()) // If affordance screw is specified, draw it
+        {
+            // Display the affordance screw axis
+            // Note the affordance screw axis in the service request is wrt to the reference frame and here we are
+            // publishing wrt to the planning frame
+            Eigen::Isometry3d T_p_r = robot_state_->getGlobalLinkTransform(
+                serv_req->ref_frame); // planning frame (which is usually the base frame from the URDF) to the reference
+                                      // frame.
+
+            // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance screw
+            // axis wrt to the x-axis.
+            Eigen::Quaterniond aff_screw_quat;
+            aff_screw_quat.setFromTwoVectors(Eigen::Vector3d::UnitX(),
+                                             Eigen::Vector3d((serv_req->aff_screw_axis).data()));
+
+            // Fill out the pose
+            Eigen::Isometry3d aff_screw_pose;
+            aff_screw_pose.linear() = aff_screw_quat.toRotationMatrix();
+            aff_screw_pose.translation() = Eigen::Vector3d((serv_req->aff_location).data());
+
+            // Translate the pose to planning frame
+            aff_screw_pose = T_p_r * aff_screw_pose;
+
+            // Publish
+            rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
+            rviz_visual_tools_->trigger();
+        }
+
         for (const auto &point : serv_req->joint_traj.points)
         {
             // copy the joint trajectory point to a std::vector<double> type
