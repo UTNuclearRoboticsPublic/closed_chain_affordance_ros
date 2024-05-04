@@ -166,6 +166,7 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
 
 {
 
+    using namespace std::chrono_literals;
     Eigen::Isometry3d htm; // Output
 
     geometry_msgs::msg::TransformStamped transform_stamped; // ROS message to hold transform info
@@ -173,7 +174,7 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
     // Query the latest available transform
     try
     {
-        transform_stamped = tf_buffer.lookupTransform(space_frame, body_frame, tf2::TimePointZero);
+        transform_stamped = tf_buffer.lookupTransform(space_frame, body_frame, tf2::TimePointZero, 3000ms);
     }
     catch (tf2::TransformException &ex)
     {
