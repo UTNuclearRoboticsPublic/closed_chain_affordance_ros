@@ -162,15 +162,16 @@ class CcAffordancePlannerRos : public rclcpp::Node
     Eigen::VectorXd get_aff_start_joint_states_();
 
     /**
-     * @brief Given the trajectory output from the cc affordance planner, visualizes it on Rviz and executes it on the
-     * robot
+     * @brief
      *
      * @param trajectory A bare joint trajectory as a vector of joint position points
+     * @param w_aff Affordance screw axis
+     * @param q_aff Affordace location
      *
-     * @return true if trajectory was successfully visualized and executed. false otherwise.
+     * @return True if trajectory was successfully visualized and executed. false otherwise.
      */
-    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory);
-
+    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &w_aff,
+                                           const Eigen::VectorXd &q_aff);
     /**
      * @brief Callback function to process the feedback from the traj_execution_as_ action server
      *
