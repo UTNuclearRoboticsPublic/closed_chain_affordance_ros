@@ -105,7 +105,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /* T_oa.translation() << -10.6166, 4.90694, 0.259192; */
 
     /* const Eigen::Isometry3d T_ob = AffordanceUtilROS::get_htm("odom", "arm0_base_link", *tf_buffer_); */
-    /* const Eigen::Isometry3d T_ob = AffordanceUtilROS::get_htm("arm0_base_link", "affordance_frame", *tf_buffer_); */
+    /* const Eigen::Isometry3d T_ob = AffordanceUtilROS::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
     /* RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame location wrt odom frame:\n" <<
      * T_oa.translation()); */
     /* RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame rotation part wrt odom frame:\n" <<
@@ -113,12 +113,17 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /* const Eigen::Isometry3d T_ba = T_ob.inverse() * T_oa; */
 
     /* const Eigen::Vector3d q_aff = tag_htm.translation(); // location of the tag */
-    /* const Eigen::Vector3d offset(((63.0 / 2.0) + 2.0) / 1000.0, 0.0, 0.0); */
+    /* const Eigen::Vector3d offset(((63.0 / 2.0) + 2.0) / 1000.0, 0.0, -(100.0 / 1000.0)); */
     /* std::cout << "Here is the offset: " << offset << std::endl; */
+    /* const Eigen::Vector3d q_aff = T_ob.translation(); // location of the tag */
     /* const Eigen::Vector3d q_aff = T_ob.translation() + offset; // location of the tag */
     /* const Eigen::Vector3d q_aff = T_ba.translation(); // location of the tag */
     /* const Eigen::Vector3d q_aff(1.15455, 0.02299, -0.234753); // location of the tag */
-    const Eigen::Vector3d q_aff(0.8294, 0.0577, 0.3087); // location of the tag
+    /* const Eigen::Vector3d q_aff(0.8294, 0.0577, 0.3087); // location of the tag */
+    /* const Eigen::Vector3d q_aff(0.626239, -0.0652102, 0.222272); // or_tandem */
+    const Eigen::Vector3d q_aff(0.517931, 0.218598, 0.221959); // or_doesnt_matter
+    /* const Eigen::Vector3d q_aff(0.619487, 0.147585, 0.220212); // valve_turn_with_freedom */
+    /* const Eigen::Vector3d q_aff(0.693979, -0.0252093, 0.219907); // or_preserved5 */
     RCLCPP_INFO_STREAM(node_logger_,
                        "Here is the affordance frame location wrt base_link. Ensure it's not empty and makes sense:\n"
                            << q_aff);
@@ -126,15 +131,23 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /* const Eigen::Vector3d q_aff_or = tag_htm.translation(); // location of the tag */
     /* RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame location without the err correction:\n" <<
      * q_aff_or); */
-    const Eigen::Matrix<double, 6, 1> aff_screw = AffordanceUtil::get_screw(w_aff, q_aff); // compute affordance screw
+    Eigen::Matrix<double, 6, 1> aff_screw = AffordanceUtil::get_screw(w_aff, q_aff); // compute affordance screw
+    /* Eigen::Vector3d pitch_vector = (2.5 / 1000.0) * w_aff; */
+    /* Eigen::Vector3d v = aff_screw.tail(3); */
+    /* v += pitch_vector; */
+    /* aff_screw.tail(3) = v; */
 
     // Get joint states at the start configuration of the affordance
     /* Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_(); */
     Eigen::VectorXd robot_thetalist(6);
     /* robot_thetalist << -0.0768, -1.4199, 2.1811, 0.0366, -0.6615, -0.0381; */
     /* robot_thetalist << 0.2366, -0.9509, 1.7418, 0.3823, -0.7856, 1.5327; */
-    robot_thetalist << 0.3370, -1.6393, 1.5758, 1.8494, -0.3827, -0.0548; // Top
+    /* robot_thetalist << 0.3370, -1.6393, 1.5758, 1.8494, -0.3827, -0.0548; // Top */
     /* robot_thetalist << 0.2690, -1.2660, 1.9042, 0.7921, -0.4053, -1.9255; */
+    /* robot_thetalist << 0.0140, -2.0268, 2.1910, 0.8096, -0.1487, 0.8129; // or_tandem */
+    robot_thetalist << 0.2628, -1.5840, 2.0090, 0.6266, -0.4712, -0.5647; // or_doesnt_matter
+    /* robot_thetalist << 0.0475, -1.2706, 2.0224, 0.0444, -0.7356, -0.5177; // valve_turn_with_freedom */
+    /* robot_thetalist << 0.1513, -1.8212, 2.0578, 0.8435, -0.3443, 0.7953; // or_preserved5 */
 
     // Compose cc model and affordance goal
     Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
@@ -162,11 +175,14 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     std::cout << "swapper_x: " << swapper_x.transpose() << std::endl;
     std::cout << "swapper_y: " << swapper_y.transpose() << std::endl;
     std::cout << "swapper_z: " << swapper_z.transpose() << std::endl;
-    cc_slist.col(6) = swapper_z;
-    cc_slist.col(7) = swapper_x;
-    cc_slist.col(8) = swapper_y;
-    Eigen::MatrixXd new_cc_slist(cc_slist.rows(), cc_slist.cols() - 3);
-    new_cc_slist << cc_slist.leftCols(6), cc_slist.rightCols(1);
+    /* cc_slist.col(6) = swapper_z; */
+    /* cc_slist.col(7) = swapper_x; */
+    /* cc_slist.col(8) = swapper_y; */
+    cc_slist.col(6) = swapper_y;
+    cc_slist.col(7) = swapper_z;
+    cc_slist.col(8) = swapper_x;
+    /* Eigen::MatrixXd new_cc_slist(cc_slist.rows(), cc_slist.cols() - 3); */
+    /* new_cc_slist << cc_slist.leftCols(6), cc_slist.rightCols(1); */
     /* Eigen::MatrixXd new_cc_slist(cc_slist.rows(), cc_slist.cols() - 2); */
     /* new_cc_slist << cc_slist.leftCols(6), cc_slist.rightCols(2); */
 
@@ -175,7 +191,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     //-------------------------------------------------------------------------------------------------//
     PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
     /* PlannerResult plannerResult = */
-    /*     ccAffordancePlanner.affordance_stepper(new_cc_slist, sec_goal, gripper_control_par_tau); */
+    /* ccAffordancePlanner.affordance_stepper(new_cc_slist, sec_goal, gripper_control_par_tau); */
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
@@ -240,16 +256,21 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
     Eigen::VectorXd robot_thetalist(6);
     /* robot_thetalist << -0.0768, -1.4199, 2.1811, 0.0366, -0.6615, -0.0381; */
     /* robot_thetalist << 0.2366, -0.9509, 1.7418, 0.3823, -0.7856, 1.5327; */
-    robot_thetalist << 0.3370, -1.6393, 1.5758, 1.8494, -0.3827, -0.0548; // Top
+    /* robot_thetalist << 0.3370, -1.6393, 1.5758, 1.8494, -0.3827, -0.0548; // Top */
     /* robot_thetalist << 0.2690, -1.2660, 1.9042, 0.7921, -0.4053, -1.9255; */
-    joint_states_.positions = robot_thetalist;
+    /* robot_thetalist << 0.0140, -2.0268, 2.1910, 0.8096, -0.1487, 0.8129; // or_tandem */
+    robot_thetalist << 0.2628, -1.5840, 2.0090, 0.6266, -0.4712, -0.5647; // or_doesnt_matter
+    /* robot_thetalist << 0.0475, -1.2706, 2.0224, 0.0444, -0.7356, -0.5177; // valve_turn_with_freedom */
+    /* robot_thetalist << 0.1513, -1.8212, 2.0578, 0.8435, -0.3443, 0.7953; // or_preserved5 */
+    /* joint_states_.positions = robot_thetalist; */
 
     // Visualize trajectory in RVIZ
     // Convert the solution trajectory to ROS message type
     const double traj_time_step = 0.3;
     const control_msgs::action::FollowJointTrajectory_Goal goal =
         AffordanceUtilROS::follow_joint_trajectory_msg_builder(
-            trajectory, joint_states_.positions, joint_names_,
+            /* trajectory, joint_states_.positions, joint_names_, */
+            trajectory, robot_thetalist, joint_names_,
             traj_time_step); // this function takes care of extracting the right
                              // number of joint_states although solution
                              // contains qs data too
