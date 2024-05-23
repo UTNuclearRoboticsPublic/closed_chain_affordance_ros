@@ -30,6 +30,8 @@ This repository contains ROS2 packages used to interface the closed-chain afford
    ```
    source install/setup.bash
    ```
+### Notable Dependencies
+1. The moveit_plan_and_viz package utilizes some MoveIt tools, albeit only for visualization purposes in Rviz. TO utilize this functionality, ensure moveit is installed along with the moveit_visual_tools package.
 
 ## Run Instructions
 The entry point for this planner is a launch file in a package named as `cca_<robot>` that contains robot-related information for closed-chain affordance planning. The framework is implemented for the following robots, and the links direct you to the repositories containing those packages and instructions on how to run the planner for each robot.
