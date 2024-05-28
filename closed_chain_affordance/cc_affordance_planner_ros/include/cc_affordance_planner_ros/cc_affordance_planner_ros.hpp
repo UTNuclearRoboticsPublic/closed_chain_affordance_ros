@@ -133,7 +133,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     std::string ref_frame_;                // reference frame for the screw representations
     std::string tool_frame_;               // name of the frame that representats the center of the palm
 
-    AffordanceUtilROS::JointTrajPoint joint_states_; // processed and ordered joint states data
+    affordance_util_ros::JointTrajPoint joint_states_; // processed and ordered joint states data
 
     /**
      * @brief Given the robot name used in creating the cca_<robot> package, returns full path to the yaml file

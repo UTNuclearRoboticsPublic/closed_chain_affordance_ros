@@ -44,7 +44,7 @@
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <unordered_map>
 
-namespace AffordanceUtilROS
+namespace affordance_util_ros
 {
 
 class CustomException : public std::exception
@@ -151,6 +151,6 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
 control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_builder(
     const std::vector<Eigen::VectorXd> &bare_trajectory, const Eigen::VectorXd &config_offset,
     const std::vector<std::string> &joint_names, const double &time_step = 0.05);
-} // namespace AffordanceUtilROS
+} // namespace affordance_util_ros
 
 #endif // AFFORDANCE_UTIL_ROS

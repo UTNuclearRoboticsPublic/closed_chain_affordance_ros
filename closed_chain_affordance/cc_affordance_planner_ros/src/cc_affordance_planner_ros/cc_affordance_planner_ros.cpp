@@ -15,7 +15,7 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
 
     // Extract robot config info
     const std::string robot_config_file_path = CcAffordancePlannerRos::get_cc_affordance_robot_description_(robot_name);
-    const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
+    const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
     robot_slist_ = robotConfig.Slist;
     M_ = robotConfig.M;
     ref_frame_ = robotConfig.ref_frame_name;
@@ -40,27 +40,29 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
                                                        const int &gripper_control_par_tau, const double &accuracy)
 {
     // Compute affordance screw
-    const Eigen::Matrix<double, 6, 1> aff_screw = AffordanceUtil::get_screw(w_aff, q_aff); // compute affordance screw
+    const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(w_aff, q_aff); // compute affordance screw
 
     // Get joint states at the start configuration of the affordance
     Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_();
 
     // Compose cc model and affordance goal
-    Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
+    Eigen::MatrixXd cc_slist = affordance_util::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
 
-    // Construct the CcAffordancePlanner object
-    CcAffordancePlanner ccAffordancePlanner;
+    // Configure the planner
+    cc_affordance_planner::PlannerConfig plannerConfig;
 
-    // Set planner parameters
+    // Extract the sign for aff_step based on aff goal
     auto sign_of = [](double x) {
         return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
     }; // Helper lambda to check the sign of affordance goal
 
     const double aff_goal = sec_goal.tail(1)(0);
-    ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
-    ccAffordancePlanner.p_accuracy = accuracy;
+    plannerConfig.aff_step = sign_of(aff_goal) * abs(aff_step);
+    plannerConfig.accuracy = accuracy;
 
-    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
+    // Run the planner
+    cc_affordance_planner::PlannerResult plannerResult =
+        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par_tau);
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
@@ -86,8 +88,8 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
 {
 
     // Get affordance screw from april tag
-    /* const Eigen::Isometry3d tag_htm = AffordanceUtilROS::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
-    /* const Eigen::Isometry3d T_oa = AffordanceUtilROS::get_htm("odom", apriltag_frame_name, *tf_buffer_); */
+    /* const Eigen::Isometry3d tag_htm = affordance_util_ros::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
+    /* const Eigen::Isometry3d T_oa = affordance_util_ros::get_htm("odom", apriltag_frame_name, *tf_buffer_); */
     // Capture initial configuration joint states
     /* RCLCPP_INFO_STREAM(node_logger_, "Ready to read base link frame wrt odom?y for yes."); */
     /* std::string tag_conf; */
@@ -104,8 +106,8 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /* T_oa.linear() = T_oa_linear; */
     /* T_oa.translation() << -10.6166, 4.90694, 0.259192; */
 
-    /* const Eigen::Isometry3d T_ob = AffordanceUtilROS::get_htm("odom", "arm0_base_link", *tf_buffer_); */
-    /* const Eigen::Isometry3d T_ob = AffordanceUtilROS::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
+    /* const Eigen::Isometry3d T_ob = affordance_util_ros::get_htm("odom", "arm0_base_link", *tf_buffer_); */
+    /* const Eigen::Isometry3d T_ob = affordance_util_ros::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
     /* RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame location wrt odom frame:\n" <<
      * T_oa.translation()); */
     /* RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame rotation part wrt odom frame:\n" <<
@@ -127,11 +129,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /*                    "Here is the affordance frame location wrt base_link. Ensure it's not empty and makes
      * sense:\n" */
     /*                        << q_aff); */
-    /* const Eigen::Isometry3d tag_htm = AffordanceUtilROS::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
+    /* const Eigen::Isometry3d tag_htm = affordance_util_ros::get_htm(ref_frame_, apriltag_frame_name, *tf_buffer_); */
     /* const Eigen::Vector3d q_aff_or = tag_htm.translation(); // location of the tag */
     /* RCLCPP_INFO_STREAM(node_logger_, "Here is the affordance frame location without the err correction:\n" <<
      * q_aff_or); */
-    /* Eigen::Matrix<double, 6, 1> aff_screw = AffordanceUtil::get_screw(w_aff, q_aff); // compute affordance screw */
+    /* Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(w_aff, q_aff); // compute affordance screw */
 
     Eigen::Matrix<double, 6, 1> aff_screw;     // pulling_a_drawer
     aff_screw << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0; // pulling_a_drawer
@@ -156,20 +158,19 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /* robot_thetalist << 0.1513, -1.8212, 2.0578, 0.8435, -0.3443, 0.7953; // valve_turn_case_1 */
 
     // Compose cc model and affordance goal
-    Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
+    Eigen::MatrixXd cc_slist = affordance_util::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
 
-    // Construct the CcAffordancePlanner object
-    CcAffordancePlanner ccAffordancePlanner;
+    // Configure the planner
+    cc_affordance_planner::PlannerConfig plannerConfig;
 
-    // Set planner parameters
+    // Extract the sign for aff_step based on aff goal
     auto sign_of = [](double x) {
         return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
     }; // Helper lambda to check the sign of affordance goal
 
     const double aff_goal = sec_goal.tail(1)(0);
-    std::cout << "Here is the affordance goal: " << aff_goal << std::endl;
-    ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
-    ccAffordancePlanner.p_accuracy = accuracy;
+    plannerConfig.aff_step = sign_of(aff_goal) * abs(aff_step);
+    plannerConfig.accuracy = accuracy;
 
     //-------------------------------------------------------------------------------------------------//
     std::cout << std::fixed << std::setprecision(4); // Display up to 4 decimal places
@@ -195,9 +196,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const Eigen::Vector3d &w_
     /* std::cout << "\nHere is the final screw list : \n" << new_cc_slist << std::endl; */
     /* std::cout << "\nHere is the final secondary goal: \n" << sec_goal << std::endl; */
     //-------------------------------------------------------------------------------------------------//
-    PlannerResult plannerResult = ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
-    /* PlannerResult plannerResult = */
-    /* ccAffordancePlanner.affordance_stepper(new_cc_slist, sec_goal, gripper_control_par_tau); */
+    // Run the planner
+    cc_affordance_planner::PlannerResult plannerResult =
+        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par_tau);
+    /* cc_affordance_planner::PlannerResult plannerResult = cc_affordance_planner::generate_joint_trajectory( */
+    /*     plannerConfig, new_cc_slist, sec_goal, gripper_control_par_tau); */
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
@@ -223,13 +226,13 @@ std::string CcAffordancePlannerRos::get_cc_affordance_robot_description_(const s
     const std::string package_name = "cca_" + robot_name;            // get package name from the parameter server
     const std::string rel_dir = "/config/";                          // relative directory where yaml file is located
     const std::string filename = package_name + "_description.yaml"; // yaml file name
-    return AffordanceUtilROS::get_filepath_inside_pkg(package_name, rel_dir, filename);
+    return affordance_util_ros::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 
 // Callback function for the joint_states subscriber
 void CcAffordancePlannerRos::joint_states_cb_(const JointState::SharedPtr msg)
 {
-    joint_states_ = AffordanceUtilROS::get_ordered_joint_states(
+    joint_states_ = affordance_util_ros::get_ordered_joint_states(
         msg,
         joint_names_); // Takes care of filtering and ordering the joint_states
 }
@@ -273,7 +276,7 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
     // Convert the solution trajectory to ROS message type
     const double traj_time_step = 0.3;
     const control_msgs::action::FollowJointTrajectory_Goal goal =
-        AffordanceUtilROS::follow_joint_trajectory_msg_builder(
+        affordance_util_ros::follow_joint_trajectory_msg_builder(
             /* trajectory, joint_states_.positions, joint_names_, */
             trajectory, robot_thetalist, joint_names_,
             traj_time_step); // this function takes care of extracting the right

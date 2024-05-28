@@ -131,32 +131,26 @@ class SpotIKSolver : public rclcpp::Node
         const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0)
     {
 
-        const double aff_goal = sec_goal.tail(1)(0);
-        // Construct the CcAffordancePlanner object
-        CcAffordancePlanner ccAffordancePlanner;
+        // Configure the planner
+        cc_affordance_planner::PlannerConfig plannerConfig;
 
-        // Set planner parameters
+        // Extract the sign for aff_step based on aff goal
         auto sign_of = [](double x) {
             return (x > 0) ? 1.0 : (x < 0) ? -1.0 : 0.0;
         }; // Helper lambda to check the sign of affordance goal
 
-        ccAffordancePlanner.p_aff_step_deltatheta_a = sign_of(aff_goal) * abs(aff_step);
-        /* ccAffordancePlanner.p_task_err_threshold_eps_s = accuracy * aff_step; */
-        ccAffordancePlanner.p_accuracy = accuracy;
-        std::cout << "Planner param aff step: " << ccAffordancePlanner.p_aff_step_deltatheta_a << std::endl;
-        std::cout << "Planner param err accuracy: " << ccAffordancePlanner.p_accuracy << std::endl;
+        const double aff_goal = sec_goal.tail(1)(0);
+        plannerConfig.aff_step = sign_of(aff_goal) * abs(aff_step);
+        plannerConfig.accuracy = accuracy;
+        std::cout << "Planner param aff step: " << plannerConfig.aff_step << std::endl;
+        std::cout << "Planner param err accuracy: " << plannerConfig.accuracy << std::endl;
         std::cout << "\nFinal cc_slist: \n" << cc_slist << std::endl;
         std::cout << "\nFinal goal: \n" << sec_goal << std::endl;
         std::cout << "\nFinal gripper control par: \n" << gripper_control_par_tau << std::endl;
 
         // Call the planner
-        /* PlannerResult plannerResult = */
-        /*     ccAffordancePlanner.affordance_stepper(cc_slist, aff_goal, gripper_control_par_tau); */
-        PlannerResult plannerResult =
-            ccAffordancePlanner.affordance_stepper(cc_slist, sec_goal, gripper_control_par_tau);
-        /* PlannerResult plannerResult = */
-        /*     ccAffordancePlanner.affordance_stepper(cc_slist_body, aff_goal, gripper_control_par_tau); */
-
+        cc_affordance_planner::PlannerResult plannerResult = cc_affordance_planner::generate_joint_trajectory(
+            plannerConfig, cc_slist, sec_goal, gripper_control_par_tau);
         // Print planner result
         std::vector<Eigen::VectorXd> cca_solution = plannerResult.joint_traj;
         if (plannerResult.success)
@@ -238,8 +232,8 @@ class SpotIKSolver : public rclcpp::Node
             }
 
             // Compute cartesian pose
-            Eigen::Matrix4d se3mat = AffordanceUtil::VecTose3(aff_twist);
-            Eigen::Matrix4d ee_htm_matrix = AffordanceUtil::MatrixExp6(se3mat) * start_ee_htm.matrix();
+            Eigen::Matrix4d se3mat = affordance_util::VecTose3(aff_twist);
+            Eigen::Matrix4d ee_htm_matrix = affordance_util::MatrixExp6(se3mat) * start_ee_htm.matrix();
             /* std::cout << "The EE pose at step " << loop_counter_k << " is \n" << ee_htm << std::endl; */
             Eigen::Isometry3d ee_htm(ee_htm_matrix);
 
@@ -303,11 +297,12 @@ class SpotIKSolver : public rclcpp::Node
 
         // Convert the solution trajectory to ROS message type
         const double traj_time_step = 0.3;
-        control_msgs::action::FollowJointTrajectory_Goal goal = AffordanceUtilROS::follow_joint_trajectory_msg_builder(
-            trajectory, config_offset, joint_names,
-            traj_time_step); // this function takes care of extracting the right
-                             // number of joint_states although solution
-                             // contains qs data too
+        control_msgs::action::FollowJointTrajectory_Goal goal =
+            affordance_util_ros::follow_joint_trajectory_msg_builder(
+                trajectory, config_offset, joint_names,
+                traj_time_step); // this function takes care of extracting the right
+                                 // number of joint_states although solution
+                                 // contains qs data too
         // Print the message
         // Loop through each trajectory point
         std::cout << "\nTrajectory Points:\n";
@@ -379,7 +374,7 @@ Eigen::MatrixXd compose_cc_model_slist(const Eigen::MatrixXd &robot_slist, const
     const size_t nof_sjoints = nof_vir_ee_joints + 1; // Number of joints to be appended, + 1 for one affordance
 
     // Compute robot Jacobian
-    Eigen::MatrixXd robot_jacobian = AffordanceUtil::JacobianSpace(robot_slist, thetalist);
+    Eigen::MatrixXd robot_jacobian = affordance_util::JacobianSpace(robot_slist, thetalist);
 
     // Append virtual EE screw axes as well as the affordance screw.
     // Note: In the future it might be desired to append the virtual EE screws as Jacobians as well. This would allow
@@ -389,7 +384,7 @@ Eigen::MatrixXd compose_cc_model_slist(const Eigen::MatrixXd &robot_slist, const
     Eigen::MatrixXd app_slist(screw_length, nof_sjoints);
 
     // Extract robot palm location
-    const Eigen::Matrix4d ee_htm = AffordanceUtil::FKinSpace(M, robot_slist, thetalist);
+    const Eigen::Matrix4d ee_htm = affordance_util::FKinSpace(M, robot_slist, thetalist);
     const Eigen::Vector3d q_vir = ee_htm.block<3, 1>(0, 3); // Translation part of the HTM
 
     // Virtual EE screw axes
@@ -402,7 +397,7 @@ Eigen::MatrixXd compose_cc_model_slist(const Eigen::MatrixXd &robot_slist, const
 
     for (size_t i = 0; i < nof_vir_ee_joints; ++i)
     {
-        app_slist.col(i) = AffordanceUtil::get_screw(w_vir.col(i), q_vir);
+        app_slist.col(i) = affordance_util::get_screw(w_vir.col(i), q_vir);
     }
 
     // Affordance screw
@@ -431,7 +426,7 @@ int main(int argc, char *argv[])
     // Extract robot config info
     const std::string robot_config_file_path = "/home/crasun/ws_moveit2/src/cca_spot/config/cca_spot_description.yaml";
     const std::string planning_group = "arm";
-    const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
+    const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
     const Eigen::MatrixXd robot_slist = robotConfig.Slist;
     const Eigen::Matrix4d M = robotConfig.M;
     const std::vector<std::string> joint_names = robotConfig.joint_names;
@@ -456,7 +451,7 @@ int main(int argc, char *argv[])
     /* const Eigen::Vector3d aff_screw_axis_location(0.602653, -0.119387, 0.16575); // location vector - turning a valve
      * 4 */
     const Eigen::Matrix<double, 6, 1> aff_screw =
-        AffordanceUtil::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
+        affordance_util::get_screw(aff_screw_axis, aff_screw_axis_location); // affordance screw
     /* Eigen::VectorXd aff_screw(6); */
     /* aff_screw << 0, 0, 0, 1, 0, 0; // pushing a drawer */
     /* aff_screw << 0, 0, 0, 1, 0, 0; // pulling a drawer */
@@ -485,7 +480,7 @@ int main(int argc, char *argv[])
     {
         // Call CCA planner
         // Create closed-chain screws
-        /* Eigen::MatrixXd cc_slist = AffordanceUtil::compose_cc_model_slist(robot_slist, aff_start_state, M,
+        /* Eigen::MatrixXd cc_slist = affordance_util::compose_cc_model_slist(robot_slist, aff_start_state, M,
          * aff_screw); */
         std::cout << std::fixed << std::setprecision(4); // Display up to 4 decimal places
         Eigen::MatrixXd cc_slist = compose_cc_model_slist(robot_slist, aff_start_state, M, aff_screw);

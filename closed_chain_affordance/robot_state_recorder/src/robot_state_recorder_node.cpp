@@ -39,10 +39,10 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
         // Get abs path to the directory where we will save data
         const std::string rel_data_save_path = "/../data/";
-        abs_data_save_path_ = AffordanceUtilROS::get_abs_path_to_rel_dir(__FILE__, rel_data_save_path);
+        abs_data_save_path_ = affordance_util_ros::get_abs_path_to_rel_dir(__FILE__, rel_data_save_path);
 
         // Extract robot config info
-        const AffordanceUtil::RobotConfig &robotConfig = AffordanceUtil::robot_builder(robot_config_file_path);
+        const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
         slist_ = robotConfig.Slist;
         joint_names_ = robotConfig.joint_names;
         M_ = robotConfig.M;
@@ -67,7 +67,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     // ROS variables
     rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr follow_joint_traj_sub_;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
-    AffordanceUtilROS::JointTrajPoint joint_states_;
+    affordance_util_ros::JointTrajPoint joint_states_;
     // Robot data
     Eigen::MatrixXd slist_;
     std::vector<std::string> joint_names_;
@@ -124,8 +124,8 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         // function
         /* const auto &unordered_pred_traj_ = msg->goal.trajectory; */
         const auto &unordered_pred_traj_ = *msg;
-        const std::vector<AffordanceUtilROS::JointTrajPoint> pred_traj_ =
-            AffordanceUtilROS::get_ordered_joint_traj(unordered_pred_traj_, joint_names_);
+        const std::vector<affordance_util_ros::JointTrajPoint> pred_traj_ =
+            affordance_util_ros::get_ordered_joint_traj(unordered_pred_traj_, joint_names_);
         std::cout << "Writing predicted data now" << std::endl;
         write_pred_data(pred_traj_);
         std::cout << "Finished writing predicted data" << std::endl;
@@ -137,7 +137,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         // Lock the mutex and update joint_states and data-ready flag
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            joint_states_ = AffordanceUtilROS::get_ordered_joint_states(msg, joint_names_);
+            joint_states_ = affordance_util_ros::get_ordered_joint_states(msg, joint_names_);
             joint_states_ready_ = true;
         }
 
@@ -146,7 +146,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     }
 
     // Function to write predicted data to file
-    void write_pred_data(const std::vector<AffordanceUtilROS::JointTrajPoint> &pred_traj_)
+    void write_pred_data(const std::vector<affordance_util_ros::JointTrajPoint> &pred_traj_)
     {
 
         const std::string filename = "pred_tf_and_joint_states_data.csv";
@@ -187,7 +187,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
             }
 
             // EE position
-            Eigen::MatrixXd ee_htm = AffordanceUtil::FKinSpace(M_, slist_, pred_traj_point.positions);
+            Eigen::MatrixXd ee_htm = affordance_util::FKinSpace(M_, slist_, pred_traj_point.positions);
             Eigen::Quaterniond ee_htm_or(ee_htm.block<3, 3>(0, 0));
             csvFile << ee_htm(0, 3) << "," << ee_htm(1, 3) << "," << ee_htm(2, 3) << ",";
             csvFile << ee_htm_or.x() << "," << ee_htm_or.y() << "," << ee_htm_or.z() << "," << ee_htm_or.w() << ",";
@@ -256,7 +256,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
             // putting the thread to sleep at other times and releasing the mutex.
             // When it is ready, copy it, set data-ready flag to false, release the
             // mutex, and move on
-            AffordanceUtilROS::JointTrajPoint joint_states_copy;
+            affordance_util_ros::JointTrajPoint joint_states_copy;
             {
                 std::unique_lock<std::mutex> lock(mutex_);
                 joint_states_cv_.wait(lock, [this] { return (joint_states_ready_ || g_exit_flag); });
@@ -272,7 +272,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
             }
 
             // Write EE position to file
-            Eigen::MatrixXd ee_htm = AffordanceUtil::FKinSpace(M_, slist_, joint_states_copy.positions);
+            Eigen::MatrixXd ee_htm = affordance_util::FKinSpace(M_, slist_, joint_states_copy.positions);
             Eigen::Quaterniond ee_htm_or(ee_htm.block<3, 3>(0, 0));
 
             csvFile << ee_htm(0, 3) << "," << ee_htm(1, 3) << "," << ee_htm(2, 3) << ",";
