@@ -68,46 +68,44 @@ class CcAffordancePlannerRos : public rclcpp::Node
     explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
     /**
-     * @brief Given affordance screw information, affordance goal, and closed-chain planner parameters, generates,
-     * visualizes, and executes joint trajectories to execute the affordance.
+     * @brief Generates, visualizes, and executes joint trajectories using the Closed-Chain Affordance model based on
+     *        given planner configuration, affordance screw information, secondary joint goals, and gripper control
+     *        parameters.
      *
-     * @param w_aff Affordance screw axis
-     * @param q_aff 3-vector location of the screw axis from the reference frame
-     * @param sec_goal Desired affordance and gripper orientation goals. Affordance part is in radians for rotational
-     * screws and meters for pure-translational screws
-     * @param aff_step Desired step for the affordance trajectory. This determines how dense you want the trajectory to
-     * be. For instance, for a 0.5rad affordance goal, you might choose a 0.1rad step. Units are radians or meters
-     * depending on affordance
-     * @param gripper_control_par_tau Planner parameter indicating whether and what part of the gripper to control
-     * @param accuracy Accuracy of the framework in decimals, for instance 0.1 for 10%
+     * @param plannerConfig cc_affordance_planner::PlannerConfig containing CC Affordance Planner configuration
+     *        settings:
+     *        - Use the parameter `aff_step` to specify the trajectory density with an affordance step.
+     *          For example, an affordance goal of 0.5 rad could have an affordance step of 0.1 rad,
+     *          resulting in a trajectory with 5 points, where the intermediate affordance goals are 0.1, 0.2, 0.3, 0.4,
+     * 		and 0.5 rad.
+     *        - The `accuracy` parameter represents the threshold for the affordance goal (and step). For instance,
+     *          if 10% accuracy is desired for a 1 rad goal, set accuracy to 0.1. This will produce joint solutions
+     *          that result in an affordance goal of 1 ± 0.1 rad.
+     *        - Advanced users can utilize two additional parameters:
+     *          - `closure_error_threshold`: Specify the error threshold for the closed-chain closure error.
+     *          - `max_itr`: Specify the maximum iterations for the closed-chain inverse kinematics solver.
      *
-     * @return true denoting execution success, false denoting failure
-     */
-    bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const Eigen::Vector3d &q_aff,
-                                   const Eigen::VectorXd &sec_goal, const double &aff_step = 0.3,
-                                   const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0);
-
-    /**
-     * @brief Given affordance screw information, affordance goal, and closed-chain planner parameters, generates,
-     * visualizes, and executes joint trajectories to execute the affordance.
+     * @param aff affordance_util::ScrewInfo containing information about the affordance. The `aff_type` and `axis`
+     * 	      fields are mandatory. Possible values for `aff_type` include "translation", "rotation", and "screw".
+     * 	      Specify `location_frame` if using AprilTag.
      *
-     * @param w_aff Affordance screw axis
-     * @param apriltag_frame_name Name of the AprilTag frame from which to retrieve the 3-vector location of the screw
-     * axis
-     * @param sec_goal Desired affordance and gripper orientation goals. Affordance part is in radians for rotational
-     * screws and meters for pure-translational screws
-     * @param aff_step Desired step for the affordance trajectory. This determines how dense you want the trajectory to
-     * be. For instance, for a 0.5rad affordance goal, you might choose a 0.1rad step. Units are radians or meters
-     * depending on affordance
-     * @param gripper_control_par_tau Planner parameter indicating whether and what part of the gripper to control
-     * @param accuracy Accuracy of the framework in decimals, for instance 0.1 for 10%
+     * @param sec_goal Eigen::VectorXd containing secondary joint angle goals including EE orientation and affordance,
+     *        with the affordance goal being the end element.
      *
-     * @return true denoting execution success, false denoting failure
+     * @param gripper_control_par_tau A numeric parameter indicating the length of the secondary joint vector:
+     *        - A value of 1 implies only affordance control.
+     *        - A value of 2 represents affordance control along with controlling the gripper orientation about the next
+     * 		adjacent virtual gripper axis (x, y, or z).
+     *        - A value of 3 involves controlling affordance along with the EE orientation about the next two virtual
+     * 		gripper axes.
+     *        - A value of 4 refers to affordance control along with all aspects of EE orientation.
+     *
+     * @return bool indicating success
      */
 
-    bool run_cc_affordance_planner(const Eigen::Vector3d &w_aff, const std::string &apriltag_frame_name,
-                                   const Eigen::VectorXd &sec_goal, const double &aff_step = 0.3,
-                                   const int &gripper_control_par_tau = 1, const double &accuracy = 10.0 / 100.0);
+    bool run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
+                                   affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
+                                   const size_t &gripper_control_par_tau = 1);
 
   private:
     rclcpp::Logger node_logger_;       // logger associated with the node
