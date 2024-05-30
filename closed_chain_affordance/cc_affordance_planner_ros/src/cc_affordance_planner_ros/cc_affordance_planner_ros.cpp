@@ -35,7 +35,9 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
                                                        affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
-                                                       const size_t &gripper_control_par_tau)
+                                                       const size_t &gripper_control_par,
+                                                       const std::string &vir_screw_order,
+                                                       Eigen::VectorXd robot_start_config)
 {
     // If tag frame is specified then, we lookup affordance location from tag
     if (!aff.location_frame.empty())
@@ -54,14 +56,18 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
 
     // Get joint states at the start configuration of the affordance
-    Eigen::VectorXd robot_thetalist = get_aff_start_joint_states_();
+    if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
+    {
+        robot_start_config = get_aff_start_joint_states_();
+    }
 
     // Compose cc model and affordance goal
-    Eigen::MatrixXd cc_slist = affordance_util::compose_cc_model_slist(robot_slist_, robot_thetalist, M_, aff_screw);
+    Eigen::MatrixXd cc_slist =
+        affordance_util::compose_cc_model_slist(robot_slist_, robot_start_config, M_, aff_screw, vir_screw_order);
 
     // Run the planner
     cc_affordance_planner::PlannerResult plannerResult =
-        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par_tau);
+        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par);
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
@@ -78,7 +84,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     }
 
     // Visualize and execute trajectory
-    return visualize_and_execute_trajectory_(solution, aff.axis, aff.location);
+    return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location);
 }
 
 // Returns full path to the yaml file containing cc affordance robot description
@@ -120,6 +126,7 @@ Eigen::VectorXd CcAffordancePlannerRos::get_aff_start_joint_states_()
 
 // Function to visualize and execute planned trajectory
 bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
+                                                               const Eigen::VectorXd &robot_start_config,
                                                                const Eigen::VectorXd &w_aff,
                                                                const Eigen::VectorXd &q_aff)
 {
@@ -129,7 +136,7 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
     const double traj_time_step = 0.3;
     const control_msgs::action::FollowJointTrajectory_Goal goal =
         affordance_util_ros::follow_joint_trajectory_msg_builder(
-            trajectory, joint_states_.positions, joint_names_,
+            trajectory, robot_start_config, joint_names_,
             traj_time_step); // this function takes care of extracting the right
                              // number of joint_states although solution
                              // contains qs data too

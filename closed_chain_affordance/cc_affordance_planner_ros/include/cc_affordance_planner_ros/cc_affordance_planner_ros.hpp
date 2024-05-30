@@ -100,12 +100,20 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * 		gripper axes.
      *        - A value of 4 refers to affordance control along with all aspects of EE orientation.
      *
+     * @param vir_screw_order std::string indicating the order for the virtual EE screws. Possible values are "xyz",
+     * "yzx" and "zxy". Default is "xyz"
+     *
+     * @param robot_start_config Eigen::VectorXd containing the start configuration of the robot. This is internally
+     * read via the robot joint_states topic. Here for testing purposes only, when planning without the joint_states
+     * topic.
+     *
      * @return bool indicating success
      */
 
     bool run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
                                    affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
-                                   const size_t &gripper_control_par_tau = 1);
+                                   const size_t &gripper_control_par = 1, const std::string &vir_screw_order = "xyz",
+                                   Eigen::VectorXd robot_start_config = Eigen::VectorXd());
 
   private:
     rclcpp::Logger node_logger_;       // logger associated with the node
@@ -168,7 +176,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @return True if trajectory was successfully visualized and executed. false otherwise.
      */
-    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &w_aff,
+    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
+                                           const Eigen::VectorXd &robot_start_config, const Eigen::VectorXd &w_aff,
                                            const Eigen::VectorXd &q_aff);
     /**
      * @brief Callback function to process the feedback from the traj_execution_as_ action server
