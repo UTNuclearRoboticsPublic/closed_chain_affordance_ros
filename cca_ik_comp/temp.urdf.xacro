@@ -1,0 +1,310 @@
+<?xml version="1.0" ?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="spot_arm" params="name" >
+
+    <link name="${name}_base_link"/>
+
+    <link name="${name}_shoulder_yaw">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_sh0.obj"/>
+        </geometry>
+        <material name="arm0.link_sh0">
+            <color rgba="0.2 0.2 0.2 1"/>
+        </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_sh0.obj"/>
+        </geometry>
+        <material name="arm0.link_sh0">
+            <color rgba="1 0.2 0.2 1"/>
+        </material>
+        </collision>
+    </link>
+    <joint name="${name}_shoulder_yaw" type="revolute">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <parent link="${name}_base_link"/>
+        <child link="${name}_shoulder_yaw"/>
+        <limit effort="1000" velocity="1000.00" lower="-2.61799387799149441136" upper="3.14159265358979311599"/>
+    </joint>
+
+    <link name="${name}_shoulder_pitch">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_sh1.obj"/>
+        </geometry>
+        <material name="arm0.link_sh1">
+            <color rgba="0.2 0.2 0.2 1"/>
+        </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_sh1.obj"/>
+        </geometry>
+        <material name="arm0.link_sh1">
+            <color rgba="1 0.2 0.2 1"/>
+        </material>
+        </collision>
+    </link>
+    <joint name="${name}_shoulder_pitch" type="revolute">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="${name}_shoulder_yaw"/>
+        <child link="${name}_shoulder_pitch"/>
+        <limit effort="1000" velocity="1000.00" lower="-3.14159265358979311599" upper="0.52359877559829881565"/>
+    </joint>
+
+    <link name="${name}_shoulder_roll">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_hr0.obj"/>
+        </geometry>
+            <material name="arm0.link_hr0">
+            <color rgba="0.2 0.2 0.2 1"/>
+            </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_hr0.obj"/>
+        </geometry>
+            <material name="arm0.link_hr0">
+            <color rgba="1 0.2 0.2 1"/>
+            </material>
+        </collision>
+    </link>
+    <joint name="${name}_shoulder_roll" type="fixed">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <parent link="${name}_shoulder_pitch"/>
+        <child link="${name}_shoulder_roll"/>
+	<limit effort="0" velocity="0" lower="0" upper="0"/>
+    </joint>
+
+    <link name="${name}_elbow_pitch">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_el0.obj"/>
+        </geometry>
+            <material name="arm0.link_el0">
+            <color rgba="0.2 0.2 0.2 1"/>
+            </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_el0.obj"/>
+        </geometry>
+            <material name="arm0.link_el0">
+            <color rgba="1 0.2 0.2 1"/>
+            </material>
+        </collision>
+    </link>
+    <joint name="${name}_elbow_pitch" type="revolute">
+        <origin xyz="0.3385 0 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="${name}_shoulder_roll"/>
+        <child link="${name}_elbow_pitch"/>
+        <limit effort="1000" velocity="1000.00" lower="0" upper="3.14159265358979311599"/>
+    </joint>
+
+    <link name="${name}_elbow_roll">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_el1.obj"/>
+        </geometry>
+            <material name="arm0.link_el1">
+            <color rgba="0.2 0.2 0.2 1"/>
+            </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_el1.obj"/>
+        </geometry>
+            <material name="arm0.link_el1">
+            <color rgba="1 0.2 0.2 1"/>
+            </material>
+        </collision>
+    </link>
+    <joint name="${name}_elbow_roll" type="revolute">
+        <origin xyz="0.40330 0.0 0.0750" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <parent link="${name}_elbow_pitch"/>
+        <child link="${name}_elbow_roll"/>
+        <limit effort="1000" velocity="1000.00" lower="-2.79252680319092716487" upper="2.79252680319092716487"/>
+    </joint>
+
+    <link name="${name}_wrist_pitch">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_wr0.obj"/>
+        </geometry>
+            <material name="arm0.link_wr0">
+            <color rgba="0.2 0.2 0.2 1"/>
+            </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_wr0.obj"/>
+        </geometry>
+            <material name="arm0.link_wr0">
+            <color rgba="1 0.2 0.2 1"/>
+            </material>
+        </collision>
+    </link>
+    <joint name="${name}_wrist_pitch" type="revolute">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <parent link="${name}_elbow_roll"/>
+        <child link="${name}_wrist_pitch"/>
+        <limit effort="1000" velocity="1000.00" lower="-1.83259571459404613236" upper="1.83259571459404613236"/>
+    </joint>
+
+    <link name="${name}_wrist_roll">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_wr1.obj"/>
+        </geometry>
+            <material name="arm0.link_wr1">
+            <color rgba="0.2 0.2 0.2 1"/>
+            </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_wr1.obj"/>
+        </geometry>
+            <material name="arm0.link_wr1">
+            <color rgba="1 0.2 0.2 1"/>
+            </material>
+        </collision>
+    </link>
+    <joint name="${name}_wrist_roll" type="revolute">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <parent link="${name}_wrist_pitch"/>
+        <child link="${name}_wrist_roll"/>
+        <limit effort="1000" velocity="1000.00" lower="-2.87979326579064354163" upper="2.87979326579064354163"/>
+    </joint>
+	    <!-- Bof virtual link and joint addition -->
+    <link name="${name}_tool0"/>
+
+	<joint name="${name}_ee_virtual_joint" type="fixed">
+	    <origin xyz="0.19557 0 0" rpy="0 0 0"/>
+	    <axis xyz="0.0 0.0 0.0"/>
+	    <parent link="${name}_wrist_roll"/>
+	    <child link="${name}_tool0"/>
+	</joint>
+	    <!-- Eof Virtual link and joint addition -->
+
+
+    <link name="${name}_fingers">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_fngr.obj"/>
+        </geometry>
+        <material name="arm0.link_fngr">
+            <color rgba="0.2 0.2 0.2 1"/>
+        </material>
+        </visual>
+        <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <mesh filename="package://spot_description/meshes/arm/arm0.link_fngr.obj"/>
+        </geometry>
+        <material name="arm0.link_fngr">
+            <color rgba="0.2 0.2 0.2 1"/>
+        </material>
+        </collision>
+    </link>
+    <joint name="${name}_fingers" type="revolute">
+        <origin xyz="0.11745 0 0.014820" rpy="0 0 0"/>
+        <axis xyz="0.0 1.0 0.0"/>
+        <parent link="${name}_wrist_roll"/>
+        <child link="${name}_fingers"/>
+        <limit effort="1000" velocity="1000.00" lower="-1.57" upper="0.0"/>
+    </joint>
+    <link name="hand_color_image_sensor"/>
+    <joint name="color_image_joint" type="fixed">
+        <parent link = "${name}_wrist_roll"/>
+        <child  link = "hand_color_image_sensor"/>
+        <origin xyz  = "0.14 0.02 0.022" rpy="-1.57 0 -1.54"/>
+    </joint>
+    </xacro:macro>
+<!-- Transmissions -->
+  <transmission name="tran1">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm0_shoulder_yaw">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor1">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="tran2">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm0_shoulder_pitch">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor2">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="tran3">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm0_elbow_pitch">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor3">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="tran4">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm0_elbow_roll">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor4">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="tran5">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm0_wrist_pitch">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor5">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="tran6">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="arm0_wrist_roll">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="motor6">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+<!-- EOF Transmissions -->
+</robot>
