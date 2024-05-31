@@ -35,8 +35,7 @@ This repository contains ROS2 packages used to interface the closed-chain afford
 
 ## Run Instructions
 The entry point for this planner is a launch file in a package named as `cca_<robot>` that contains robot-related information for closed-chain affordance planning. The framework is implemented for the following robots, and the links direct you to the repositories containing those packages and instructions on how to run the planner for each robot.
-   - [Boston Dynamics Spot robot](https://github.com/UTNuclearRobotics/closed_chain_affordance_spot.git)
-   - [Kinova Gen3 7DoF arm](https://github.com/UTNuclearRobotics/closed_chain_affordance_kinova.git)
+   - [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/cca_spot.git)
 
 ## Instructions to Implement the Framework on a New Robot
 
