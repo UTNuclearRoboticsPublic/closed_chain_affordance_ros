@@ -23,9 +23,9 @@ This repository contains ROS2 packages used to interface the Closed-chain Afford
    source install/setup.bash
    ```
 
-3. If using an AprilTag to detect affordance, also build and source the following package (TODO):
+3. If using an AprilTag to detect affordance, also build and source the following packages:
    ```
-   colcon build --packages-select apriltag_setup
+   colcon build --packages-select apriltag_msgs apriltag_ros
    ```
    ```
    source install/setup.bash
