@@ -1,17 +1,17 @@
 # Closed-Chain Affordance Planning Framework - ROS2 Interface
 
 ## Build Instructions
-This repository contains ROS2 packages used to interface the closed-chain affordance planner with a physical robot. Follow these steps:
+This repository contains ROS2 packages used to interface the closed-chain affordance planner with a robot. Follow these steps:
 
 1. Install the closed-chain affordance Cpp libraries by following instructions on the `cpp` branch of this repository:</br>
-   [Cpp library installation instructions](https://github.com/UTNuclearRobotics/closed_chain_affordance/tree/cpp)
+   [Cpp library installation instructions](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
 
 2. Clone the packages from this branch into your ROS2 workspace's `src` folder and build and source them:
    ```
    cd ~/<ros_workspace_name>/src
    ```
    ```
-   git clone -b ros_galactic git@github.com:UTNuclearRobotics/closed_chain_affordance.git
+   git clone git@github.com:UTNuclearRoboticsPublic/closed_chain_affordance_ros.git
    ```
    ```
    cd ~/<ros_workspace_name>
@@ -77,3 +77,6 @@ The package will contain two files in its `config` folder: `cca_<robot>_descript
    ```
    ros2 launch cca_<robot> cca_<robot>.launch.py
    ```
+
+## Author
+Janak Panthi aka Crasun Jans
