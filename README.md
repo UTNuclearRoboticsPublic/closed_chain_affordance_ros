@@ -1,0 +1,1 @@
+# closed_chain_affordance_ros
