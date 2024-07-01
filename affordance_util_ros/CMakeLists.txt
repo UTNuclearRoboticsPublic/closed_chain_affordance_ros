@@ -37,6 +37,9 @@ add_library(${PROJECT_NAME}
 # Link Eigen libraries against this project library
 target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 
+# Specify ROS dependencies
+ament_target_dependencies(${PROJECT_NAME} rclcpp tf2_ros control_msgs geometry_msgs sensor_msgs)
+
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
