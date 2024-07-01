@@ -198,9 +198,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
     /**
      * @brief Callback to process the goal response from the traj_execution_as_ action server
      *
-     * @param future A shared_future object to a follow_joint_trajectory action server goal handle
+     * @param goal_handle A shared pointer to a follow_joint_trajectory action server goal handle
      */
-    void traj_execution_goal_response_callback_(std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> future);
+    void traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
 };
 
 #endif // CC_AFFORDANCE_PLANNER_ROS

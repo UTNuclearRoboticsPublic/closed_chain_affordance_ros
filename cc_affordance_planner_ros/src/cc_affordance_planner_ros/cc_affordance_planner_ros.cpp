@@ -244,9 +244,8 @@ void CcAffordancePlannerRos::traj_execution_result_callback_(
 
 // Callback to process traj_exection_as goal response
 void CcAffordancePlannerRos::traj_execution_goal_response_callback_(
-    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> future)
+    const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle)
 {
-    auto goal_handle = future.get();
     if (!goal_handle)
     {
         RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", traj_execution_as_name_.c_str());
