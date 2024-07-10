@@ -34,7 +34,9 @@
 
 #include "control_msgs/action/follow_joint_trajectory.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "std_srvs/srv/trigger.hpp"
 #include "tf2_ros/transform_listener.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -136,6 +138,10 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    // joint states subscriber
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                      // buffer to lookup tf data
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+
+    // Gripper service clients
+    rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr gripper_open_client_;
+    rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr gripper_close_client_;
 
     // Robot ROS setup data
     std::string traj_execution_as_name_;      // trajectory execution action server name

@@ -25,6 +25,8 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     // Initialize clients and subscribers
     traj_execution_client_ = rclcpp_action::create_client<FollowJointTrajectory>(this, traj_execution_as_name_);
     plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
+    gripper_open_client_ = this->create_client<std_srvs::srv::Trigger>("/spot_manipulation_driver/open_gripper");
+    gripper_close_client_ = this->create_client<std_srvs::srv::Trigger>("/spot_manipulation_driver/close_gripper");
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcAffordancePlannerRos::joint_states_cb_, this, std::placeholders::_1));
 
@@ -114,6 +116,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
         point.head(6) = point.head(6) + robot_start_config;
     }
     solution.insert(solution.begin(), robot_start_config);
+    bool success = visualize_and_execute_trajectory_(solution, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
 
     const Eigen::Matrix4d computed_grasp_pose = affordance_util::FKinSpace(M_, robot_slist_, solution.back().head(6));
     std::cout << "Here is the computed grasp pose:\n" << computed_grasp_pose << std::endl;
@@ -123,6 +126,55 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
         point.head(6) = point.head(6) + grasp_config;
     }
     affResult.insert(affResult.begin(), grasp_config);
+    /***********************************************************************************/
+    // open gripper
+    rclcpp::sleep_for(std::chrono::seconds(2));
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+    /* //  Wait for the service to be activated */
+    /* while (!gripper_open_client_->wait_for_service(1s)) */
+    /* { */
+    /*     // If ROS is shutdown before the service is activated, show this error */
+    /*     if (!rclcpp::ok()) */
+    /*     { */
+    /*         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Interrupted while waiting for the service. Exiting."); */
+    /*         return 0; */
+    /*     } */
+    /*     // Print in the screen some information so the user knows what is happening */
+    /*     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "service not available, waiting again..."); */
+    /* } */
+    // Client sends its asynchronous request
+    auto open_result = gripper_open_client_->async_send_request(request);
+    auto open_response = open_result.get(); // blocks until response is received
+    // Wait for the result
+    if (open_response->success)
+    {
+        // Get the response's success field to see if all checks passed
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Gripper open service called successfully");
+    }
+    else
+    {
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call Gripper open service");
+    }
+
+    /***********************************************************************************/
+    std::vector<Eigen::VectorXd> start_point;
+    start_point.push_back(affResult[0]);
+    success = visualize_and_execute_trajectory_(start_point, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
+    rclcpp::sleep_for(std::chrono::seconds(2));
+    /***********************************************************************************/
+    auto close_result = gripper_close_client_->async_send_request(request);
+    auto close_response = close_result.get(); // blocks until response is received
+    // Wait for the result
+    if (close_response->success)
+    {
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Gripper close service called successfully");
+    }
+    else
+    {
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call Gripper close service");
+    }
+    /***********************************************************************************/
+    success = visualize_and_execute_trajectory_(affResult, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
     solution.insert(solution.end(), affResult.begin(), affResult.end());
     /* if (approachResult.success) */
     if (approachResult.success)
@@ -140,7 +192,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
 
     // Visualize and execute trajectory
     /* bool success = visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
-    bool success = visualize_and_execute_trajectory_(solution, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
+    /* bool success = visualize_and_execute_trajectory_(solution, Eigen::VectorXd::Zero(6), aff.axis, aff.location); */
     /* return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
 }
 
@@ -411,7 +463,7 @@ void CcAffordancePlannerRos::traj_execution_result_callback_(
         return;
     }
     RCLCPP_INFO(node_logger_, "%s action server call concluded", traj_execution_as_name_.c_str());
-    rclcpp::shutdown();
+    /* rclcpp::shutdown(); */
 }
 
 // Callback to process traj_exection_as goal response
