@@ -115,6 +115,18 @@ class CcAffordancePlannerRos : public rclcpp::Node
                                    const size_t &gripper_control_par = 1, const std::string &vir_screw_order = "xyz",
                                    Eigen::VectorXd robot_start_config = Eigen::VectorXd());
 
+    std::vector<Eigen::VectorXd> run_cc_affordance_planner_affordance_motion(
+        const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
+        const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par = 1,
+        const std::string &vir_screw_order = "xyz", Eigen::VectorXd robot_start_config = Eigen::VectorXd());
+
+    bool run_cc_affordance_planner_approach_motion(const cc_affordance_planner::PlannerConfig &plannerConfig,
+                                                   affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
+                                                   const Eigen::VectorXd &grasp_config,
+                                                   const size_t &gripper_control_par = 1,
+                                                   const std::string &vir_screw_order = "xyz",
+                                                   Eigen::VectorXd robot_start_config = Eigen::VectorXd());
+
   private:
     rclcpp::Logger node_logger_;       // logger associated with the node
     std::string plan_and_viz_ss_name_; // name of the planning visualization server
