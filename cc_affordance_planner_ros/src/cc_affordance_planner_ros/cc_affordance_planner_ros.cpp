@@ -37,9 +37,10 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
-    const Eigen::VectorXd &sec_goal, const Eigen::VectorXd &grasp_config, const size_t &gripper_control_par,
+    const Eigen::VectorXd &sec_goal, Eigen::VectorXd grasp_config, const size_t &gripper_control_par,
     const std::string &vir_screw_order, Eigen::VectorXd robot_start_config)
 {
+    Eigen::Matrix4d grasp_pose;
     // If tag frame is specified then, we lookup affordance location from tag
     if (!aff.location_frame.empty())
     {
@@ -52,7 +53,13 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
             throw std::runtime_error("You indicated you are not ready to read affordance location");
         }
         const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
-        aff.location = aff_htm.translation();
+        /* aff.location = aff_htm.translation(); */
+        aff.location = Eigen::Vector3d(0.0, 0.0, 0.0); // moving_a_stool
+        Eigen::Matrix4d offset = Eigen::Matrix4d::Identity();
+        Eigen::Matrix4d aff_htm_m = aff_htm.matrix();
+        offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.45, 0.27);
+        grasp_pose = aff_htm_m * offset;
+        grasp_pose.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity();
     }
     const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
 
@@ -65,8 +72,8 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     // Compute approach screw
     const Eigen::Matrix4d start_pose = affordance_util::FKinSpace(M_, robot_slist_, robot_start_config);
     /* const Eigen::Matrix4d grasp_pose = affordance_util::FKinSpace(M_, robot_slist_, grasp_config); */
-    Eigen::Matrix4d grasp_pose = affordance_util::FKinSpace(M_, robot_slist_, grasp_config);
-    grasp_pose.block<3, 1>(0, 3) = grasp_pose.block<3, 1>(0, 3) + Eigen::Vector3d(-0.2, 0, 0.0);
+    /* Eigen::Matrix4d grasp_pose = affordance_util::FKinSpace(M_, robot_slist_, grasp_config); */
+    /* grasp_pose.block<3, 1>(0, 3) = grasp_pose.block<3, 1>(0, 3) + Eigen::Vector3d(-0.2, 0, 0.0); */
 
     const Eigen::Matrix<double, 6, 1> approach_twist =
         affordance_util::Adjoint(start_pose) *
@@ -75,16 +82,14 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     const Eigen::Matrix<double, 6, 1> approach_screw = approach_twist / approach_twist.norm();
 
     // Compose cc model and affordance goal
-    std::cout << "Here is the grasp config:\n" << grasp_config << std::endl;
-    const Eigen::MatrixXd cc_slist =
-        affordance_util::compose_cc_model_slist(robot_slist_, grasp_config, M_, aff_screw, vir_screw_order);
     /* const Eigen::MatrixXd start_jac = affordance_util::JacobianSpace(robot_slist_, robot_start_config); */
     /* Eigen::MatrixXd approach_cc_slist(cc_slist.rows(), cc_slist.cols() + 1); */
     /* approach_cc_slist << start_jac, cc_slist.col(6), cc_slist.col(7), cc_slist.col(8), cc_slist.col(9),
      * approach_screw; */
     const Eigen::MatrixXd cc_slist_a =
         affordance_util::compose_cc_model_slist(robot_slist_, robot_start_config, M_, aff_screw, vir_screw_order);
-    Eigen::MatrixXd approach_cc_slist(cc_slist.rows(), cc_slist.cols() + 1);
+    /* Eigen::MatrixXd approach_cc_slist(cc_slist.rows(), cc_slist.cols() + 1); */
+    Eigen::MatrixXd approach_cc_slist(cc_slist_a.rows(), cc_slist_a.cols() + 1);
     approach_cc_slist << cc_slist_a, approach_screw;
 
     /* std::cout << "DEBUG FLAG" << std::endl; */
@@ -93,7 +98,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     /* approach_goal << 0.0, approach_vector.norm() + 0.6; */
     approach_goal << 0.0, approach_twist.norm();
     std::cout << std::fixed << std::setprecision(3); // Display up to 4 decimal places
-    std::cout << "Here is the closed-chain screw list:\n" << cc_slist << std::endl;
+    /* std::cout << "Here is the closed-chain screw list:\n" << cc_slist << std::endl; */
     std::cout << "Here is the closed-chain screw list with approach screw:\n" << approach_cc_slist << std::endl;
     std::cout << "Here is the start pose:\n" << start_pose << std::endl;
     std::cout << "Here is the grasp pose:\n" << grasp_pose << std::endl;
@@ -105,8 +110,6 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
         cc_affordance_planner::generate_joint_trajectory(plannerConfig, approach_cc_slist, approach_goal, 2);
     /* cc_affordance_planner::PlannerResult plannerResult = */
     /*     cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par); */
-    std::vector<Eigen::VectorXd> affResult = run_cc_affordance_planner_affordance_motion(
-        plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order, grasp_config);
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = approachResult.joint_traj;
@@ -118,14 +121,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     solution.insert(solution.begin(), robot_start_config);
     bool success = visualize_and_execute_trajectory_(solution, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
 
-    const Eigen::Matrix4d computed_grasp_pose = affordance_util::FKinSpace(M_, robot_slist_, solution.back().head(6));
-    std::cout << "Here is the computed grasp pose:\n" << computed_grasp_pose << std::endl;
-    for (auto &point : affResult)
-    {
-
-        point.head(6) = point.head(6) + grasp_config;
-    }
-    affResult.insert(affResult.begin(), grasp_config);
+    /* const Eigen::Matrix4d computed_grasp_pose = affordance_util::FKinSpace(M_, robot_slist_,
+     * solution.back().head(6)); */
+    /* std::cout << "Here is the computed grasp pose:\n" << computed_grasp_pose << std::endl; */
     /***********************************************************************************/
     // open gripper
     rclcpp::sleep_for(std::chrono::seconds(2));
@@ -157,10 +155,23 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     }
 
     /***********************************************************************************/
-    std::vector<Eigen::VectorXd> start_point;
-    start_point.push_back(affResult[0]);
-    success = visualize_and_execute_trajectory_(start_point, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
-    rclcpp::sleep_for(std::chrono::seconds(2));
+    grasp_config = get_aff_start_joint_states_();
+    std::cout << "Here is the grasp config:\n" << grasp_config << std::endl;
+    /* const Eigen::MatrixXd cc_slist = */
+    /* affordance_util::compose_cc_model_slist(robot_slist_, grasp_config, M_, aff_screw, vir_screw_order); */
+    /* std::vector<Eigen::VectorXd> affResult = run_cc_affordance_planner_affordance_motion( */
+    /* plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order, grasp_config); */
+    /* plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order); */
+    /* for (auto &point : affResult) */
+    /* { */
+
+    /*     point.head(6) = point.head(6) + grasp_config; */
+    /* } */
+    /* affResult.insert(affResult.begin(), grasp_config); */
+    /* std::vector<Eigen::VectorXd> start_point; */
+    /* start_point.push_back(affResult[0]); */
+    /* success = visualize_and_execute_trajectory_(start_point, Eigen::VectorXd::Zero(6), aff.axis, aff.location); */
+    /* rclcpp::sleep_for(std::chrono::seconds(2)); */
     /***********************************************************************************/
     auto close_result = gripper_close_client_->async_send_request(request);
     auto close_response = close_result.get(); // blocks until response is received
@@ -174,21 +185,23 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call Gripper close service");
     }
     /***********************************************************************************/
-    success = visualize_and_execute_trajectory_(affResult, Eigen::VectorXd::Zero(6), aff.axis, aff.location);
-    solution.insert(solution.end(), affResult.begin(), affResult.end());
+    std::vector<Eigen::VectorXd> affResult = run_cc_affordance_planner_affordance_motion(
+        plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order, grasp_config);
+    /* success = visualize_and_execute_trajectory_(affResult, Eigen::VectorXd::Zero(6), aff.axis, aff.location); */
+    /* solution.insert(solution.end(), affResult.begin(), affResult.end()); */
     /* if (approachResult.success) */
-    if (approachResult.success)
+    /* if (approachResult.success) */
     /* if (approachResult.success && plannerResult.success) */
-    {
-        RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with "
-                                             << approachResult.traj_full_or_partial << " solution, planning took "
-                                             << approachResult.planning_time.count() << " microseconds, and "
-                                             << approachResult.update_method << " update method was used.");
-    }
-    else
-    {
-        RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution");
-    }
+    /* { */
+    /* RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with " */
+    /*                                      << approachResult.traj_full_or_partial << " solution, planning took " */
+    /*                                      << approachResult.planning_time.count() << " microseconds, and " */
+    /*                                      << approachResult.update_method << " update method was used."); */
+    /* } */
+    /* else */
+    /* { */
+    /* RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution"); */
+    /* } */
 
     // Visualize and execute trajectory
     /* bool success = visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
@@ -202,19 +215,20 @@ std::vector<Eigen::VectorXd> CcAffordancePlannerRos::run_cc_affordance_planner_a
     Eigen::VectorXd robot_start_config)
 {
     // If tag frame is specified then, we lookup affordance location from tag
-    if (!aff.location_frame.empty())
-    {
+    /* if (!aff.location_frame.empty()) */
+    /* { */
 
-        RCLCPP_INFO_STREAM(node_logger_, "Ready to read affordance location from apriltag? y or Y for yes.");
-        std::string conf;
-        std::cin >> conf;
-        if (conf != "y" && conf != "Y")
-        {
-            throw std::runtime_error("You indicated you are not ready to read affordance location");
-        }
-        const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
-        aff.location = aff_htm.translation();
-    }
+    /*     RCLCPP_INFO_STREAM(node_logger_, "Ready to read affordance location from apriltag? y or Y for yes."); */
+    /*     std::string conf; */
+    /*     std::cin >> conf; */
+    /*     if (conf != "y" && conf != "Y") */
+    /*     { */
+    /*         throw std::runtime_error("You indicated you are not ready to read affordance location"); */
+    /*     } */
+    /*     const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
+     */
+    /*     /1* aff.location = aff_htm.translation(); *1/ */
+    /* } */
     const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
 
     // Get joint states at the start configuration of the affordance
@@ -239,6 +253,7 @@ std::vector<Eigen::VectorXd> CcAffordancePlannerRos::run_cc_affordance_planner_a
                                              << plannerResult.traj_full_or_partial << " solution, planning took "
                                              << plannerResult.planning_time.count() << " microseconds, and "
                                              << plannerResult.update_method << " update method was used.");
+        bool success = visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location);
         return plannerResult.joint_traj;
     }
     else
@@ -350,7 +365,7 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
 
     // Visualize trajectory in RVIZ
     // Convert the solution trajectory to ROS message type
-    const double traj_time_step = 0.3;
+    const double traj_time_step = 0.8;
     const control_msgs::action::FollowJointTrajectory_Goal goal =
         affordance_util_ros::follow_joint_trajectory_msg_builder(
             trajectory, robot_start_config, joint_names_,

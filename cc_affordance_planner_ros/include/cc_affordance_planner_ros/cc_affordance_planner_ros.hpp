@@ -124,8 +124,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
 
     bool run_cc_affordance_planner_approach_motion(const cc_affordance_planner::PlannerConfig &plannerConfig,
                                                    affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
-                                                   const Eigen::VectorXd &grasp_config,
-                                                   const size_t &gripper_control_par = 1,
+                                                   Eigen::VectorXd grasp_config, const size_t &gripper_control_par = 1,
                                                    const std::string &vir_screw_order = "xyz",
                                                    Eigen::VectorXd robot_start_config = Eigen::VectorXd());
 
