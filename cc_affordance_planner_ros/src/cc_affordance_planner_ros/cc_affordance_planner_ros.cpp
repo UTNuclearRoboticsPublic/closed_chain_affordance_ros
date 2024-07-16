@@ -27,20 +27,35 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
     gripper_open_client_ = this->create_client<std_srvs::srv::Trigger>("/spot_manipulation_driver/open_gripper");
     gripper_close_client_ = this->create_client<std_srvs::srv::Trigger>("/spot_manipulation_driver/close_gripper");
+    navigation_action_client_ =
+        rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "/navigate_to_pose");
+    /* rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "/spot_driver/navigate_to"); */
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcAffordancePlannerRos::joint_states_cb_, this, std::placeholders::_1));
 
     // Construct buffer to lookup affordance location from apriltag using tf data
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 }
 
+void CcAffordancePlannerRos::navigate_to_pose(const nav2_msgs::action::NavigateToPose::Goal &navigation_goal)
+{
+    auto goal_handle_future = navigation_action_client_->async_send_goal(navigation_goal);
+    /* auto result = rclcpp::spin_until_future_complete(this->get_node_base_interface(), goal_handle_future, */
+    /*                                                  std::chrono::milliseconds(5)); */
+    rclcpp::sleep_for(std::chrono::seconds(5));
+    RCLCPP_INFO(node_logger_, "Navigation action server call concluded");
+}
 bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
     const Eigen::VectorXd &sec_goal, Eigen::VectorXd grasp_config, const size_t &gripper_control_par,
     const std::string &vir_screw_order, Eigen::VectorXd robot_start_config)
 {
     Eigen::Matrix4d grasp_pose;
+    nav2_msgs::action::NavigateToPose::Goal navigation_goal;
+    navigation_goal.pose.header.frame_id = "map";
+    navigation_goal.pose.header.stamp = this->get_clock()->now();
     // If tag frame is specified then, we lookup affordance location from tag
     if (!aff.location_frame.empty())
     {
@@ -60,8 +75,48 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
         offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.45, 0.27);
         grasp_pose = aff_htm_m * offset;
         grasp_pose.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity();
+        Eigen::Matrix4d body_offset = Eigen::Matrix4d::Identity();
+        body_offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, 0.0, 1.2);
+        const Eigen::Isometry3d aff_htm_map = affordance_util_ros::get_htm("map", aff.location_frame, *tf_buffer_);
+        const Eigen::Isometry3d body_or = affordance_util_ros::get_htm("map", "arm0_base_link", *tf_buffer_);
+        const Eigen::Quaterniond body_or_quat(body_or.rotation());
+        Eigen::Matrix4d aff_htm_map_m = aff_htm_map.matrix() * body_offset;
+        navigation_goal.pose.pose.position.x = aff_htm_map_m(0, 3);
+        navigation_goal.pose.pose.position.y = aff_htm_map_m(1, 3);
+        /* navigation_goal.pose.pose.orientation.x = 0; */
+        /* navigation_goal.pose.pose.orientation.y = 0; */
+        /* navigation_goal.pose.pose.orientation.z = 0; */
+        /* navigation_goal.pose.pose.orientation.w = 1; */
+        navigation_goal.pose.pose.orientation.x = body_or_quat.x();
+        navigation_goal.pose.pose.orientation.y = body_or_quat.y();
+        navigation_goal.pose.pose.orientation.z = body_or_quat.z();
+        navigation_goal.pose.pose.orientation.w = body_or_quat.w();
+
+        geometry_msgs::msg::TransformStamped t;
+
+        t.header.stamp = this->get_clock()->now();
+        t.header.frame_id = navigation_goal.pose.header.frame_id;
+        t.child_frame_id = "carrot";
+        t.transform.translation.x = navigation_goal.pose.pose.position.x;
+        t.transform.translation.y = navigation_goal.pose.pose.position.y;
+        t.transform.rotation.x = navigation_goal.pose.pose.orientation.x;
+        t.transform.rotation.y = navigation_goal.pose.pose.orientation.y;
+        t.transform.rotation.z = navigation_goal.pose.pose.orientation.z;
+        t.transform.rotation.w = navigation_goal.pose.pose.orientation.w;
+        rclcpp::Rate loop_rate(4.0);
+
+        for (int i = 0; i <= 100; i++)
+        {
+            tf_broadcaster_->sendTransform(t);
+            loop_rate.sleep();
+        }
+        /* rclcpp::shutdown(); */
     }
     const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
+
+    std::cout << "NAVIGATION DEBUG FLAG" << std::endl;
+    RCLCPP_INFO_STREAM(node_logger_, "Navigating to affordance");
+    navigate_to_pose(navigation_goal);
 
     // Get joint states at the start configuration of the affordance
     if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
@@ -448,6 +503,38 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
     else
     {
         RCLCPP_ERROR(node_logger_, "%s service call failed", plan_and_viz_ss_name_.c_str());
+        // Execute trajectory on the real robot
+        RCLCPP_INFO_STREAM(node_logger_, "Ready to execute the trajectory? y to confirm");
+        std::string execution_conf;
+        std::cin >> execution_conf;
+
+        if (execution_conf != "y" && execution_conf != "Y")
+        {
+            RCLCPP_INFO_STREAM(node_logger_, "Trajectory execution was canceled");
+            return false;
+        }
+
+        // Send the goal to follow_joint_trajectory action server for execution
+        if (!this->traj_execution_client_->wait_for_action_server())
+        {
+            RCLCPP_ERROR(node_logger_, " %s action server not available after waiting",
+                         traj_execution_as_name_.c_str());
+            return false;
+        }
+
+        RCLCPP_INFO(node_logger_, "Sending goal to %s action server", traj_execution_as_name_.c_str());
+
+        auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
+        send_goal_options.goal_response_callback =
+            std::bind(&CcAffordancePlannerRos::traj_execution_goal_response_callback_, this, std::placeholders::_1);
+        /* send_goal_options.feedback_callback =
+         * std::bind(&CcAffordancePlannerRos::traj_execution_feedback_callback_,
+         */
+        /*                                                 this, std::placeholders::_1, std::placeholders::_2); */
+        send_goal_options.result_callback =
+            std::bind(&CcAffordancePlannerRos::traj_execution_result_callback_, this, std::placeholders::_1);
+
+        this->traj_execution_client_->async_send_goal(goal, send_goal_options);
         return false;
     }
 }

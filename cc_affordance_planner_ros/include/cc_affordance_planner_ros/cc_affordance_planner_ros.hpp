@@ -37,6 +37,7 @@
 #include "rclcpp/utilities.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -47,6 +48,7 @@
 #include <cstdlib>
 #include <future>
 #include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
+#include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
 
@@ -142,6 +144,10 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr gripper_open_client_;
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr gripper_close_client_;
 
+    // Navigation client
+    rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigation_action_client_;
+    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
     // Robot ROS setup data
     std::string traj_execution_as_name_;      // trajectory execution action server name
     std::string planning_group_;              // name of the MoveIt planning group for visualization purposes
@@ -218,6 +224,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @param goal_handle A shared pointer to a follow_joint_trajectory action server goal handle
      */
     void traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
+
+    void navigate_to_pose(const nav2_msgs::action::NavigateToPose::Goal &navigation_goal);
 };
 
 #endif // CC_AFFORDANCE_PLANNER_ROS
