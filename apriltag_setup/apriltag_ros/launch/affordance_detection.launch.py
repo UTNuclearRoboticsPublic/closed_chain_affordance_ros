@@ -27,15 +27,20 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import launch
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
-import os
-from ament_index_python.packages import get_package_share_directory
+
+import launch
 from launch.substitutions import LaunchConfiguration
 
 image_topic_ = LaunchConfiguration("image_topic", default="image")
-camera_name = LaunchConfiguration("camera_name", default="/spot_manipulation_driver/rgb/camera")
+camera_name = LaunchConfiguration(
+    "camera_name", default="/spot_manipulation_driver/rgb/camera"
+)
+# camera_name = LaunchConfiguration("camera_name", default="/spot_driver/rgb/frontright")
 
 image_topic = [camera_name, "/", image_topic_]
 info_topic = [camera_name, "/camera_info"]

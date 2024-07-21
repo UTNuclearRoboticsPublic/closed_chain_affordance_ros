@@ -44,7 +44,7 @@ void CcAffordancePlannerRos::navigate_to_pose(const nav2_msgs::action::NavigateT
     auto goal_handle_future = navigation_action_client_->async_send_goal(navigation_goal);
     /* auto result = rclcpp::spin_until_future_complete(this->get_node_base_interface(), goal_handle_future, */
     /*                                                  std::chrono::milliseconds(5)); */
-    rclcpp::sleep_for(std::chrono::seconds(5));
+    /* rclcpp::sleep_for(std::chrono::seconds(5)); */
     RCLCPP_INFO(node_logger_, "Navigation action server call concluded");
 }
 bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
@@ -67,19 +67,28 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
         {
             throw std::runtime_error("You indicated you are not ready to read affordance location");
         }
-        const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
-        /* aff.location = aff_htm.translation(); */
-        aff.location = Eigen::Vector3d(0.0, 0.0, 0.0); // moving_a_stool
-        Eigen::Matrix4d offset = Eigen::Matrix4d::Identity();
-        Eigen::Matrix4d aff_htm_m = aff_htm.matrix();
-        offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.45, 0.27);
-        grasp_pose = aff_htm_m * offset;
-        grasp_pose.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity();
+        /* const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
+         */
+        /* /1* aff.location = aff_htm.translation(); *1/ */
+        /* aff.location = Eigen::Vector3d(0.0, 0.0, 0.0); // moving_a_stool */
+        /* Eigen::Matrix4d offset = Eigen::Matrix4d::Identity(); */
+        /* Eigen::Matrix4d aff_htm_m = aff_htm.matrix(); */
+        /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.45, 0.27); */
+        /* grasp_pose = aff_htm_m * offset; */
+        /* grasp_pose.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(); */
         Eigen::Matrix4d body_offset = Eigen::Matrix4d::Identity();
+        /* body_offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, 0.0, 1.5); */
         body_offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, 0.0, 1.2);
+        /* body_offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, 0.0, 0.8); */
         const Eigen::Isometry3d aff_htm_map = affordance_util_ros::get_htm("map", aff.location_frame, *tf_buffer_);
-        const Eigen::Isometry3d body_or = affordance_util_ros::get_htm("map", "arm0_base_link", *tf_buffer_);
-        const Eigen::Quaterniond body_or_quat(body_or.rotation());
+        /* const Eigen::Isometry3d body_or = affordance_util_ros::get_htm("map", "arm0_base_link", *tf_buffer_); */
+        Eigen::Matrix4d tag_to_body_or = Eigen::Matrix4d::Identity();
+        tag_to_body_or.block<3, 1>(0, 0) = Eigen::Vector3d(0, 0, -1);
+        tag_to_body_or.block<3, 1>(0, 1) = Eigen::Vector3d(-1, 0, 0);
+        tag_to_body_or.block<3, 1>(0, 2) = Eigen::Vector3d(0, 1, 0);
+        const Eigen::Matrix4d body_or = aff_htm_map.matrix() * tag_to_body_or;
+        /* const Eigen::Quaterniond body_or_quat(body_or.rotation()); */
+        const Eigen::Quaterniond body_or_quat(body_or.block<3, 3>(0, 0));
         Eigen::Matrix4d aff_htm_map_m = aff_htm_map.matrix() * body_offset;
         navigation_goal.pose.pose.position.x = aff_htm_map_m(0, 3);
         navigation_goal.pose.pose.position.y = aff_htm_map_m(1, 3);
@@ -117,7 +126,49 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     std::cout << "NAVIGATION DEBUG FLAG" << std::endl;
     RCLCPP_INFO_STREAM(node_logger_, "Navigating to affordance");
     navigate_to_pose(navigation_goal);
+    std::cout << "Confirm navigation goal reached?" << std::endl;
+    std::string nav_conf;
+    std::cin >> nav_conf;
 
+    const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
+    /* aff.location = aff_htm.translation(); */
+    aff.location = Eigen::Vector3d(0.0, 0.0, 0.0); // moving_a_stool
+    Eigen::Matrix4d offset = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4d aff_htm_m = aff_htm.matrix();
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.45, 0.27); */
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.27, 0.45); */
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -1.0, 0.45); */
+    offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.35, 0.35);
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.57, 0.27); */
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.57, 0.45); */
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.65, 0.6); */
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.3, 0.0, 0.0); */
+    std::cout << "Here is the offset:\n" << offset << std::endl;
+    grasp_pose = aff_htm_m * offset;
+    /* grasp_pose = aff_htm_m; */
+    grasp_pose.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity();
+
+    // Print Grasp Pose
+
+    geometry_msgs::msg::TransformStamped t;
+
+    t.header.stamp = this->get_clock()->now();
+    t.header.frame_id = ref_frame_;
+    t.child_frame_id = "carrot";
+    t.transform.translation.x = grasp_pose(0, 3);
+    t.transform.translation.y = grasp_pose(1, 3);
+    t.transform.translation.z = grasp_pose(2, 3);
+    t.transform.rotation.x = 0;
+    t.transform.rotation.y = 0;
+    t.transform.rotation.z = 0;
+    t.transform.rotation.w = 1;
+    rclcpp::Rate loop_rate(4.0);
+
+    for (int i = 0; i <= 100; i++)
+    {
+        tf_broadcaster_->sendTransform(t);
+        loop_rate.sleep();
+    }
     // Get joint states at the start configuration of the affordance
     if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
     {
