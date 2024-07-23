@@ -143,6 +143,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     // Gripper service clients
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr gripper_open_client_;
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr gripper_close_client_;
+    rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr mini_unstow_client_;
 
     // Navigation client
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigation_action_client_;
