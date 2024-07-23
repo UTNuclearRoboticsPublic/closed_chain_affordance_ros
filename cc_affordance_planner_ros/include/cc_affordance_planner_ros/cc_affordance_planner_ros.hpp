@@ -50,6 +50,7 @@
 #include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <spot_msgs/action/walk_to.hpp>
 #include <tf2_ros/buffer.h>
 
 using namespace std::chrono_literals;
@@ -146,6 +147,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr mini_unstow_client_;
 
     // Navigation client
+    rclcpp_action::Client<spot_msgs::action::WalkTo>::SharedPtr walk_action_client_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigation_action_client_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 

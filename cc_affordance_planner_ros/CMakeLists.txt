@@ -26,6 +26,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(nav2_msgs REQUIRED)
+find_package(spot_msgs REQUIRED)
 
 # Find cc affordance cpp libraries
 FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
@@ -44,11 +45,11 @@ add_library(${PROJECT_NAME}
 )
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs std_srvs nav2_msgs)
+ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs std_srvs nav2_msgs spot_msgs)
 
 
 # Export ROS dependencies for downstream ROS packages
-ament_export_dependencies(affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs std_srvs nav2_msgs)
+ament_export_dependencies(affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs std_srvs nav2_msgs spot_msgs)
 
 # Link the executable against external libraries
 target_link_libraries(${PROJECT_NAME} affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen

@@ -30,6 +30,7 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     mini_unstow_client_ = this->create_client<std_srvs::srv::Trigger>("/spot_manipulation_driver/mini_unstow_arm");
     navigation_action_client_ =
         rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "/navigate_to_pose");
+    walk_action_client_ = rclcpp_action::create_client<spot_msgs::action::WalkTo>(this, "/spot_driver/walk_to");
     /* rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "/spot_driver/navigate_to"); */
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcAffordancePlannerRos::joint_states_cb_, this, std::placeholders::_1));
@@ -121,11 +122,18 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
             loop_rate.sleep();
         }
         /* rclcpp::shutdown(); */
+
+        // Generate the action request
+        spot_msgs::action::WalkTo::Goal walk_goal;
+        walk_goal.target_pose = navigation_goal.pose;
+        walk_goal.maximum_movement_time = 10.0;
+
+        auto goal_handle_future_ = walk_action_client_->async_send_goal(walk_goal);
     }
     const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
 
     RCLCPP_INFO_STREAM(node_logger_, "Navigating to affordance");
-    navigate_to_pose(navigation_goal);
+    /* navigate_to_pose(navigation_goal); */
     std::cout << "Confirm navigation goal reached?" << std::endl;
     std::string nav_conf;
     std::cin >> nav_conf;
@@ -139,7 +147,8 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.27, 0.45); */
     /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -1.0, 0.45); */
     /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.35, 0.35); // working */
-    offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.33, 0.28); //
+    offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.35, 0.36); // working
+    /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.33, 0.28); // */
     /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.57, 0.27); */
     /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.57, 0.45); */
     /* offset.block<3, 1>(0, 3) = Eigen::Vector3d(0.0, -0.65, 0.6); */
@@ -370,6 +379,23 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     /* start_point.push_back(affResult[0]); */
     /* success = visualize_and_execute_trajectory_(start_point, Eigen::VectorXd::Zero(6), aff.axis, aff.location); */
     /* rclcpp::sleep_for(std::chrono::seconds(2)); */
+    /* std::vector<Eigen::VectorXd> affResult = run_cc_affordance_planner_affordance_motion( */
+    /* plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order, grasp_config); */
+    affordance_util::ScrewInfo aff_fine;
+    aff_fine.type = "translation";
+    /* aff.axis = Eigen::Vector3d(0, 1, 0);                            // valve_turn_case_1_and_2 */
+    /* aff.axis = Eigen::Vector3d(1, 0, 0); // valve_turn_case_3_and_4 */
+    aff_fine.axis = Eigen::Vector3d(-1, 0, 0);
+    cc_affordance_planner::PlannerConfig fineplannerConfig;
+    fineplannerConfig.accuracy = 10.0 / 100.0;
+    fineplannerConfig.aff_step = 0.05;
+
+    Eigen::VectorXd aff_fine_goal(1);
+    aff_fine_goal << 0.1;
+    std::vector<Eigen::VectorXd> afffineResult =
+        run_cc_affordance_planner_affordance_motion(fineplannerConfig, aff_fine, aff_fine_goal, 1, vir_screw_order);
+    std::cout << "Confirm fine motion" << std::endl;
+    std::cin >> gripper_conf;
     /***********************************************************************************/
     auto close_result = gripper_close_client_->async_send_request(request);
     auto close_response = close_result.get(); // blocks until response is received
@@ -385,8 +411,6 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner_approach_motion(
     std::cout << "Confirm Gripper close" << std::endl;
     std::cin >> gripper_conf;
     /***********************************************************************************/
-    /* std::vector<Eigen::VectorXd> affResult = run_cc_affordance_planner_affordance_motion( */
-    /* plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order, grasp_config); */
     std::vector<Eigen::VectorXd> affResult =
         run_cc_affordance_planner_affordance_motion(plannerConfig, aff, sec_goal, gripper_control_par, vir_screw_order);
     /* success = visualize_and_execute_trajectory_(affResult, Eigen::VectorXd::Zero(6), aff.axis, aff.location); */
@@ -432,6 +456,7 @@ std::vector<Eigen::VectorXd> CcAffordancePlannerRos::run_cc_affordance_planner_a
     /*     /1* aff.location = aff_htm.translation(); *1/ */
     /* } */
     const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
+    std::cout << "Here is the affordance screw: \n" << aff_screw << std::endl;
 
     // Get joint states at the start configuration of the affordance
     if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
