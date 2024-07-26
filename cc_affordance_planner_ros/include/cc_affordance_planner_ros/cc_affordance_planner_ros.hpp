@@ -50,6 +50,17 @@
 
 using namespace std::chrono_literals;
 
+namespace cc_affordance_planner_ros
+{
+
+enum Status
+{
+    PROCESSING,
+    SUCCEEDED,
+    FAILED,
+    UNKNOWN
+};
+
 class CcAffordancePlannerRos : public rclcpp::Node
 {
   public:
@@ -110,12 +121,21 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @return bool indicating success
      */
 
-    bool run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
-                                   affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
-                                   const size_t &gripper_control_par = 1, const std::string &vir_screw_order = "xyz",
-                                   Eigen::VectorXd robot_start_config = Eigen::VectorXd());
+    bool run_cc_affordance_planner(
+        const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
+        const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par = 1,
+        const std::shared_ptr<Status> status =
+            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
+        const std::string &vir_screw_order = "xyz", Eigen::VectorXd robot_start_config = Eigen::VectorXd());
+    bool run_cc_affordance_planner(
+        const cc_affordance_planner::PlannerConfig &plannerConfig, const Eigen::VectorXd &aff_screw,
+        const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par = 1,
+        const std::shared_ptr<Status> status =
+            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
+        const std::string &vir_screw_order = "xyz", Eigen::VectorXd robot_start_config = Eigen::VectorXd());
 
   private:
+    std::shared_ptr<Status> status_{nullptr};
     rclcpp::Logger node_logger_;       // logger associated with the node
     std::string plan_and_viz_ss_name_; // name of the planning visualization server
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
@@ -179,6 +199,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
                                            const Eigen::VectorXd &robot_start_config, const Eigen::VectorXd &w_aff,
                                            const Eigen::VectorXd &q_aff);
+    bool execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &robot_start_config);
     /**
      * @brief Callback function to process the feedback from the traj_execution_as_ action server
      *
@@ -202,5 +223,6 @@ class CcAffordancePlannerRos : public rclcpp::Node
      */
     void traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
 };
+} // namespace cc_affordance_planner_ros
 
 #endif // CC_AFFORDANCE_PLANNER_ROS
