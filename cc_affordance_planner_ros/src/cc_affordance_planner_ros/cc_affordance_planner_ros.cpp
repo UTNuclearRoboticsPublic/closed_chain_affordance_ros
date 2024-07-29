@@ -38,8 +38,8 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
                                                        affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
                                                        const size_t &gripper_control_par,
-                                                       const std::shared_ptr<Status> status,
                                                        const std::string &vir_screw_order,
+                                                       const std::shared_ptr<Status> status,
                                                        Eigen::VectorXd robot_start_config)
 {
     status_ = status;
@@ -58,7 +58,6 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
         const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
         aff.location = aff_htm.translation();
     }
-    const Eigen::Matrix<double, 6, 1> aff_screw = affordance_util::get_screw(aff); // compute affordance screw
 
     // Get joint states at the start configuration of the affordance
     if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
@@ -68,7 +67,8 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
 
     // Compose cc model and affordance goal
     Eigen::MatrixXd cc_slist =
-        affordance_util::compose_cc_model_slist(robot_slist_, robot_start_config, M_, aff_screw, vir_screw_order);
+        affordance_util::compose_cc_model_slist(robot_slist_, robot_start_config, M_, aff, vir_screw_order);
+    std::cout << "Here is the cc slist: \n" << cc_slist << std::endl;
 
     // Run the planner
     cc_affordance_planner::PlannerResult plannerResult =
@@ -82,7 +82,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
                                              << plannerResult.traj_full_or_partial << " solution, planning took "
                                              << plannerResult.planning_time.count() << " microseconds, and "
                                              << plannerResult.update_method << " update method was used.");
-        if (plannerResult.traj_full_or_partial != "Full")
+        if (plannerResult.traj_full_or_partial != "full")
         {
             *status_ = Status::FAILED;
             RCLCPP_ERROR(node_logger_, "Planner returned a partial trajectory. Visualize before executing.");
@@ -98,56 +98,6 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
 
     // Visualize and execute trajectory
     /* return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
-    // Execute trajectory
-    return execute_trajectory_(solution, robot_start_config);
-}
-
-bool CcAffordancePlannerRos::run_cc_affordance_planner(
-    const cc_affordance_planner::PlannerConfig &plannerConfig, const Eigen::VectorXd &aff_screw,
-    const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par, const std::shared_ptr<Status> status,
-    const std::string &vir_screw_order, Eigen::VectorXd robot_start_config)
-{
-    status_ = status;
-    *status_ = Status::PROCESSING;
-    // Get joint states at the start configuration of the affordance
-    if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
-    {
-        robot_start_config = get_aff_start_joint_states_();
-    }
-
-    // Compose cc model and affordance goal
-    Eigen::MatrixXd cc_slist_a =
-        affordance_util::compose_cc_model_slist(robot_slist_, robot_start_config, M_, aff_screw, vir_screw_order);
-    Eigen::MatrixXd cc_slist(6, 7);
-    cc_slist << cc_slist_a.block<6, 6>(0, 0), aff_screw;
-
-    // Run the planner
-    cc_affordance_planner::PlannerResult plannerResult =
-        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par);
-
-    // Print planner result
-    std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
-    if (plannerResult.success)
-    {
-        RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with "
-                                             << plannerResult.traj_full_or_partial << " solution, planning took "
-                                             << plannerResult.planning_time.count() << " microseconds, and "
-                                             << plannerResult.update_method << " update method was used.");
-
-        if (plannerResult.traj_full_or_partial != "Full")
-        {
-            *status_ = Status::FAILED;
-            RCLCPP_ERROR(node_logger_, "Planner returned a partial trajectory. Visualize before executing.");
-            return false;
-        }
-    }
-    else
-    {
-        RCLCPP_ERROR(node_logger_, "Planner did not find a solution");
-        *status_ = Status::FAILED;
-        return false;
-    }
-
     // Execute trajectory
     return execute_trajectory_(solution, robot_start_config);
 }
@@ -175,16 +125,11 @@ Eigen::VectorXd CcAffordancePlannerRos::get_aff_start_joint_states_()
     // Set Eigen::VectorXd size
     joint_states_.positions.conservativeResize(joint_names_.size());
 
-    /* // Capture initial configuration joint states */
-    /* RCLCPP_INFO_STREAM(node_logger_, */
-    /*                    "Put the robot in the start configuration for affordance execution. Done? y for yes."); */
-    /* std::string capture_joint_states_conf; */
-    /* std::cin >> capture_joint_states_conf; */
+    if (joint_states_.positions.isZero())
+    {
 
-    /* if (capture_joint_states_conf != "y" && capture_joint_states_conf != "Y") */
-    /* { */
-    /*     throw std::runtime_error("You indicated you are not ready to capture joint states"); */
-    /* } */
+        throw std::runtime_error("Could not read joint states.");
+    }
 
     return joint_states_.positions;
 }

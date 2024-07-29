@@ -114,6 +114,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @param vir_screw_order std::string indicating the order for the virtual EE screws. Possible values are "xyz",
      * "yzx" and "zxy". Default is "xyz"
      *
+     * @param status cc_affordance_planner_ros::Status indicating planning and executation status
+     *
      * @param robot_start_config Eigen::VectorXd containing the start configuration of the robot. This is internally
      * read via the robot joint_states topic. Here for testing purposes only, when planning without the joint_states
      * topic.
@@ -124,15 +126,10 @@ class CcAffordancePlannerRos : public rclcpp::Node
     bool run_cc_affordance_planner(
         const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
         const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par = 1,
+        const std::string &vir_screw_order = "xyz",
         const std::shared_ptr<Status> status =
             std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const std::string &vir_screw_order = "xyz", Eigen::VectorXd robot_start_config = Eigen::VectorXd());
-    bool run_cc_affordance_planner(
-        const cc_affordance_planner::PlannerConfig &plannerConfig, const Eigen::VectorXd &aff_screw,
-        const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par = 1,
-        const std::shared_ptr<Status> status =
-            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const std::string &vir_screw_order = "xyz", Eigen::VectorXd robot_start_config = Eigen::VectorXd());
+        Eigen::VectorXd robot_start_config = Eigen::VectorXd());
 
   private:
     std::shared_ptr<Status> status_{nullptr};
