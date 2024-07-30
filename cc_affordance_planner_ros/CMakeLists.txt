@@ -21,7 +21,7 @@ find_package(rclcpp REQUIRED)  # ROS 2 communication library
 find_package(rclcpp_action REQUIRED)
 find_package(tf2_ros REQUIRED)  # ROS 2 library for managing coordinate frames
 find_package(affordance_util_ros REQUIRED)  # Basic ROS 2 utility functions for affordance work
-find_package(moveit_plan_and_viz REQUIRED)  # To plan and visualize joint and EE trajectories
+find_package(moveit_plan_and_viz_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
 find_package(sensor_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
 
@@ -42,11 +42,10 @@ add_library(${PROJECT_NAME}
 )
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs)
-
+ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros moveit_plan_and_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs)
 
 # Export ROS dependencies for downstream ROS packages
-ament_export_dependencies(affordance_util_ros moveit_plan_and_viz rclcpp_action tf2_ros sensor_msgs control_msgs)
+ament_export_dependencies(affordance_util_ros moveit_plan_and_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs)
 
 # Link the executable against external libraries
 target_link_libraries(${PROJECT_NAME} affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen

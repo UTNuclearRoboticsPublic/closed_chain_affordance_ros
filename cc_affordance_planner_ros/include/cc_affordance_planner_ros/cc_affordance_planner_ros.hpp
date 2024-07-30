@@ -44,7 +44,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <future>
-#include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
+#include <moveit_plan_and_viz_msgs/srv/move_it_plan_and_viz.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
 
@@ -66,7 +66,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
   public:
     // Namespaces
     using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
-    using MoveItPlanAndViz = moveit_plan_and_viz::srv::MoveItPlanAndViz;
+    using MoveItPlanAndViz = moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
 
