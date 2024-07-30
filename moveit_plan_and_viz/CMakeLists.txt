@@ -17,13 +17,13 @@ find_package(Eigen3 REQUIRED)  # Linear algebra library
 # ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)  # ROS 2 communication library
-find_package(rosidl_default_generators REQUIRED) # For message generation
 find_package(control_msgs REQUIRED)  # ROS 2 messages for robot control
 find_package(geometry_msgs REQUIRED)  # ROS 2 messages for geometry
 find_package(visualization_msgs REQUIRED) # To use visualization markers in Rviz
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_visual_tools REQUIRED)
+find_package(moveit_plan_and_viz_msgs REQUIRED)
 
 # Include directories for headers
 include_directories(
@@ -31,20 +31,10 @@ include_directories(
   ${Eigen3_INCLUDE_DIRS}  # Include Eigen3 headers
 )
 
-# Generate interfaces
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/MoveItPlanAndViz.srv"
-  DEPENDENCIES
-  trajectory_msgs
-)
-
 # Create executable
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools )
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools moveit_plan_and_viz_msgs)
 
-# To use interfaces in the target from within this package
-rosidl_target_interfaces(${PROJECT_NAME}_node
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # Install the executables
 install(TARGETS

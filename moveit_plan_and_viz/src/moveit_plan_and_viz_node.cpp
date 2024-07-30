@@ -29,7 +29,7 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
-#include <moveit_plan_and_viz/srv/move_it_plan_and_viz.hpp>
+#include <moveit_plan_and_viz_msgs/srv/move_it_plan_and_viz.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <pluginlib/class_loader.hpp>
@@ -56,7 +56,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     {
 
         // Create and advertise planning and visualization service
-        srv_ = this->create_service<moveit_plan_and_viz::srv::MoveItPlanAndViz>(
+        srv_ = this->create_service<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz>(
             "/moveit_plan_and_viz_server", std::bind(&MoveItPlanAndVizServer::moveit_plan_and_viz_server_callback_,
                                                      this, std::placeholders::_1, std::placeholders::_2));
 
@@ -111,7 +111,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor>
         executor_;                // executor needed for MoveIt robot state checking
     std::thread executor_thread_; // thread
-    rclcpp::Service<moveit_plan_and_viz::srv::MoveItPlanAndViz>::SharedPtr
+    rclcpp::Service<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz>::SharedPtr
         srv_; // joint traj plan and visualization service
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr ee_traj_pub_; // publisher for EE trajectory
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
@@ -126,8 +126,8 @@ class MoveItPlanAndVizServer : public rclcpp::Node
 
     // Methods
     void moveit_plan_and_viz_server_callback_(
-        const std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Request> serv_req,
-        std::shared_ptr<moveit_plan_and_viz::srv::MoveItPlanAndViz::Response> serv_res)
+        const std::shared_ptr<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz::Request> serv_req,
+        std::shared_ptr<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz::Response> serv_res)
     {
 
         bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
