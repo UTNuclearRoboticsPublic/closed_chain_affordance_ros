@@ -68,7 +68,6 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     // Compose cc model and affordance goal
     Eigen::MatrixXd cc_slist =
         affordance_util::compose_cc_model_slist(robot_slist_, robot_start_config, M_, aff, vir_screw_order);
-    std::cout << "Here is the cc slist: \n" << cc_slist << std::endl;
 
     // Run the planner
     cc_affordance_planner::PlannerResult plannerResult =
