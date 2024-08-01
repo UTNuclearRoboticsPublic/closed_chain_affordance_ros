@@ -81,12 +81,12 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
                                              << plannerResult.traj_full_or_partial << " solution, planning took "
                                              << plannerResult.planning_time.count() << " microseconds, and "
                                              << plannerResult.update_method << " update method was used.");
-        if (plannerResult.traj_full_or_partial != "full")
-        {
-            *status_ = Status::FAILED;
-            RCLCPP_ERROR(node_logger_, "Planner returned a partial trajectory. Visualize before executing.");
-            return false;
-        }
+        /* if (plannerResult.traj_full_or_partial != "full") */
+        /* { */
+        /*     *status_ = Status::FAILED; */
+        /*     RCLCPP_ERROR(node_logger_, "Planner returned a partial trajectory. Visualize before executing."); */
+        /*     return false; */
+        /* } */
     }
     else
     {
