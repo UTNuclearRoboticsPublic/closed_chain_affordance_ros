@@ -35,6 +35,71 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
+bool CcAffordancePlannerRos::run_cc_affordance_planner(
+    const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
+    Eigen::VectorXd &sec_goal, const size_t &gripper_control_par, const Eigen::Matrix4d &approach_end_pose,
+    const std::string &vir_screw_order, const std::shared_ptr<Status> status, Eigen::VectorXd robot_start_config)
+{
+    status_ = status;
+    *status_ = Status::PROCESSING;
+    // If tag frame is specified then, we lookup affordance location from tag
+    if (!aff.location_frame.empty())
+    {
+
+        RCLCPP_INFO_STREAM(node_logger_, "Ready to read affordance location from apriltag? y or Y for yes.");
+        std::string conf;
+        std::cin >> conf;
+        if (conf != "y" && conf != "Y")
+        {
+            throw std::runtime_error("You indicated you are not ready to read affordance location");
+        }
+        const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(ref_frame_, aff.location_frame, *tf_buffer_);
+        aff.location = aff_htm.translation();
+    }
+
+    // Get joint states at the start configuration of the affordance
+    if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
+    {
+        robot_start_config = get_aff_start_joint_states_();
+    }
+
+    // Compose cc model and affordance goal
+    affordance_util::CcModel cc_model = affordance_util::compose_cc_model_slist(
+        robot_slist_, robot_start_config, M_, aff, vir_screw_order, approach_end_pose);
+    sec_goal.head(1)(0) = cc_model.approach_limit;
+
+    // Run the planner
+    cc_affordance_planner::PlannerResult plannerResult =
+        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par);
+
+    // Print planner result
+    std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
+    if (plannerResult.success)
+    {
+        RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with "
+                                             << plannerResult.traj_full_or_partial << " solution, planning took "
+                                             << plannerResult.planning_time.count() << " microseconds, and "
+                                             << plannerResult.update_method << " update method was used.");
+        /* if (plannerResult.traj_full_or_partial != "full") */
+        /* { */
+        /*     *status_ = Status::FAILED; */
+        /*     RCLCPP_ERROR(node_logger_, "Planner returned a partial trajectory. Visualize before executing."); */
+        /*     return false; */
+        /* } */
+    }
+    else
+    {
+        RCLCPP_INFO_STREAM(node_logger_, "Planner did not find a solution");
+        *status_ = Status::FAILED;
+        return false;
+    }
+
+    // Visualize and execute trajectory
+    /* return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
+    // Execute trajectory
+    return execute_trajectory_(solution, robot_start_config);
+}
+
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
                                                        affordance_util::ScrewInfo &aff, const Eigen::VectorXd &sec_goal,
                                                        const size_t &gripper_control_par,

@@ -78,6 +78,14 @@ class CcAffordancePlannerRos : public rclcpp::Node
      */
     explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
+    bool run_cc_affordance_planner(
+        const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
+        Eigen::VectorXd &sec_goal, const Eigen::Matrix4d &approach_end_pose, const size_t &gripper_control_par = 1,
+        const std::string &vir_screw_order = "xyz",
+        const std::shared_ptr<Status> status =
+            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
+        Eigen::VectorXd robot_start_config = Eigen::VectorXd());
+
     /**
      * @brief Generates, visualizes, and executes joint trajectories using the Closed-Chain Affordance model based on
      *        given planner configuration, affordance screw information, secondary joint goals, and gripper control
