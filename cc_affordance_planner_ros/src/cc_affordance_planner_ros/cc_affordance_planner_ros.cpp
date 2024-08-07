@@ -36,8 +36,8 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
 }
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner(
-    const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
-    Eigen::VectorXd &sec_goal, const size_t &gripper_control_par, const Eigen::Matrix4d &approach_end_pose,
+    cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
+    Eigen::VectorXd &sec_goal, const Eigen::Matrix4d &approach_end_pose, const size_t &gripper_control_par, 
     const std::string &vir_screw_order, const std::shared_ptr<Status> status, Eigen::VectorXd robot_start_config)
 {
     status_ = status;
@@ -64,13 +64,32 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
     }
 
     // Compose cc model and affordance goal
+	RCLCPP_INFO(this->get_logger(), "DEBUG FLAG");
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the gripper_control_par to the planner\n"<<gripper_control_par
+                                             );
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the robot start config\n"<<robot_start_config
+                                             );
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the vir screw order\n"<<vir_screw_order
+                                             );
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the approach_end_pose\n"<<approach_end_pose
+                                             );
+
+
     affordance_util::CcModel cc_model = affordance_util::compose_cc_model_slist(
         robot_slist_, robot_start_config, M_, aff, vir_screw_order, approach_end_pose);
+	plannerConfig.aff_step =  cc_model.approach_limit/10.0;
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the cc_slist to the planner\n"<<cc_model.slist
+                                             );
     sec_goal.head(1)(0) = cc_model.approach_limit;
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the approach limit to the planner\n"<<cc_model.approach_limit
+                                             );
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the sec_goal to the planner\n"<<sec_goal
+                                             );
+			/* cc_model.slist.col(6) = -cc_model.slist.col(6); */
 
     // Run the planner
     cc_affordance_planner::PlannerResult plannerResult =
-        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_slist, sec_goal, gripper_control_par);
+        cc_affordance_planner::generate_joint_trajectory(plannerConfig, cc_model.slist, sec_goal, gripper_control_par);
 
     // Print planner result
     std::vector<Eigen::VectorXd> solution = plannerResult.joint_traj;
@@ -80,6 +99,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
                                              << plannerResult.traj_full_or_partial << " solution, planning took "
                                              << plannerResult.planning_time.count() << " microseconds, and "
                                              << plannerResult.update_method << " update method was used.");
+
+        RCLCPP_INFO_STREAM(node_logger_, "Here is the solution\n");
+	for (const auto& point: solution){
+        RCLCPP_INFO_STREAM(node_logger_,point.transpose());
+	}
         /* if (plannerResult.traj_full_or_partial != "full") */
         /* { */
         /*     *status_ = Status::FAILED; */
@@ -95,9 +119,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
     }
 
     // Visualize and execute trajectory
-    /* return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
+    return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location);
     // Execute trajectory
-    return execute_trajectory_(solution, robot_start_config);
+    /* return execute_trajectory_(solution, robot_start_config); */
 }
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &plannerConfig,
@@ -161,9 +185,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     }
 
     // Visualize and execute trajectory
-    /* return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location); */
+    return visualize_and_execute_trajectory_(solution, robot_start_config, aff.axis, aff.location);
     // Execute trajectory
-    return execute_trajectory_(solution, robot_start_config);
+    /* return execute_trajectory_(solution, robot_start_config); */
 }
 
 // Returns full path to the yaml file containing cc affordance robot description
@@ -214,6 +238,14 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
             traj_time_step); // this function takes care of extracting the right
                              // number of joint_states although solution
                              // contains qs data too
+    std::cout<<"Here is the final trajectory:"<<std::endl;
+    for (const auto& point: goal.trajectory.points){
+    
+	    for (int i=0; i<point.positions.size(); i++){
+	    std::cout<<point.positions[i]<<" ";
+	    }
+	    std::cout<< std::endl;
+    }
 
     // Fill out service request
     auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();

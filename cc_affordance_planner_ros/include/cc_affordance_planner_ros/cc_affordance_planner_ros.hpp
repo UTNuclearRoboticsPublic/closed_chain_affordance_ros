@@ -79,7 +79,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
     bool run_cc_affordance_planner(
-        const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
+        cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff,
         Eigen::VectorXd &sec_goal, const Eigen::Matrix4d &approach_end_pose, const size_t &gripper_control_par = 1,
         const std::string &vir_screw_order = "xyz",
         const std::shared_ptr<Status> status =
