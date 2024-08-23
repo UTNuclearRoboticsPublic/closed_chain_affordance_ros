@@ -41,6 +41,7 @@
 #include <affordance_util/affordance_util.hpp>
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
+#include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cmath>
 #include <cstdlib>
 #include <future>
@@ -81,6 +82,14 @@ class CcAffordancePlannerRos : public rclcpp::Node
     bool run_cc_affordance_planner(
         const cc_affordance_planner::PlannerConfig &planner_config,
         const cc_affordance_planner::TaskDescription &TaskDescription,
+        const std::shared_ptr<Status> status =
+            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
+        const Eigen::VectorXd &robot_start_config = Eigen::VectorXd());
+    bool run_cc_affordance_planner(
+        const cc_affordance_planner::PlannerConfig &approach_planner_config,
+        const cc_affordance_planner::PlannerConfig &affordance_planner_config,
+        const cc_affordance_planner::TaskDescription &approachTaskDescription,
+        const cc_affordance_planner::TaskDescription &affordanceTaskDescription,
         const std::shared_ptr<Status> status =
             std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
         const Eigen::VectorXd &robot_start_config = Eigen::VectorXd());
