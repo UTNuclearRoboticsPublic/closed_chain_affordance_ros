@@ -54,6 +54,10 @@ using namespace std::chrono_literals;
 namespace cc_affordance_planner_ros
 {
 
+/**
+ * @brief Enum to indicate the status of running the CC Affordance Planner and visualizing or executing the solved
+ * trajectory
+ */
 enum Status
 {
     PROCESSING,
@@ -65,7 +69,7 @@ enum Status
 class CcAffordancePlannerRos : public rclcpp::Node
 {
   public:
-    // Namespaces
+    // Type aliases
     using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
     using MoveItPlanAndViz = moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
@@ -79,73 +83,136 @@ class CcAffordancePlannerRos : public rclcpp::Node
      */
     explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
-    bool run_cc_affordance_planner(
-        const cc_affordance_planner::PlannerConfig &planner_config,
-        const cc_affordance_planner::TaskDescription &TaskDescription,
-        const std::shared_ptr<Status> status =
-            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const Eigen::VectorXd &robot_start_config = Eigen::VectorXd());
-    bool run_cc_affordance_planner(
-        const cc_affordance_planner::PlannerConfig &approach_planner_config,
-        const cc_affordance_planner::PlannerConfig &affordance_planner_config,
-        const cc_affordance_planner::TaskDescription &approachTaskDescription,
-        const cc_affordance_planner::TaskDescription &affordanceTaskDescription,
-        const std::shared_ptr<Status> status =
-            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const Eigen::VectorXd &robot_start_config = Eigen::VectorXd());
-
     /**
-     * @brief Generates, visualizes, and executes joint trajectories using the Closed-Chain Affordance model based on
-     *        given planner configuration, affordance screw information, secondary joint goals, and gripper control
-     *        parameters.
+     * @brief Given configuration settings for the CC Affordance planner and a description of the task, plan and
+     * visualizes the robot joint trajectory and executes it on the robot. The planning is done from the current
+     * state of the robot unless optionally a robot start configuration is passed. Optionally one can also pass a
+     * pointer to get the status of this function.
      *
-     * @param plannerConfig cc_affordance_planner::PlannerConfig containing CC Affordance Planner configuration
-     *        settings:
-     *        - Use the parameter `aff_step` to specify the trajectory density with an affordance step.
-     *          For example, an affordance goal of 0.5 rad could have an affordance step of 0.1 rad,
-     *          resulting in a trajectory with 5 points, where the intermediate affordance goals are 0.1, 0.2, 0.3, 0.4,
-     * 		and 0.5 rad.
-     *        - The `accuracy` parameter represents the threshold for the affordance goal (and step). For instance,
-     *          if 10% accuracy is desired for a 1 rad goal, set accuracy to 0.1. This will produce joint solutions
-     *          that result in an affordance goal of 1 ± 0.1 rad.
-     *        - Advanced users can utilize two additional parameters:
-     *          - `closure_error_threshold`: Specify the error threshold for the closed-chain closure error.
-     *          - `max_itr`: Specify the maximum iterations for the closed-chain inverse kinematics solver.
+     * @param planner_config `cc_affordance_planner::PlannerConfig` containing the settings for the Cc Affordance
+     * planner:
+     * - `trajectory_density`: Specifies the density of the trajectory as the number of points.
+     *   For example, an affordance goal of 0.5 rad could have 5 points, each with a step of 0.1 rad.
+     * - `accuracy`: Defines the threshold for the affordance goal.
+     *   For instance, for a 5 rad goal with 10% accuracy, set this parameter to 0.1 to achieve an affordance goal of 5
+     * ± 0.5.
+     * - `ik_max_itr`: (Advanced) Specifies the maximum iterations for the closed-chain inverse kinematics solver.
+     * Default is 200.
+     * - `update_method`: (Advanced) Specifies the update method to use. Possible values are `INVERSE`, `TRANSPOSE`, and
+     * `BEST`. Default is `BEST`.
+     * - `closure_error_threshold_ang`: (Advanced) Specifies the angular error threshold for closed-chain closure.
+     * Default is 1e-4.
+     * - `closure_error_threshold_lin`: (Advanced) Specifies the linear error threshold for closed-chain closure.
+     * Default is 1e-5.
      *
-     * @param aff affordance_util::ScrewInfo containing information about the affordance. The `aff_type` and `axis`
-     * 	      fields are mandatory. Possible values for `aff_type` include "translation", "rotation", and "screw".
-     * 	      Specify `location_frame` if using AprilTag.
+     * @param taskDescription `cc_affordance_planner::TaskDescription` describing the task with fields:
+     * - `motion_type`: `cc_affordance_planner::MotionType` describing the motion type to consider. The options are
+     *   cc_affordance_planner::APPROACH or cc_affordance_planner::AFFORDANCE. AFFORDANCE is default.
+     * - `affordance_info`: `affordance_util::ScrewInfo` describing the affordance with type, and
+     * 	 axis/location or screw as mandatory fields.
+     * - `nof_secondary_joints`: Specifies the number of secondary joints.
+     *   - For affordance motion:
+     *     - 1: Affordance control only.
+     *     - 2: Control of affordance along with EE orientation about one axis (x, y, or z whichever is first in the
+     * 		vir_screw_order specified).
+     *     - 3: Control of affordance along with EE orientation about two axes (the first two specified in
+     * 		vir_screw_order).
+     *     - 4: Affordance and full EE orientation control.
+     *   - For approach motion:
+     *     - Minimum 2: Controls approach motion in the context of the affordance.
+     *     - 3: Adds gripper orientation control about the next axis as specified in vir_screw_order.
+     *     - 4: Adds gripper orientation control about the next two axes as specified in vir_screw_order.
+     *     - 5: Adds full EE orientation.
+     * - `secondary_joint_goals`: Eigen::VectorXd with desired goals for secondary joints. The size of
+     *   secondary_joint_goals must match `nof_secondary_joints`. The end element of secondary_joint_goals is always
+     *   affordance. For affordance motion, the EE orientation goals are inserted as needed and in the order specified
+     *   in vir_screw_order. For approach motion, with nof_secondary_joints = 2, secondary_joint_goals should contain
+     *   (approach_goal, affordance_goal). The EE orientation goals are inserted before the approach_goal as needed. Set
+     *   approach_goal=0 for all approach motion cases as it is computed by the planner.
+     * - `grasp_pose`: Eigen::MatrixXd containing the grasp pose's homogenous transformation matrix (only for APPROACH
+     *   motion).
+     * - `vir_screw_order`: affordance_util::VirtualScrewOrder describing the order of the joints in the virtual
+     *   spherical joint of the closed-chain model. This joint describes the orientation freedom of the gripper. Default
+     *   value is affordance_util::VirtualScrewOrder::XYZ.
      *
-     * @param sec_goal Eigen::VectorXd containing secondary joint angle goals including EE orientation and affordance,
-     *        with the affordance goal being the end element.
-     *
-     * @param gripper_control_par_tau A numeric parameter indicating the length of the secondary joint vector:
-     *        - A value of 1 implies only affordance control.
-     *        - A value of 2 represents affordance control along with controlling the gripper orientation about the next
-     * 		adjacent virtual gripper axis (x, y, or z).
-     *        - A value of 3 involves controlling affordance along with the EE orientation about the next two virtual
-     * 		gripper axes.
-     *        - A value of 4 refers to affordance control along with all aspects of EE orientation.
-     *
-     * @param vir_screw_order std::string indicating the order for the virtual EE screws. Possible values are "xyz",
-     * "yzx" and "zxy". Default is "xyz"
-     *
-     * @param status cc_affordance_planner_ros::Status indicating planning and executation status
-     *
-     * @param robot_start_config Eigen::VectorXd containing the start configuration of the robot. This is internally
-     * read via the robot joint_states topic. Here for testing purposes only, when planning without the joint_states
-     * topic.
+     * @param status (Optional) cc_affordance_planner_ros::Status indicating planning and execution status
+     * @param robotStartConfig (Optional) Eigen::VectorXd containing the start configuration of the robot. If not
+     * specified, the planning is done from the current state of the robot.
      *
      * @return bool indicating success
      */
+    bool run_cc_affordance_planner(
+        const cc_affordance_planner::PlannerConfig &planner_config,
+        const cc_affordance_planner::TaskDescription &taskDescription,
+        const std::shared_ptr<Status> status =
+            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
+        const Eigen::VectorXd &robotStartConfig = Eigen::VectorXd());
 
-    /* bool run_cc_affordance_planner( */
-    /*     const cc_affordance_planner::PlannerConfig &plannerConfig, affordance_util::ScrewInfo &aff, */
-    /*     const Eigen::VectorXd &sec_goal, const size_t &gripper_control_par = 1, */
-    /*     const std::string &vir_screw_order = "xyz", */
-    /*     const std::shared_ptr<Status> status = */
-    /*         std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN), */
-    /*     Eigen::VectorXd robot_start_config = Eigen::VectorXd()); */
+    /**
+     * @brief Given vectors of configuration settings for the CC Affordance planner along with the corresponding task
+     * descriptions, plan and visualizes the robot joint trajectory that solves for all specified tasks and executes it
+     * on the robot. The planning is done from the current state of the robot unless optionally a robot start
+     * configuration is passed. Optionally one can also pass a pointer to get the status of this function.
+     *
+     * @param planner_configs `std::vector<cc_affordance_planner::PlannerConfig>` containing a series of settings for
+     * the Cc Affordance planner that correspond to various tasks. Each struct has the following fields:
+     * - `trajectory_density`: Specifies the density of the trajectory as the number of points.
+     *   For example, an affordance goal of 0.5 rad could have 5 points, each with a step of 0.1 rad.
+     * - `accuracy`: Defines the threshold for the affordance goal.
+     *   For instance, for a 5 rad goal with 10% accuracy, set this parameter to 0.1 to achieve an affordance goal of 5
+     * ± 0.5.
+     * - `ik_max_itr`: (Advanced) Specifies the maximum iterations for the closed-chain inverse kinematics solver.
+     * Default is 200.
+     * - `update_method`: (Advanced) Specifies the update method to use. Possible values are `INVERSE`, `TRANSPOSE`, and
+     * `BEST`. Default is `BEST`.
+     * - `closure_error_threshold_ang`: (Advanced) Specifies the angular error threshold for closed-chain closure.
+     * Default is 1e-4.
+     * - `closure_error_threshold_lin`: (Advanced) Specifies the linear error threshold for closed-chain closure.
+     * Default is 1e-5.
+     *
+     * @param task_descriptions `std::vector<cc_affordance_planner::TaskDescription>` describing a series of tasks. Each
+     * struct has the following fields:
+     * - `motion_type`: `cc_affordance_planner::MotionType` describing the motion type to consider. The options are
+     *   cc_affordance_planner::APPROACH or cc_affordance_planner::AFFORDANCE. AFFORDANCE is default.
+     * - `affordance_info`: `affordance_util::ScrewInfo` describing the affordance with type, and
+     * 	 axis/location or screw as mandatory fields.
+     * - `nof_secondary_joints`: Specifies the number of secondary joints.
+     *   - For affordance motion:
+     *     - 1: Affordance control only.
+     *     - 2: Control of affordance along with EE orientation about one axis (x, y, or z whichever is first in the
+     * 		vir_screw_order specified).
+     *     - 3: Control of affordance along with EE orientation about two axes (the first two specified in
+     * 		vir_screw_order).
+     *     - 4: Affordance and full EE orientation control.
+     *   - For approach motion:
+     *     - Minimum 2: Controls approach motion in the context of the affordance.
+     *     - 3: Adds gripper orientation control about the next axis as specified in vir_screw_order.
+     *     - 4: Adds gripper orientation control about the next two axes as specified in vir_screw_order.
+     *     - 5: Adds full EE orientation.
+     * - `secondary_joint_goals`: Eigen::VectorXd with desired goals for secondary joints. The size of
+     *   secondary_joint_goals must match `nof_secondary_joints`. The end element of secondary_joint_goals is always
+     *   affordance. For affordance motion, the EE orientation goals are inserted as needed and in the order specified
+     *   in vir_screw_order. For approach motion, with nof_secondary_joints = 2, secondary_joint_goals should contain
+     *   (approach_goal, affordance_goal). The EE orientation goals are inserted before the approach_goal as needed. Set
+     *   approach_goal=0 for all approach motion cases as it is computed by the planner.
+     * - `grasp_pose`: Eigen::MatrixXd containing the grasp pose's homogenous transformation matrix (only for APPROACH
+     *   motion).
+     * - `vir_screw_order`: affordance_util::VirtualScrewOrder describing the order of the joints in the virtual
+     *   spherical joint of the closed-chain model. This joint describes the orientation freedom of the gripper. Default
+     *   value is affordance_util::VirtualScrewOrder::XYZ.
+     *
+     * @param status (Optional) cc_affordance_planner_ros::Status indicating planning and execution status
+     * @param robotStartConfig (Optional) Eigen::VectorXd containing the start configuration of the robot. If not
+     * specified, the planning is done from the current state of the robot.
+     *
+     * @return bool indicating success
+     */
+    bool run_cc_affordance_planner(
+        const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
+        const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions,
+        const std::shared_ptr<Status> status =
+            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
+        const Eigen::VectorXd &robotStartConfig = Eigen::VectorXd());
 
   private:
     std::shared_ptr<Status> status_{nullptr};
@@ -201,18 +268,25 @@ class CcAffordancePlannerRos : public rclcpp::Node
     Eigen::VectorXd get_aff_start_joint_states_();
 
     /**
-     * @brief
+     * @brief Given a joint trajectory and screw axis, visualizes the trajectory and executes it on the robot
      *
-     * @param trajectory A bare joint trajectory as a vector of joint position points
+     * @param trajectory A bare joint trajectory as a vector of joint states
      * @param w_aff Affordance screw axis
      * @param q_aff Affordace location
      *
      * @return True if trajectory was successfully visualized and executed. false otherwise.
      */
-    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
-                                           const Eigen::VectorXd &robot_start_config, const Eigen::VectorXd &w_aff,
+    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &w_aff,
                                            const Eigen::VectorXd &q_aff);
-    bool execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &robot_start_config);
+    /**
+     * @brief Given a joint trajectory , executes it on the robot
+     *
+     * @param trajectory A bare joint trajectory as a vector of joint states
+     *
+     * @return True if trajectory was successfully visualized and executed. false otherwise.
+     */
+    bool execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory);
+
     /**
      * @brief Callback function to process the feedback from the traj_execution_as_ action server
      *
