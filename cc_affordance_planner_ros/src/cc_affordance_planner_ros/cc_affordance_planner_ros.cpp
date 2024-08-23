@@ -57,16 +57,15 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     // If tag frame is specified then, we lookup affordance location from tag
     if (!task_description.affordance_info.location_frame.empty())
     {
-
-        RCLCPP_INFO_STREAM(node_logger_, "Ready to read affordance location from apriltag? y or Y for yes.");
-        std::string conf;
-        std::cin >> conf;
-        if (conf != "y" && conf != "Y")
-        {
-            throw std::runtime_error("You indicated you are not ready to read affordance location");
-        }
         const Eigen::Isometry3d aff_htm =
             affordance_util_ros::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
+        if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Shutting down.",
+                         task_description.affordance_info.location_frame.c_str());
+            *status_ = Status::FAILED;
+            return false;
+        }
         task_description.affordance_info.location = aff_htm.translation();
     }
 
@@ -125,43 +124,28 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     }
 
     // Visualize and execute trajectory
-    return visualize_and_execute_trajectory_(solution, robot_start_config, task_description.affordance_info.axis,
+    return visualize_and_execute_trajectory_(solution, task_description.affordance_info.axis,
                                              task_description.affordance_info.location);
     // Execute trajectory
-    /* return execute_trajectory_(solution, robot_start_config); */
+    /* return execute_trajectory_(solution); */
 }
 
 bool CcAffordancePlannerRos::run_cc_affordance_planner(
-    const cc_affordance_planner::PlannerConfig &approach_planner_config,
-    const cc_affordance_planner::PlannerConfig &affordance_planner_config,
-    const cc_affordance_planner::TaskDescription &approachTaskDescription,
-    const cc_affordance_planner::TaskDescription &affordanceTaskDescription, const std::shared_ptr<Status> status,
+    const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
+    const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions, const std::shared_ptr<Status> status,
     const Eigen::VectorXd &robotStartConfig)
 {
     status_ = status;
     *status_ = Status::PROCESSING;
 
-    // Copy task description and robot start config in case we need to make modifications before calling the planner
-    cc_affordance_planner::TaskDescription approach_task_description = approachTaskDescription;
-    cc_affordance_planner::TaskDescription affordance_task_description = affordanceTaskDescription;
-    Eigen::VectorXd robot_start_config = robotStartConfig;
-
-    // If tag frame is specified then, we lookup affordance location from tag
-    if (!approach_task_description.affordance_info.location_frame.empty())
+    if ((planner_configs.size() != task_descriptions.size()) || planner_configs.empty())
     {
-
-        RCLCPP_INFO_STREAM(node_logger_, "Ready to read affordance location from apriltag? y or Y for yes.");
-        std::string conf;
-        std::cin >> conf;
-        if (conf != "y" && conf != "Y")
-        {
-            throw std::runtime_error("You indicated you are not ready to read affordance location");
-        }
-        const Eigen::Isometry3d aff_htm = affordance_util_ros::get_htm(
-            ref_frame_, approach_task_description.affordance_info.location_frame, *tf_buffer_);
-        approach_task_description.affordance_info.location = aff_htm.translation();
-        affordance_task_description.affordance_info.location = aff_htm.translation();
+        RCLCPP_ERROR(node_logger_, "Planner config and task descriptions must be of the same size and non-empty.");
+        return false;
     }
+
+    // Copy robot start config in case we need to make modifications before calling the planner
+    Eigen::VectorXd robot_start_config = robotStartConfig;
 
     // Get joint states at the start configuration of the affordance
     if (robot_start_config.size() == 0) // Non-zero if testing or planning without the joint_states topic
@@ -175,104 +159,89 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
     robot_description.M = M_;
     robot_description.joint_states = robot_start_config;
 
-    // Construct the planner interface object with given approach configuration
-    cc_affordance_planner::CcAffordancePlannerInterface approachPlannerInterface(approach_planner_config);
+    std::vector<Eigen::VectorXd> solution;
+    cc_affordance_planner::TaskDescription task_description;
 
-    // Run the planner for approach motion
-    cc_affordance_planner::PlannerResult approachPlannerResult;
-    try
+    size_t i = 0;
+    for (const auto &planner_config : planner_configs)
     {
-        approachPlannerResult =
-            approachPlannerInterface.generate_joint_trajectory(robot_description, approach_task_description);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        RCLCPP_ERROR(node_logger_, "Planner returned exception for approach motion: %s", e.what());
-    }
+        // Copy task description in case we need to make modifications before calling the planner
+        task_description = task_descriptions[i];
 
-    // Print planner result
-    if (approachPlannerResult.success)
-    {
-        RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded for approach motion with update trail '"
-                                             << approachPlannerResult.update_trail << "' and the planning took "
-                                             << approachPlannerResult.planning_time.count() << " microseconds.");
-        switch (approachPlannerResult.trajectory_description)
+        // If tag frame is specified then, we lookup affordance location from tag
+        if (!task_description.affordance_info.location_frame.empty())
         {
-
-        case cc_affordance_planner::TrajectoryDescription::FULL:
-            RCLCPP_INFO(node_logger_, "Trajectory description: FULL.");
-            break;
-        case cc_affordance_planner::TrajectoryDescription::PARTIAL:
-            RCLCPP_WARN(node_logger_, "Trajectory description: PARTIAL. Execute with caution.");
-            break;
-        default:
-            RCLCPP_ERROR(node_logger_, "Trajectory description: UNSET.");
-            break;
+            const Eigen::Isometry3d aff_htm =
+                affordance_util_ros::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
+            if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
+            {
+                RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Shutting down.",
+                             task_description.affordance_info.location_frame.c_str());
+                *status_ = Status::FAILED;
+                return false;
+            }
+            task_description.affordance_info.location = aff_htm.translation();
         }
-    }
-    else
-    {
-        RCLCPP_WARN(node_logger_, "Planner did not find a solution for given approach motion");
-        *status_ = Status::FAILED;
-        return false;
-    }
 
-    // Construct the planner interface object with given approach configuration
-    cc_affordance_planner::CcAffordancePlannerInterface affordancePlannerInterface(affordance_planner_config);
+        // Construct the planner interface object with given configuration
+        cc_affordance_planner::CcAffordancePlannerInterface ccAffordancePlannerInterface(planner_config);
 
-    // Update the robot description start state for the affordance motion with the end point from the approach motion
-    // trajectory
-    robot_description.joint_states = approachPlannerResult.joint_trajectory.back().head(robot_start_config.size());
-    // Run the planner for affordance motion
-    cc_affordance_planner::PlannerResult affordancePlannerResult;
-    try
-    {
-        affordancePlannerResult =
-            affordancePlannerInterface.generate_joint_trajectory(robot_description, affordance_task_description);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        RCLCPP_ERROR(node_logger_, "Planner returned exception for affordance motion: %s", e.what());
-    }
-
-    // Print planner result
-    if (affordancePlannerResult.success)
-    {
-        RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded for affordance motion with update trail '"
-                                             << affordancePlannerResult.update_trail << "' and the planning took "
-                                             << affordancePlannerResult.planning_time.count() << " microseconds.");
-        switch (affordancePlannerResult.trajectory_description)
+        // Run the planner
+        cc_affordance_planner::PlannerResult plannerResult;
+        try
         {
-
-        case cc_affordance_planner::TrajectoryDescription::FULL:
-            RCLCPP_INFO(node_logger_, "Trajectory description: FULL.");
-            break;
-        case cc_affordance_planner::TrajectoryDescription::PARTIAL:
-            RCLCPP_WARN(node_logger_, "Trajectory description: PARTIAL. Execute with caution.");
-            break;
-        default:
-            RCLCPP_ERROR(node_logger_, "Trajectory description: UNSET.");
-            break;
+            plannerResult = ccAffordancePlannerInterface.generate_joint_trajectory(robot_description, task_description);
         }
-    }
-    else
-    {
-        RCLCPP_WARN(node_logger_, "Planner did not find a solution for given affordance motion");
-        *status_ = Status::FAILED;
-        return false;
-    }
+        catch (const std::invalid_argument &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Planner returned exception: %s", e.what());
+        }
 
-    std::vector<Eigen::VectorXd> solution(approachPlannerResult.joint_trajectory.begin(),
-                                          approachPlannerResult.joint_trajectory.end());
-    solution.insert(solution.end(), affordancePlannerResult.joint_trajectory.begin(),
-                    affordancePlannerResult.joint_trajectory.end());
+        // Print planner result
+        if (plannerResult.success)
+        {
+            RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with update trail '"
+                                                 << plannerResult.update_trail << "' and the planning took "
+                                                 << plannerResult.planning_time.count() << " microseconds.");
+            switch (plannerResult.trajectory_description)
+            {
+
+            case cc_affordance_planner::TrajectoryDescription::FULL:
+                RCLCPP_INFO(node_logger_, "Trajectory description: FULL.");
+                break;
+            case cc_affordance_planner::TrajectoryDescription::PARTIAL:
+                RCLCPP_ERROR(node_logger_, "Terminating planning due to the solution for %zuth task being partial.", i);
+                *status_ = Status::FAILED;
+                break;
+            default:
+                RCLCPP_ERROR(node_logger_, "Trajectory description: UNSET.");
+                break;
+            }
+        }
+        else
+        {
+            RCLCPP_WARN(node_logger_, "Planner did not find a solution for %zuth task", i);
+            *status_ = Status::FAILED;
+            return false;
+        }
+
+        // Append the solution
+        solution.insert(solution.end(), plannerResult.joint_trajectory.begin(), plannerResult.joint_trajectory.end());
+
+        // Next iteration updates
+
+        // Update the robot description start state for the next motion with the end point from the previous
+        // motion trajectory
+        robot_description.joint_states = plannerResult.joint_trajectory.back().head(robot_start_config.size());
+
+        i++;
+    }
 
     // Visualize and execute trajectory
-    return visualize_and_execute_trajectory_(solution, robot_start_config,
-                                             affordance_task_description.affordance_info.axis,
-                                             affordance_task_description.affordance_info.location);
+    return visualize_and_execute_trajectory_(solution, task_description.affordance_info.axis,
+                                             task_description.affordance_info.location);
     // Execute trajectory
-    /* return execute_trajectory_(solution, robot_start_config); */
+    /* return execute_trajectory_(solution); */
 }
 
 // Returns full path to the yaml file containing cc affordance robot description
@@ -309,7 +278,6 @@ Eigen::VectorXd CcAffordancePlannerRos::get_aff_start_joint_states_()
 
 // Function to visualize and execute planned trajectory
 bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
-                                                               const Eigen::VectorXd &robot_start_config,
                                                                const Eigen::VectorXd &w_aff,
                                                                const Eigen::VectorXd &q_aff)
 {
@@ -323,16 +291,6 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
             traj_time_step); // this function takes care of extracting the right
                              // number of joint_states although solution
                              // contains the whole closed-chain trajectory
-    std::cout << "Here is the final trajectory:" << std::endl;
-    for (const auto &point : goal.trajectory.points)
-    {
-
-        for (int i = 0; i < point.positions.size(); i++)
-        {
-            std::cout << point.positions[i] << " ";
-        }
-        std::cout << std::endl;
-    }
 
     // Fill out service request
     auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
@@ -407,8 +365,7 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
 }
 
 // Function to execute planned trajectory
-bool CcAffordancePlannerRos::execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
-                                                 const Eigen::VectorXd &robot_start_config)
+bool CcAffordancePlannerRos::execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory)
 {
 
     // Visualize trajectory in RVIZ
@@ -416,7 +373,7 @@ bool CcAffordancePlannerRos::execute_trajectory_(const std::vector<Eigen::Vector
     const double traj_time_step = 0.3;
     const control_msgs::action::FollowJointTrajectory_Goal goal =
         affordance_util_ros::follow_joint_trajectory_msg_builder(
-            trajectory, robot_start_config, joint_names_,
+            trajectory, Eigen::VectorXd::Zero(6), joint_names_,
             traj_time_step); // this function takes care of extracting the right
                              // number of joint_states although solution
                              // contains qs data too
