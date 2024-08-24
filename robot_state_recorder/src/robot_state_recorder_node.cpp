@@ -300,7 +300,11 @@ int main(int argc, char **argv)
 
     // Furnish the filepath where the robot config yaml file is located and
     // supply the action server name whose goal to listen to
-    const std::string robot_config_file_path = "/home/crasun/ws_moveit2/src/cca_spot/config/cca_spot_description.yaml";
+    const std::string package_name = "cca_spot";
+    const std::string rel_dir = "/config/";                          // relative directory where yaml file is located
+    const std::string filename = package_name + "_description.yaml"; // yaml file name
+    const std::string robot_config_file_path =
+        affordance_util_ros::get_filepath_inside_pkg(package_name, rel_dir, filename);
     const std::string as_server_name = "/arm_controller/follow_joint_trajectory";
     auto node = std::make_shared<JointTrajAndTfRecorder>(robot_config_file_path, as_server_name);
 
