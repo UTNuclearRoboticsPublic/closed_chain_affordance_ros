@@ -264,14 +264,14 @@ void CcAffordancePlannerRos::joint_states_cb_(const JointState::SharedPtr msg)
 // Function to read robot joint states at the start of the affordance
 Eigen::VectorXd CcAffordancePlannerRos::get_aff_start_joint_states_()
 {
-    // Set Eigen::VectorXd size
-    joint_states_.positions.conservativeResize(joint_names_.size());
-
-    if (joint_states_.positions.isZero())
+    if (joint_states_.positions.size() == 0)
     {
 
-        throw std::runtime_error("Could not read joint states.");
+        RCLCPP_ERROR(node_logger_, "Could not read joint states");
     }
+
+    // Set Eigen::VectorXd size
+    joint_states_.positions.conservativeResize(joint_names_.size());
 
     return joint_states_.positions;
 }
