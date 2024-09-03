@@ -109,11 +109,13 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
             RCLCPP_INFO(node_logger_, "Trajectory description: FULL.");
             break;
         case cc_affordance_planner::TrajectoryDescription::PARTIAL:
-            RCLCPP_WARN(node_logger_, "Trajectory description: PARTIAL. Execute with caution.");
-            break;
+            RCLCPP_ERROR(node_logger_, "Trajectory description: PARTIAL.");
+            *status_ = Status::FAILED;
+            return false;
         default:
             RCLCPP_ERROR(node_logger_, "Trajectory description: UNSET.");
-            break;
+            *status_ = Status::FAILED;
+            return false;
         }
     }
     else
@@ -212,10 +214,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
             case cc_affordance_planner::TrajectoryDescription::PARTIAL:
                 RCLCPP_ERROR(node_logger_, "Terminating planning due to the solution for %zuth task being partial.", i);
                 *status_ = Status::FAILED;
-                break;
+                return false;
             default:
                 RCLCPP_ERROR(node_logger_, "Trajectory description: UNSET.");
-                break;
+                *status_ = Status::FAILED;
+                return false;
             }
         }
         else
