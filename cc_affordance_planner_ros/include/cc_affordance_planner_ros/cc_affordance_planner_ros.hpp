@@ -219,27 +219,32 @@ class CcAffordancePlannerRos : public rclcpp::Node
     rclcpp::Logger node_logger_;       // logger associated with the node
     std::string plan_and_viz_ss_name_; // name of the planning visualization server
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
-        traj_execution_client_; // action client to execute trajectory on the robot
+        robot_traj_execution_client_; // action client to execute trajectory on the robot
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
+        gripper_traj_execution_client_; // action client to execute trajectory on the robot
     rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_; // service client to visualize joint trajectory
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    // joint states subscriber
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                      // buffer to lookup tf data
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 
     // Robot ROS setup data
-    std::string traj_execution_as_name_;      // trajectory execution action server name
-    std::string planning_group_;              // name of the MoveIt planning group for visualization purposes
-    std::string robot_description_parameter_; // name of the robot description parameter
+    std::string robot_traj_execution_as_name_;   // trajectory execution action server name
+    std::string gripper_traj_execution_as_name_; // trajectory execution action server name
+    std::string planning_group_;                 // name of the MoveIt planning group for visualization purposes
+    std::string robot_description_parameter_;    // name of the robot description parameter
     std::string rviz_fixed_frame_; // name of the fixed frame in Rviz in reference to which EE trajectory is plotted for
                                    // visualization
 
     // Robot data
-    Eigen::MatrixXd robot_slist_;          // screw list for the robot
-    std::vector<std::string> joint_names_; // name of the joints
-    Eigen::Matrix<double, 4, 4> M_;        // HTM representing the center of the robot palm
-    std::string ref_frame_;                // reference frame for the screw representations
-    std::string tool_frame_;               // name of the frame that representats the center of the palm
+    Eigen::MatrixXd robot_slist_;                  // screw list for the robot
+    std::vector<std::string> robot_joint_names_;   // name of the joints
+    std::vector<std::string> gripper_joint_names_; // name of the joints
+    Eigen::Matrix<double, 4, 4> M_;                // HTM representing the center of the robot palm
+    std::string ref_frame_;                        // reference frame for the screw representations
+    std::string tool_frame_;                       // name of the frame that representats the center of the palm
 
-    affordance_util_ros::JointTrajPoint joint_states_; // processed and ordered joint states data
+    affordance_util_ros::JointTrajPoint robot_joint_states_;   // processed and ordered joint states data
+    affordance_util_ros::JointTrajPoint gripper_joint_states_; // processed and ordered joint states data
 
     /**
      * @brief Given the robot name used in creating the cca_<robot> package, returns full path to the yaml file
@@ -265,7 +270,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @return
      */
-    Eigen::VectorXd get_aff_start_joint_states_();
+    std::pair<Eigen::VectorXd, Eigen::VectorXd> get_aff_start_joint_states_();
 
     /**
      * @brief Given a joint trajectory and screw axis, visualizes the trajectory and executes it on the robot
@@ -277,7 +282,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @return True if trajectory was successfully visualized and executed. false otherwise.
      */
     bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &w_aff,
-                                           const Eigen::VectorXd &q_aff);
+                                           const Eigen::VectorXd &q_aff, const bool includes_gripper_trajectory);
     /**
      * @brief Given a joint trajectory , executes it on the robot
      *
@@ -285,30 +290,37 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @return True if trajectory was successfully visualized and executed. false otherwise.
      */
-    bool execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory);
-
-    /**
-     * @brief Callback function to process the feedback from the traj_execution_as_ action server
-     *
-     * @param GoalHandleFollowJointTrajectory::SharedPtr Goal handle to a follow_joint_trajectory action server
-     * @param feedback Feedback message from a follow_joint_trajectory action server
-     */
-    void traj_execution_feedback_callback_(GoalHandleFollowJointTrajectory::SharedPtr,
-                                           const std::shared_ptr<const FollowJointTrajectory::Feedback> feedback);
+    bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
+                             rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
+                             const std::string &traj_execution_as_name, const std::vector<std::string> &joint_names,
+                             const std::vector<Eigen::VectorXd> &trajectory);
 
     /**
      * @brief Callback to process the result from the traj_execution_as_ action server
      *
      * @param result Result from a follow_joint_trajectory action server
      */
-    void traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result);
+    void robot_traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result);
 
     /**
      * @brief Callback to process the goal response from the traj_execution_as_ action server
      *
      * @param goal_handle A shared pointer to a follow_joint_trajectory action server goal handle
      */
-    void traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
+    void robot_traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
+    /**
+     * @brief Callback to process the result from the traj_execution_as_ action server
+     *
+     * @param result Result from a follow_joint_trajectory action server
+     */
+    void gripper_traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result);
+
+    /**
+     * @brief Callback to process the goal response from the traj_execution_as_ action server
+     *
+     * @param goal_handle A shared pointer to a follow_joint_trajectory action server goal handle
+     */
+    void gripper_traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
 };
 } // namespace cc_affordance_planner_ros
 
