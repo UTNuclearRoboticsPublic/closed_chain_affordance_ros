@@ -56,6 +56,17 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
+// Destructor for CcAffordancePlannerRos, cleans up.
+CcAffordancePlannerRos::~CcAffordancePlannerRos()
+{
+    rclcpp::shutdown();
+
+    if (result_status_thread_.joinable())
+    {
+        result_status_thread_.join();
+    }
+}
+
 // Runs the affordance planner for a single task and config.
 bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &planner_config,
                                                        const cc_affordance_planner::TaskDescription &taskDescription,
@@ -397,33 +408,9 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
                 &CcAffordancePlannerRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
             gripper_send_goal_options.result_callback = std::bind(
                 &CcAffordancePlannerRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
-            // Lambda expression to check the result status of gripper and robot trajectory execution
-            auto check_result_status = [this]() {
-                // Check if both pointers are in a non-processing status
-                if (*robot_result_status_ != cc_affordance_planner_ros::Status::PROCESSING &&
-                    *gripper_result_status_ != cc_affordance_planner_ros::Status::PROCESSING)
-                {
-                    // Both pointers are not in PROCESSING status, check their values
-                    if (*robot_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED &&
-                        *gripper_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED)
-                    {
-                        *status_ = cc_affordance_planner_ros::Status::SUCCEEDED;
-                    }
-                    else
-                    {
-                        *status_ = cc_affordance_planner_ros::Status::FAILED;
-                    }
-                }
-            };
 
-            // Start the status checking thread
-            std::thread result_status_thread = std::thread([this, check_result_status]() {
-                while (rclcpp::ok())
-                {
-                    check_result_status();                                // check status
-                    std::this_thread::sleep_for(std::chrono::seconds(1)); // Sleep for a bit
-                }
-            });
+            // Start checking the result status in a separate thread
+            result_status_thread_ = std::thread(&CcAffordancePlannerRos::check_robot_and_gripper_result_status_, this);
 
             return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
                                         robot_traj_execution_as_name_, robot_joint_names_, trajectory)) &&
@@ -560,4 +547,30 @@ std::shared_ptr<Status> CcAffordancePlannerRos::analyze_as_result_(const rclcpp_
     return result_status;
 }
 
+void CcAffordancePlannerRos::check_robot_and_gripper_result_status_()
+{
+    while (rclcpp::ok())
+    {
+        if (*robot_result_status_ != cc_affordance_planner_ros::Status::PROCESSING &&
+            *gripper_result_status_ != cc_affordance_planner_ros::Status::PROCESSING)
+        {
+
+            // Both pointers are not in PROCESSING status, check their values
+            std::lock_guard<std::mutex> lock(status_mutex_); // Lock the mutex before modifying status_
+            if (*robot_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED &&
+                *gripper_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED)
+            {
+                *status_ = cc_affordance_planner_ros::Status::SUCCEEDED;
+            }
+            else
+            {
+                *status_ = cc_affordance_planner_ros::Status::FAILED;
+            }
+            return; // Exit
+        }
+
+        // Sleep for a short duration to avoid busy-waiting
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    }
+}
 } // namespace cc_affordance_planner_ros
