@@ -45,8 +45,10 @@
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <chrono>
 #include <moveit_plan_and_viz_msgs/srv/move_it_plan_and_viz.hpp>
+#include <mutex>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -85,6 +87,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @param options Options for the node, e.g., parameter overrides.
      */
     explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
+
+    /**
+     * @brief Destructs a CcAffordancePlannerRos node.
+     */
+    ~CcAffordancePlannerRos();
 
     /**
      * @brief Runs the CC Affordance planner for a single task, visualizes the robot joint trajectory, and executes it
@@ -213,8 +220,10 @@ class CcAffordancePlannerRos : public rclcpp::Node
         cc_affordance_planner_ros::Status::PROCESSING); ///< Current status of robot trajectory execution result
     std::shared_ptr<Status> gripper_result_status_ = std::make_shared<cc_affordance_planner_ros::Status>(
         cc_affordance_planner_ros::Status::PROCESSING); ///< Current status of gripper trajectory execution result
-    rclcpp::Logger node_logger_;                        ///< Node-specific logger
-    std::string plan_and_viz_ss_name_;                  ///< Name of the plan and visualization server
+    std::thread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
+    std::mutex status_mutex_;          ///< Mutex to protect access to status_
+    rclcpp::Logger node_logger_;       ///< Node-specific logger
+    std::string plan_and_viz_ss_name_; ///< Name of the plan and visualization server
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
         robot_traj_execution_client_; ///< Client for executing robot trajectory
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
@@ -349,6 +358,10 @@ class CcAffordancePlannerRos : public rclcpp::Node
      */
     std::shared_ptr<Status> analyze_as_result_(const rclcpp_action::ResultCode &result_code,
                                                const std::string &as_name);
+    /**
+     * @brief Checks statuses for robot and gripper trajectory execution and sets node status based on them
+     */
+    void check_robot_and_gripper_result_status_();
 };
 
 } // namespace cc_affordance_planner_ros
