@@ -10,12 +10,12 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
       plan_and_viz_ss_name_("/moveit_plan_and_viz_server") // Name of the MoveIt Plan and Visualization server
 {
     // Extract necessary parameters for ROS setup and robot configuration
-    const std::string robot_traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
-    const std::string gripper_traj_execution_as_name_ =
-        this->get_parameter_or<std::string>("cca_gripper_as", ""); // optional
-    const std::string robot_description_parameter_ = this->get_parameter("cca_robot_description_parameter").as_string();
-    const std::string planning_group_ = this->get_parameter("cca_planning_group").as_string();
-    const std::string rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
+    robot_traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
+    gripper_traj_execution_as_name_ = this->get_parameter_or<std::string>("cca_gripper_as", ""); // optional
+
+    robot_description_parameter_ = this->get_parameter("cca_robot_description_parameter").as_string();
+    planning_group_ = this->get_parameter("cca_planning_group").as_string();
+    rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
     const std::string joint_states_topic = this->get_parameter("cca_joint_states_topic").as_string();
     const std::string robot_name = this->get_parameter("cca_robot").as_string();
 
@@ -35,7 +35,7 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     }
     catch (const std::exception &e)
     {
-        RCLCPP_ERROR(this->get_logger(), "Exception while building robot configuration: %s", e.what());
+        RCLCPP_ERROR(node_logger_, "Exception while building robot configuration: %s", e.what());
     }
 
     // Initialize action clients and subscribers
@@ -72,7 +72,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
     }
     catch (const std::invalid_argument &e)
     {
-        RCLCPP_ERROR(this->get_logger(), "Error in input validation: %s", e.what());
+        RCLCPP_ERROR(node_logger_, "Error in input validation: %s", e.what());
         *status_ = Status::FAILED;
         return false;
     }
@@ -88,7 +88,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
             affordance_util_ros::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
         if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
         {
-            RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Shutting down.",
+            RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
                          task_description.affordance_info.location_frame.c_str());
             *status_ = Status::FAILED;
             return false;
@@ -130,7 +130,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
         RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with update trail '"
                                              << plannerResult.update_trail << "' and took "
                                              << plannerResult.planning_time.count() << " microseconds.");
-        if (plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL)
+        RCLCPP_WARN(node_logger_, "Joint trajectory size: %zu", plannerResult.joint_trajectory.size());
+        if ((plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL) &&
+            ((task_description.trajectory_density - plannerResult.joint_trajectory.size()) > 2))
         {
             RCLCPP_ERROR(node_logger_, "Trajectory description: PARTIAL.");
             *status_ = Status::FAILED;
@@ -166,7 +168,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
     }
     catch (const std::invalid_argument &e)
     {
-        RCLCPP_ERROR(this->get_logger(), "Error in input validation: %s", e.what());
+        RCLCPP_ERROR(node_logger_, "Error in input validation: %s", e.what());
         *status_ = Status::FAILED;
         return false;
     }
@@ -200,7 +202,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
                 affordance_util_ros::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
             if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
             {
-                RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Shutting down.",
+                RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
                              task_description.affordance_info.location_frame.c_str());
                 *status_ = Status::FAILED;
                 return false;
@@ -223,7 +225,10 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
         // Handle planner result
         if (plannerResult.success)
         {
-            if (plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL)
+            RCLCPP_WARN(node_logger_, "Joint trajectory size: %zu", plannerResult.joint_trajectory.size());
+            if ((plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL) &&
+                ((task_description.trajectory_density - plannerResult.joint_trajectory.size()) > 2))
+
             {
                 RCLCPP_ERROR(node_logger_, "Partial solution at task %zu.", i);
                 *status_ = Status::FAILED;
@@ -254,6 +259,11 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
 // Helper function to validate input
 void CcAffordancePlannerRos::validate_input_(const cc_affordance_planner::TaskDescription &task_description)
 {
+    RCLCPP_INFO(node_logger_, "Gripper goal, %f", task_description.goal.gripper);
+    RCLCPP_INFO(node_logger_, "AS name, %s", gripper_traj_execution_as_name_.c_str());
+    RCLCPP_INFO(node_logger_, "Gripper goal bool: %s", !std::isnan(task_description.goal.gripper) ? "true" : "false");
+    RCLCPP_INFO(node_logger_, "AS bool: %s", gripper_traj_execution_as_name_.empty() ? "true" : "false");
+
     if (!std::isnan(task_description.goal.gripper) && gripper_traj_execution_as_name_.empty())
     {
         throw std::invalid_argument("Task description: `goal.gripper` is specified, but `cca_gripper_as` parameter is "
@@ -387,6 +397,33 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
                 &CcAffordancePlannerRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
             gripper_send_goal_options.result_callback = std::bind(
                 &CcAffordancePlannerRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
+            // Lambda expression to check the result status of gripper and robot trajectory execution
+            auto check_result_status = [this]() {
+                // Check if both pointers are in a non-processing status
+                if (*robot_result_status_ != cc_affordance_planner_ros::Status::PROCESSING &&
+                    *gripper_result_status_ != cc_affordance_planner_ros::Status::PROCESSING)
+                {
+                    // Both pointers are not in PROCESSING status, check their values
+                    if (*robot_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED &&
+                        *gripper_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED)
+                    {
+                        *status_ = cc_affordance_planner_ros::Status::SUCCEEDED;
+                    }
+                    else
+                    {
+                        *status_ = cc_affordance_planner_ros::Status::FAILED;
+                    }
+                }
+            };
+
+            // Start the status checking thread
+            std::thread result_status_thread = std::thread([this, check_result_status]() {
+                while (rclcpp::ok())
+                {
+                    check_result_status();                                // check status
+                    std::this_thread::sleep_for(std::chrono::seconds(1)); // Sleep for a bit
+                }
+            });
 
             return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
                                         robot_traj_execution_as_name_, robot_joint_names_, trajectory)) &&
@@ -413,15 +450,18 @@ bool CcAffordancePlannerRos::execute_trajectory_(
     const std::string &traj_execution_as_name, const std::vector<std::string> &joint_names,
     const std::vector<Eigen::VectorXd> &trajectory)
 {
-    // Ask for confirmation before executing the trajectory
-    RCLCPP_INFO_STREAM(node_logger_, "Ready to execute the trajectory? Press 'y' to confirm");
-    std::string execution_conf;
-    std::cin >> execution_conf;
-
-    if (execution_conf != "y" && execution_conf != "Y")
+    if (traj_execution_as_name == robot_traj_execution_as_name_)
     {
-        RCLCPP_INFO_STREAM(node_logger_, "Trajectory execution was canceled");
-        return false;
+        // Ask for confirmation before executing the trajectory
+        RCLCPP_INFO_STREAM(node_logger_, "Ready to execute the trajectory? Press 'y' to confirm");
+        std::string execution_conf;
+        std::cin >> execution_conf;
+
+        if (execution_conf != "y" && execution_conf != "Y")
+        {
+            RCLCPP_INFO_STREAM(node_logger_, "Trajectory execution was canceled");
+            return false;
+        }
     }
 
     // Convert the solution trajectory to ROS message
@@ -448,7 +488,7 @@ void CcAffordancePlannerRos::robot_traj_execution_result_callback_(
     const GoalHandleFollowJointTrajectory::WrappedResult &result)
 {
     // Analyze result
-    this->analyze_as_result_(result.code, robot_traj_execution_as_name_);
+    robot_result_status_ = this->analyze_as_result_(result.code, robot_traj_execution_as_name_);
 }
 
 // Callback to handle the goal response for robot trajectory execution
@@ -471,7 +511,7 @@ void CcAffordancePlannerRos::gripper_traj_execution_result_callback_(
     const GoalHandleFollowJointTrajectory::WrappedResult &result)
 {
     // Analyze result
-    this->analyze_as_result_(result.code, gripper_traj_execution_as_name_);
+    gripper_result_status_ = this->analyze_as_result_(result.code, gripper_traj_execution_as_name_);
 }
 
 // Callback to handle the goal response for gripper trajectory execution
@@ -489,35 +529,35 @@ void CcAffordancePlannerRos::gripper_traj_execution_goal_response_callback_(
     }
 }
 
-void CcAffordancePlannerRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code,
-                                                const std::string &as_name)
+std::shared_ptr<Status> CcAffordancePlannerRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code,
+                                                                   const std::string &as_name)
 {
 
-    std::lock_guard<std::mutex> lock(status_mutex_); // Lock the mutex to ensure thread safety
+    std::shared_ptr<Status> result_status =
+        std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN);
 
     switch (result_code)
     {
     case rclcpp_action::ResultCode::SUCCEEDED:
-        if (*status_ != Status::FAILED) // If it's already failed, don't override with success
-        {
-            *status_ = Status::SUCCEEDED;
-        }
+        *result_status = Status::SUCCEEDED;
         break;
     case rclcpp_action::ResultCode::ABORTED:
         RCLCPP_ERROR(node_logger_, "%s action server goal was aborted", as_name.c_str());
-        *status_ = Status::FAILED;
+        *result_status = Status::FAILED;
         break;
     case rclcpp_action::ResultCode::CANCELED:
         RCLCPP_ERROR(node_logger_, "%s action server goal was canceled", as_name.c_str());
-        *status_ = Status::FAILED;
+        *result_status = Status::FAILED;
         break;
     default:
         RCLCPP_ERROR(node_logger_, "%s action server returned unknown result code", as_name.c_str());
-        *status_ = Status::FAILED;
+        *result_status = Status::FAILED;
         break;
     }
 
     RCLCPP_INFO(node_logger_, "%s action server call concluded", as_name.c_str());
+
+    return result_status;
 }
 
 } // namespace cc_affordance_planner_ros

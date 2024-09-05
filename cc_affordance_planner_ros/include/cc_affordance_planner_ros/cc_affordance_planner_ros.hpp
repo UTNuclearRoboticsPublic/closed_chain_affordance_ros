@@ -45,7 +45,6 @@
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <chrono>
 #include <moveit_plan_and_viz_msgs/srv/move_it_plan_and_viz.hpp>
-#include <mutex>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
 
@@ -210,9 +209,12 @@ class CcAffordancePlannerRos : public rclcpp::Node
 
   private:
     std::shared_ptr<Status> status_{nullptr}; ///< Current status of planning and execution
-    std::mutex status_mutex_;                 ///< Mutex to protect _status access
-    rclcpp::Logger node_logger_;              ///< Node-specific logger
-    std::string plan_and_viz_ss_name_;        ///< Name of the plan and visualization server
+    std::shared_ptr<Status> robot_result_status_ = std::make_shared<cc_affordance_planner_ros::Status>(
+        cc_affordance_planner_ros::Status::PROCESSING); ///< Current status of robot trajectory execution result
+    std::shared_ptr<Status> gripper_result_status_ = std::make_shared<cc_affordance_planner_ros::Status>(
+        cc_affordance_planner_ros::Status::PROCESSING); ///< Current status of gripper trajectory execution result
+    rclcpp::Logger node_logger_;                        ///< Node-specific logger
+    std::string plan_and_viz_ss_name_;                  ///< Name of the plan and visualization server
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
         robot_traj_execution_client_; ///< Client for executing robot trajectory
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
@@ -343,10 +345,10 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @param as_name The name of the action server (either for the robot or the gripper), used for logging.
      *
-     * @note The function ensures that if any of the action results in failure, the final status will be `FAILED`,
-     * and a successful action will not override a previous failure.
+     * @return A shared pointer to the result status
      */
-    void analyze_as_result_(const rclcpp_action::ResultCode &result_code, const std::string &as_name);
+    std::shared_ptr<Status> analyze_as_result_(const rclcpp_action::ResultCode &result_code,
+                                               const std::string &as_name);
 };
 
 } // namespace cc_affordance_planner_ros
