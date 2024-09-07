@@ -55,6 +55,11 @@ using namespace std::chrono_literals;
 namespace cc_affordance_planner_ros
 {
 
+struct KinematicState
+{
+    Eigen::VectorXd robot;
+    double gripper;
+};
 /**
  * @brief Enum indicating the status of the CC Affordance Planner during execution.
  */
@@ -139,8 +144,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * @param status (Optional) Pointer to the cc_affordance_planner_ros::Status indicating the current status of the
      * planner. The status is set to `PROCESSING` during the planning phase, and it will be updated to either
      * `SUCCEEDED` or `FAILED` based on the result.
-     * @param robotStartConfig (Optional) Initial configuration of the robot as an Eigen::VectorXd vector. If this is
-     * not specified, the planner will use the current robot configuration obtained from the joint states topic.
+     * @param startConfig (Optional) Initial configuration of the robot and gripper as
+     * cc_affordance_planner_ros::KinematicState. If this is not specified, the planner will use the current robot
+     * configuration obtained from the joint states topic.
      *
      * @return bool True if the planning and execution are successful; false otherwise.
      */
@@ -149,7 +155,8 @@ class CcAffordancePlannerRos : public rclcpp::Node
         const cc_affordance_planner::TaskDescription &taskDescription,
         const std::shared_ptr<Status> status =
             std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const Eigen::VectorXd &robotStartConfig = Eigen::VectorXd());
+        const Eigen::VectorXd &startConfig = KinematicState{Eigen::VectorXd(),
+                                                            std::numeric_limits<double>::quiet_NaN()});
 
     /**
      * @brief Runs the CC Affordance planner for multiple tasks producing a single joint trajectory. Visualizes and
@@ -202,9 +209,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * - `SUCCEEDED`: All tasks were successfully planned, visualized, and executed.
      * - `FAILED`: One or more tasks failed during planning or execution.
      *
-     * @param robotStartConfig (Optional) Specifies the initial configuration of the robot as an Eigen::VectorXd. If
-     * this is not provided, the current robot configuration is retrieved from the joint states topic.
-     *
+     * @param startConfig (Optional) Initial configuration of the robot and gripper as
+     * cc_affordance_planner_ros::KinematicState. If this is not specified, the planner will use the current robot
+     * configuration obtained from the joint states topic.
      * @return bool True if all tasks were successfully planned and executed, false otherwise.
      */
     bool run_cc_affordance_planner(
@@ -212,14 +219,16 @@ class CcAffordancePlannerRos : public rclcpp::Node
         const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions,
         const std::shared_ptr<Status> status =
             std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const Eigen::VectorXd &robotStartConfig = Eigen::VectorXd());
+        const Eigen::VectorXd &startConfig = KinematicState{Eigen::VectorXd(),
+                                                            std::numeric_limits<double>::quiet_NaN()});
+
+    void cleanup_between_calls();
 
   private:
-    std::shared_ptr<Status> status_{nullptr}; ///< Current status of planning and execution
-    std::shared_ptr<Status> robot_result_status_ = std::make_shared<cc_affordance_planner_ros::Status>(
-        cc_affordance_planner_ros::Status::PROCESSING); ///< Current status of robot trajectory execution result
-    std::shared_ptr<Status> gripper_result_status_ = std::make_shared<cc_affordance_planner_ros::Status>(
-        cc_affordance_planner_ros::Status::PROCESSING); ///< Current status of gripper trajectory execution result
+    std::shared_ptr<Status> status_{nullptr};                 ///< Current status of planning and execution
+    std::shared_ptr<Status> robot_result_status_ = {nullptr}; ///< Current status of robot trajectory execution result
+    std::shared_ptr<Status> gripper_result_status_ = {
+        nullptr};                      ///< Current status of gripper trajectory execution result
     std::thread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
     std::mutex status_mutex_;          ///< Mutex to protect access to status_
     rclcpp::Logger node_logger_;       ///< Node-specific logger
@@ -285,11 +294,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
     void joint_states_cb_(const JointState::SharedPtr msg);
 
     /**
-     * @brief Retrieves the start joint states of the robot for the affordance.
+     * @brief Retrieves the joint states of the robot and gripper.
      *
-     * @return Pair of Eigen::VectorXd containing robot and gripper start configurations.
+     * @return State struct containing robot and gripper state.
      */
-    std::pair<Eigen::VectorXd, Eigen::VectorXd> get_aff_start_joint_states_();
+    KinematicState read_joint_states_();
 
     /**
      * @brief Visualizes and executes the planned trajectory.
@@ -316,7 +325,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                              rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
                              const std::string &traj_execution_as_name, const std::vector<std::string> &joint_names,
-                             const std::vector<Eigen::VectorXd> &trajectory);
+                             const std::vector<Eigen::VectorXd> &trajectory, const double &traj_time_step);
 
     /**
      * @brief Callback for handling the result of robot trajectory execution.
@@ -354,10 +363,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
      *
      * @param as_name The name of the action server (either for the robot or the gripper), used for logging.
      *
-     * @return A shared pointer to the result status
+     * @return A result status
      */
-    std::shared_ptr<Status> analyze_as_result_(const rclcpp_action::ResultCode &result_code,
-                                               const std::string &as_name);
+    Status analyze_as_result_(const rclcpp_action::ResultCode &result_code, const std::string &as_name);
     /**
      * @brief Checks statuses for robot and gripper trajectory execution and sets node status based on them
      */
