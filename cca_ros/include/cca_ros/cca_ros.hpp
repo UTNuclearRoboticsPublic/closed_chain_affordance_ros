@@ -50,10 +50,10 @@
 #include <tf2_ros/buffer.h>
 #include <thread>
 
-using namespace std::chrono_literals;
-
 namespace cca_ros
 {
+using namespace std::chrono_literals;
+using FollowJointTrajectoryGoal = control_msgs::action::FollowJointTrajectory_Goal;
 
 struct KinematicState
 {
@@ -84,6 +84,10 @@ class CcaRos : public rclcpp::Node
     using CcaRosViz = cca_ros_viz_msgs::srv::CcaRosViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
+
+    // Variables
+    bool visualize_trajectory = true; // visualize by default
+    bool execute_trajectory = false;  // do not execute by default
 
     /**
      * @brief Constructs a CcaRos node.
@@ -304,11 +308,10 @@ class CcaRos : public rclcpp::Node
      * @param trajectory Vector of joint states representing the planned trajectory.
      * @param w_aff Affordance screw axis.
      * @param q_aff Affordance location.
-     * @param includes_gripper_trajectory Whether the gripper trajectory is included.
      * @return True if successful, false otherwise.
      */
-    bool visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory, const Eigen::VectorXd &w_aff,
-                                           const Eigen::VectorXd &q_aff, const bool includes_gripper_trajectory);
+    bool visualize_trajectory_(const FollowJointTrajectoryGoal &goal, const Eigen::VectorXd &w_aff,
+                               const Eigen::VectorXd &q_aff);
 
     /**
      * @brief Executes the given trajectory on the robot.
@@ -316,14 +319,12 @@ class CcaRos : public rclcpp::Node
      * @param traj_execution_client Action client for executing the trajectory.
      * @param send_goal_options Options for sending the trajectory execution goal.
      * @param traj_execution_as_name Name of the action server.
-     * @param joint_names List of joint names.
-     * @param trajectory Vector of joint states representing the trajectory.
+     * @param goal follow_joint_trajectory goal message containing the trajectory to execute
      * @return True if successful, false otherwise.
      */
     bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                              rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
-                             const std::string &traj_execution_as_name, const std::vector<std::string> &joint_names,
-                             const std::vector<Eigen::VectorXd> &trajectory, const double &traj_time_step);
+                             const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal);
 
     /**
      * @brief Callback for handling the result of robot trajectory execution.
@@ -368,6 +369,9 @@ class CcaRos : public rclcpp::Node
      * @brief Checks statuses for robot and gripper trajectory execution and sets node status based on them
      */
     void check_robot_and_gripper_result_status_();
+
+    std::pair<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
+        const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory);
 };
 
 } // namespace cca_ros
