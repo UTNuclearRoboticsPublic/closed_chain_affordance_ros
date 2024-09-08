@@ -2,28 +2,15 @@
 
 namespace cca_ros
 {
-// Utility function to convert Eigen::VectorXd to a string
-std::string vectorToString(const Eigen::VectorXd &vec)
-{
-    std::stringstream ss;
-    ss << "[";
-    for (int i = 0; i < vec.size(); ++i)
-    {
-        if (i > 0)
-        {
-            ss << ", ";
-        }
-        ss << vec[i];
-    }
-    ss << "]";
-    return ss.str();
-}
 
 // Constructor for CcaRos, initializes the node and sets up required parameters and clients.
-CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
+CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options, bool visualize_trajectory,
+               bool execute_trajectory)
     : Node(node_name, node_options),
-      node_logger_(this->get_logger()),   // Logger for the node
-      viz_ss_name_("/cca_ros_viz_server") // Name of the MoveIt Plan and Visualization server
+      node_logger_(this->get_logger()),    // Logger for the node
+      viz_ss_name_("/cca_ros_viz_server"), // Name of the MoveIt Plan and Visualization server
+      visualize_trajectory(visualize_trajectory),
+      execute_trajectory(execute_trajectory)
 {
     // Extract necessary parameters for ROS setup and robot configuration
     robot_traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
@@ -54,16 +41,23 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
         RCLCPP_ERROR(node_logger_, "Exception while building robot configuration: %s", e.what());
     }
 
-    // Initialize action clients and subscribers
-    robot_traj_execution_client_ =
-        rclcpp_action::create_client<FollowJointTrajectory>(this, robot_traj_execution_as_name_);
-    if (!gripper_traj_execution_as_name_.empty())
+    // Initialize service/action clients and subscribers
+    if (visualize_trajectory)
     {
-        // Only initialize if the gripper as name is provided
-        gripper_traj_execution_client_ =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, gripper_traj_execution_as_name_);
+        viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
     }
-    viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
+
+    if (execute_trajectory)
+    {
+        robot_traj_execution_client_ =
+            rclcpp_action::create_client<FollowJointTrajectory>(this, robot_traj_execution_as_name_);
+        if (!gripper_traj_execution_as_name_.empty())
+        {
+            // Only initialize if the gripper as name is provided
+            gripper_traj_execution_client_ =
+                rclcpp_action::create_client<FollowJointTrajectory>(this, gripper_traj_execution_as_name_);
+        }
+    }
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
@@ -224,6 +218,7 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
                                        robot_traj_execution_as_name_, robot_goal_msg);
         }
     }
+    *status_ = cca_ros::Status::SUCCEEDED;
     return true;
 }
 
@@ -378,6 +373,7 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
                                        robot_traj_execution_as_name_, robot_goal_msg);
         }
     }
+    *status_ = cca_ros::Status::SUCCEEDED;
     return true;
 }
 

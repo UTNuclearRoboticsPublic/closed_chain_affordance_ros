@@ -86,16 +86,18 @@ class CcaRos : public rclcpp::Node
     using JointState = sensor_msgs::msg::JointState;
 
     // Variables
-    bool visualize_trajectory = true; // visualize by default
-    bool execute_trajectory = false;  // do not execute by default
-
+    bool visualize_trajectory;
+    bool execute_trajectory;
     /**
      * @brief Constructs a CcaRos node.
      *
      * @param node_name Name of the ROS node.
      * @param options Options for the node, e.g., parameter overrides.
+     * @param visualize_trajectory Whether to visualize the solved trajectory. Default is true.
+     * @param execute_trajectory Whether to execute the solved trajectory on the robot. Default is false.
      */
-    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options);
+    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options, bool visualize_trajectory = true,
+                    bool execute_trajectory = false);
 
     /**
      * @brief Destructs a CcaRos node.
