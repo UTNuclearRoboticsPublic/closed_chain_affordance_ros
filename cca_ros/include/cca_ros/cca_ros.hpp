@@ -240,18 +240,22 @@ class CcaRos : public rclcpp::Node
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
         robot_traj_execution_client_; ///< Client for executing robot trajectory
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
-        gripper_traj_execution_client_;                            ///< Client for executing gripper trajectory
-    rclcpp::Client<CcaRosViz>::SharedPtr viz_client_;              ///< Client for visualizing the planned trajectory
-    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_; ///< Subscriber for joint states
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                   ///< TF2 buffer for transformation lookup
+        gripper_traj_execution_client_; ///< Client for executing gripper trajectory
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
+        robot_and_gripper_traj_execution_client_;     ///< Client for executing robot and gripper trajectory together
+    rclcpp::Client<CcaRosViz>::SharedPtr viz_client_; ///< Client for visualizing the planned trajectory
+    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;     ///< Subscriber for joint states
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                       ///< TF2 buffer for transformation lookup
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr}; ///< TF2 transform listener
 
     // Robot ROS setup data
-    std::string robot_traj_execution_as_name_;   ///< Action server name for robot trajectory execution
-    std::string gripper_traj_execution_as_name_; ///< Action server name for gripper trajectory execution
-    std::string planning_group_;                 ///< MoveIt planning group for visualization
-    std::string robot_description_parameter_;    ///< Parameter for the robot description
-    std::string rviz_fixed_frame_;               ///< Fixed frame for RViz visualization
+    std::string robot_traj_execution_as_name_;             ///< Action server name for robot trajectory execution
+    std::string gripper_traj_execution_as_name_;           ///< Action server name for gripper trajectory execution
+    std::string robot_and_gripper_traj_execution_as_name_; ///< Action server name for robot and gripper trajectory
+                                                           ///< execution together
+    std::string planning_group_;                           ///< MoveIt planning group for visualization
+    std::string robot_description_parameter_;              ///< Parameter for the robot description
+    std::string rviz_fixed_frame_;                         ///< Fixed frame for RViz visualization
 
     // Robot data
     Eigen::MatrixXd robot_slist_;                  ///< Screw axes list for the robot
@@ -263,6 +267,9 @@ class CcaRos : public rclcpp::Node
 
     affordance_util_ros::JointTrajPoint robot_joint_states_;   ///< Processed and ordered robot joint states
     affordance_util_ros::JointTrajPoint gripper_joint_states_; ///< Processed and ordered gripper joint states
+
+    bool unified_executor_available_ =
+        false; ///< Indicates whether an action server is available to execute the robot and gripper trajectory together
 
     /**
      * @brief Validates a single task description for the CC Affordance Planner ROS node.
@@ -372,8 +379,23 @@ class CcaRos : public rclcpp::Node
      */
     void check_robot_and_gripper_result_status_();
 
-    std::pair<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
+    /**
+     * @brief Creates follow joint trajectory messages for the robot and/or gripper trajectory visualization and
+     * execution servers
+     *
+     * @param trajectory Bare trajectory containing robot and/or gripper trajectory
+     * @param includes_gripper_trajectory Bool indicating whether the trajectory arg contains gripper trajectory
+     *
+     * @return Tuple or ROS follow_joint_trajectory goal messages for the robot, gripper, and robot and gripper
+     * together. Robot msg is always returned. Other two are conditional.
+     */
+    std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
         const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory);
+
+    /**
+     * @brief Initializes proper action clients in the constructor
+     */
+    void initialize_action_clients_();
 };
 
 } // namespace cca_ros
