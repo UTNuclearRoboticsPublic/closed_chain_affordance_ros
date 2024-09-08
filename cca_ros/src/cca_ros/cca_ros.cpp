@@ -37,6 +37,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
         tool_frame_ = robotConfig.tool_name;          // Tool frame
         robot_joint_names_ = robotConfig.joint_names; // Robot joint names
         gripper_joint_names_ = {"arm0_fingers"};      // Gripper joint names
+                                                      // TODO: Parse gripper joint names from description yaml file
     }
     catch (const std::exception &e)
     {
