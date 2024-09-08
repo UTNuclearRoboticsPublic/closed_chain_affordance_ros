@@ -17,7 +17,7 @@ This repository contains robot-agnostic ROS2 packages used to interface the Clos
    cd ~/<ros_workspace_name>
    ```
    ```
-   colcon build --packages-select affordance_util_ros moveit_plan_and_viz cc_affordance_planner_ros
+   colcon build --packages-select affordance_util_ros cca_ros_viz cc_affordance_planner_ros
    ```
    ```
    source install/setup.bash
@@ -31,7 +31,7 @@ This repository contains robot-agnostic ROS2 packages used to interface the Clos
    source install/setup.bash
    ```
 ### Notable Dependencies
-1. The moveit_plan_and_viz package utilizes some MoveIt tools, albeit only for visualization purposes in Rviz. To utilize this functionality, ensure moveit is installed along with the moveit_visual_tools package.
+1. The cca_ros_viz package provides a ROS service to visualize the planned trajectory in Rviz. To utilize this functionality, ensure moveit is installed along with the moveit_visual_tools package.
 2. For AprilTag usage, install the ROS apriltag package with 'sudo apt install ros-<ROS_DISTRO>-apriltag`.
 
 ## Run Instructions
@@ -70,7 +70,7 @@ The package will contain two files in its `config` folder: `cca_<robot>_descript
 
 2. Run the service server to visualize the planned trajectory in Rviz with the following command:
    ```
-   ros2 run moveit_plan_and_viz moveit_plan_and_viz_node
+   ros2 run cca_ros_viz cca_ros_viz_node
    ```
 
 3. Run the planner, replacing `<robot>` with the robot name used to create the `cca_<robot>` package:

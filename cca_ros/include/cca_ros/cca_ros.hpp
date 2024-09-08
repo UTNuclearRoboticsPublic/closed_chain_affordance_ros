@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
-//      Title     : cc_affordance_planner_ros.hpp
-//      Project   : cc_affordance_planner_ros
+//      Title     : cca_ros.hpp
+//      Project   : cca_ros
 //      Created   : Spring 2024
 //      Author    : Janak Panthi (Crasun Jans)
 //      Copyright : Copyright© The University of Texas at Austin, 2014-2026.
@@ -30,8 +30,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef CC_AFFORDANCE_PLANNER_ROS_HPP
-#define CC_AFFORDANCE_PLANNER_ROS_HPP
+#ifndef CCA_ROS_HPP
+#define CCA_ROS_HPP
 
 #include "control_msgs/action/follow_joint_trajectory.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -43,8 +43,8 @@
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
+#include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
-#include <moveit_plan_and_viz_msgs/srv/move_it_plan_and_viz.hpp>
 #include <mutex>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
@@ -52,7 +52,7 @@
 
 using namespace std::chrono_literals;
 
-namespace cc_affordance_planner_ros
+namespace cca_ros
 {
 
 struct KinematicState
@@ -76,27 +76,27 @@ enum Status
  * This class manages the process of planning, visualizing, and executing trajectories
  * for robot affordances using closed-chain kinematics.
  */
-class CcAffordancePlannerRos : public rclcpp::Node
+class CcaRos : public rclcpp::Node
 {
   public:
     // Type aliases
     using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
-    using MoveItPlanAndViz = moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz;
+    using CcaRosViz = cca_ros_viz_msgs::srv::CcaRosViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
 
     /**
-     * @brief Constructs a CcAffordancePlannerRos node.
+     * @brief Constructs a CcaRos node.
      *
      * @param node_name Name of the ROS node.
      * @param options Options for the node, e.g., parameter overrides.
      */
-    explicit CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &options);
+    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
     /**
-     * @brief Destructs a CcAffordancePlannerRos node.
+     * @brief Destructs a CcaRos node.
      */
-    ~CcAffordancePlannerRos();
+    ~CcaRos();
 
     /**
      * @brief Runs the CC Affordance planner for a single task, visualizes the robot joint trajectory, and executes it
@@ -141,11 +141,11 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * - **vir_screw_order**: (Optional) Specifies the virtual screw order for the closed-chain model. Default is
      * `affordance_util::VirtualScrewOrder::XYZ`, which assumes rotational freedom around the x, y, and z axes in order.
      *
-     * @param status (Optional) Pointer to the cc_affordance_planner_ros::Status indicating the current status of the
+     * @param status (Optional) Pointer to the cca_ros::Status indicating the current status of the
      * planner. The status is set to `PROCESSING` during the planning phase, and it will be updated to either
      * `SUCCEEDED` or `FAILED` based on the result.
      * @param startConfig (Optional) Initial configuration of the robot and gripper as
-     * cc_affordance_planner_ros::KinematicState. If this is not specified, the planner will use the current robot
+     * cca_ros::KinematicState. If this is not specified, the planner will use the current robot
      * configuration obtained from the joint states topic.
      *
      * @return bool True if the planning and execution are successful; false otherwise.
@@ -153,10 +153,9 @@ class CcAffordancePlannerRos : public rclcpp::Node
     bool run_cc_affordance_planner(
         const cc_affordance_planner::PlannerConfig &planner_config,
         const cc_affordance_planner::TaskDescription &taskDescription,
-        const std::shared_ptr<Status> status =
-            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const Eigen::VectorXd &startConfig = KinematicState{Eigen::VectorXd(),
-                                                            std::numeric_limits<double>::quiet_NaN()});
+        const std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN),
+        const KinematicState &startConfig = KinematicState{Eigen::VectorXd(),
+                                                           std::numeric_limits<double>::quiet_NaN()});
 
     /**
      * @brief Runs the CC Affordance planner for multiple tasks producing a single joint trajectory. Visualizes and
@@ -203,24 +202,23 @@ class CcAffordancePlannerRos : public rclcpp::Node
      * - **vir_screw_order**: (Optional) Specifies the virtual screw order for the closed-chain model. Default is
      * `affordance_util::VirtualScrewOrder::XYZ`, which assumes rotational freedom around the x, y, and z axes in order.
      *
-     * @param status (Optional) Pointer to the cc_affordance_planner_ros::Status indicating the result of the planning
+     * @param status (Optional) Pointer to the cca_ros::Status indicating the result of the planning
      * and execution. Statuses are:
      * - `PROCESSING`: The planner is currently working on the tasks.
      * - `SUCCEEDED`: All tasks were successfully planned, visualized, and executed.
      * - `FAILED`: One or more tasks failed during planning or execution.
      *
      * @param startConfig (Optional) Initial configuration of the robot and gripper as
-     * cc_affordance_planner_ros::KinematicState. If this is not specified, the planner will use the current robot
+     * cca_ros::KinematicState. If this is not specified, the planner will use the current robot
      * configuration obtained from the joint states topic.
      * @return bool True if all tasks were successfully planned and executed, false otherwise.
      */
     bool run_cc_affordance_planner(
         const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
         const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions,
-        const std::shared_ptr<Status> status =
-            std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::UNKNOWN),
-        const Eigen::VectorXd &startConfig = KinematicState{Eigen::VectorXd(),
-                                                            std::numeric_limits<double>::quiet_NaN()});
+        const std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN),
+        const KinematicState &startConfig = KinematicState{Eigen::VectorXd(),
+                                                           std::numeric_limits<double>::quiet_NaN()});
 
     void cleanup_between_calls();
 
@@ -232,14 +230,14 @@ class CcAffordancePlannerRos : public rclcpp::Node
     std::thread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
     std::mutex status_mutex_;          ///< Mutex to protect access to status_
     rclcpp::Logger node_logger_;       ///< Node-specific logger
-    std::string plan_and_viz_ss_name_; ///< Name of the plan and visualization server
+    std::string viz_ss_name_;          ///< Name of the plan and visualization server
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
         robot_traj_execution_client_; ///< Client for executing robot trajectory
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
-        gripper_traj_execution_client_;                               ///< Client for executing gripper trajectory
-    rclcpp::Client<MoveItPlanAndViz>::SharedPtr plan_and_viz_client_; ///< Client for visualizing the planned trajectory
-    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;    ///< Subscriber for joint states
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                      ///< TF2 buffer for transformation lookup
+        gripper_traj_execution_client_;                            ///< Client for executing gripper trajectory
+    rclcpp::Client<CcaRosViz>::SharedPtr viz_client_;              ///< Client for visualizing the planned trajectory
+    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_; ///< Subscriber for joint states
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                   ///< TF2 buffer for transformation lookup
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr}; ///< TF2 transform listener
 
     // Robot ROS setup data
@@ -356,7 +354,7 @@ class CcAffordancePlannerRos : public rclcpp::Node
     void gripper_traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle);
 
     /**
-     * @brief Analyzes the result code returned by an action server and updates the cc_affordance_planner_ros status
+     * @brief Analyzes the result code returned by an action server and updates the cca_ros status
      * accordingly.
      *
      * @param result_code The result code returned by a ROS action server
@@ -372,6 +370,6 @@ class CcAffordancePlannerRos : public rclcpp::Node
     void check_robot_and_gripper_result_status_();
 };
 
-} // namespace cc_affordance_planner_ros
+} // namespace cca_ros
 
-#endif // CC_AFFORDANCE_PLANNER_ROS_HPP
+#endif // CCA_ROS_HPP

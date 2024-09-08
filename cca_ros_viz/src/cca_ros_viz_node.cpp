@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
-//      Title     : moveit_plan_and_viz_node.cpp
-//      Project   : moveit_plan_and_viz
+//      Title     : cca_ros_viz_node.cpp
+//      Project   : cca_ros_viz
 //      Created   : Jan 2024
 //      Author    : Janak Panthi (Crasun Jans)
 //      Copyright : Copyright© The University of Texas at Austin, 2014-2026. All
@@ -29,7 +29,7 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
-#include <moveit_plan_and_viz_msgs/srv/move_it_plan_and_viz.hpp>
+#include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <pluginlib/class_loader.hpp>
@@ -46,19 +46,19 @@
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
 using namespace std::chrono_literals;
-class MoveItPlanAndVizServer : public rclcpp::Node
+class CcaRosVizServer : public rclcpp::Node
 {
   public:
-    MoveItPlanAndVizServer(const rclcpp::NodeOptions &options)
-        : Node("moveit_plan_and_viz_server_node", options),
+    explicit CcaRosVizServer(const rclcpp::NodeOptions &options)
+        : Node("cca_ros_viz_server_node", options),
           node_logger_(this->get_logger()),
           executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>())
     {
 
         // Create and advertise planning and visualization service
-        srv_ = this->create_service<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz>(
-            "/moveit_plan_and_viz_server", std::bind(&MoveItPlanAndVizServer::moveit_plan_and_viz_server_callback_,
-                                                     this, std::placeholders::_1, std::placeholders::_2));
+        srv_ = this->create_service<cca_ros_viz_msgs::srv::CcaRosViz>(
+            "/cca_ros_viz_server", std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
+                                             std::placeholders::_1, std::placeholders::_2));
 
         // Create a publisher to publish EE trajectory
         ee_traj_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/ee_trajectory", 10);
@@ -66,10 +66,10 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
             this->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path", 1);
-        RCLCPP_INFO_STREAM(node_logger_, "/moveit_plan_and_viz service server is active");
+        RCLCPP_INFO_STREAM(node_logger_, "/cca_ros_viz service server is active");
     }
 
-    ~MoveItPlanAndVizServer() { rclcpp::shutdown(); }
+    ~CcaRosVizServer() { rclcpp::shutdown(); }
     void start_and_spin_executor()
     {
         // Add node to executor and start executor thread
@@ -100,7 +100,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
         rviz_visual_tools_->loadMarkerPub();
         rviz_visual_tools_->enableBatchPublishing();
         moveit_visual_tools_ = std::make_shared<moveit_visual_tools::MoveItVisualTools>(node_handle_, "arm0_base_link",
-                                                                                        "moveit_plan_and_viz", psm_);
+                                                                                        "cca_ros_viz", psm_);
     }
 
   private:
@@ -111,8 +111,7 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     std::shared_ptr<rclcpp::executors::SingleThreadedExecutor>
         executor_;                // executor needed for MoveIt robot state checking
     std::thread executor_thread_; // thread
-    rclcpp::Service<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz>::SharedPtr
-        srv_; // joint traj plan and visualization service
+    rclcpp::Service<cca_ros_viz_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr ee_traj_pub_; // publisher for EE trajectory
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
@@ -125,9 +124,8 @@ class MoveItPlanAndVizServer : public rclcpp::Node
     moveit_visual_tools::MoveItVisualToolsPtr moveit_visual_tools_;
 
     // Methods
-    void moveit_plan_and_viz_server_callback_(
-        const std::shared_ptr<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz::Request> serv_req,
-        std::shared_ptr<moveit_plan_and_viz_msgs::srv::MoveItPlanAndViz::Response> serv_res)
+    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Request> serv_req,
+                                      std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Response> serv_res)
     {
 
         bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
@@ -234,7 +232,7 @@ int main(int argc, char **argv)
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
-    auto node = std::make_shared<MoveItPlanAndVizServer>(node_options);
+    auto node = std::make_shared<CcaRosVizServer>(node_options);
     node->start_and_spin_executor();
 
     while (rclcpp::ok())

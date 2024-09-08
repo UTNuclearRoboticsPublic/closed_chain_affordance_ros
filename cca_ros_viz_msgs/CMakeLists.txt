@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(moveit_plan_and_viz_msgs)
+project(cca_ros_viz_msgs)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -13,7 +13,7 @@ find_package(trajectory_msgs)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/MoveItPlanAndViz.srv"
+  "srv/CcaRosViz.srv"
   DEPENDENCIES
   trajectory_msgs
 )

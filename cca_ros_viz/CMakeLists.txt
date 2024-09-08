@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(moveit_plan_and_viz)
+project(cca_ros_viz)
 
 # Set C++ standard to 17
 set(CMAKE_CXX_STANDARD 17)
@@ -23,7 +23,7 @@ find_package(visualization_msgs REQUIRED) # To use visualization markers in Rviz
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_visual_tools REQUIRED)
-find_package(moveit_plan_and_viz_msgs REQUIRED)
+find_package(cca_ros_viz_msgs REQUIRED)
 
 # Include directories for headers
 include_directories(
@@ -33,7 +33,7 @@ include_directories(
 
 # Create executable
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools moveit_plan_and_viz_msgs)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools cca_ros_viz_msgs)
 
 
 # Install the executables

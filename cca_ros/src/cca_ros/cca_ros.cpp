@@ -1,6 +1,6 @@
-#include <cc_affordance_planner_ros/cc_affordance_planner_ros.hpp>
+#include <cca_ros/cca_ros.hpp>
 
-namespace cc_affordance_planner_ros
+namespace cca_ros
 {
 // Utility function to convert Eigen::VectorXd to a string
 std::string vectorToString(const Eigen::VectorXd &vec)
@@ -19,11 +19,11 @@ std::string vectorToString(const Eigen::VectorXd &vec)
     return ss.str();
 }
 
-// Constructor for CcAffordancePlannerRos, initializes the node and sets up required parameters and clients.
-CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
+// Constructor for CcaRos, initializes the node and sets up required parameters and clients.
+CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
     : Node(node_name, node_options),
-      node_logger_(this->get_logger()),                    // Logger for the node
-      plan_and_viz_ss_name_("/moveit_plan_and_viz_server") // Name of the MoveIt Plan and Visualization server
+      node_logger_(this->get_logger()),   // Logger for the node
+      viz_ss_name_("/cca_ros_viz_server") // Name of the MoveIt Plan and Visualization server
 {
     // Extract necessary parameters for ROS setup and robot configuration
     robot_traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
@@ -36,7 +36,7 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
     const std::string robot_name = this->get_parameter("cca_robot").as_string();
 
     // Get the path for robot configuration file
-    const std::string robot_config_file_path = CcAffordancePlannerRos::get_cc_affordance_robot_description_(robot_name);
+    const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name);
 
     // Load robot configuration
     try
@@ -63,17 +63,17 @@ CcAffordancePlannerRos::CcAffordancePlannerRos(const std::string &node_name, con
         gripper_traj_execution_client_ =
             rclcpp_action::create_client<FollowJointTrajectory>(this, gripper_traj_execution_as_name_);
     }
-    plan_and_viz_client_ = this->create_client<MoveItPlanAndViz>(plan_and_viz_ss_name_);
+    viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
     joint_states_sub_ = this->create_subscription<JointState>(
-        joint_states_topic, 1000, std::bind(&CcAffordancePlannerRos::joint_states_cb_, this, std::placeholders::_1));
+        joint_states_topic, 1000, std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
     // Setup TF buffer and listener for affordance location from apriltag
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
-// Destructor for CcAffordancePlannerRos, cleans up.
-CcAffordancePlannerRos::~CcAffordancePlannerRos()
+// Destructor for CcaRos, cleans up.
+CcaRos::~CcaRos()
 {
     rclcpp::shutdown();
 
@@ -84,10 +84,9 @@ CcAffordancePlannerRos::~CcAffordancePlannerRos()
 }
 
 // Runs the affordance planner for a single task and config.
-bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &planner_config,
-                                                       const cc_affordance_planner::TaskDescription &taskDescription,
-                                                       const std::shared_ptr<Status> status,
-                                                       const KinematicState &startConfig)
+bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &planner_config,
+                                       const cc_affordance_planner::TaskDescription &taskDescription,
+                                       const std::shared_ptr<Status> status, const KinematicState &startConfig)
 {
     status_ = status;
     *status_ = Status::PROCESSING;
@@ -186,10 +185,9 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(const cc_affordance_plann
 }
 
 // Runs the affordance planner for multiple tasks and configurations.
-bool CcAffordancePlannerRos::run_cc_affordance_planner(
-    const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
-    const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions, const std::shared_ptr<Status> status,
-    const KinematicState &startConfig)
+bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
+                                       const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions,
+                                       const std::shared_ptr<Status> status, const KinematicState &startConfig)
 {
     status_ = status;
     *status_ = Status::PROCESSING;
@@ -298,7 +296,7 @@ bool CcAffordancePlannerRos::run_cc_affordance_planner(
 }
 
 // Helper function to validate input
-void CcAffordancePlannerRos::validate_input_(const cc_affordance_planner::TaskDescription &task_description)
+void CcaRos::validate_input_(const cc_affordance_planner::TaskDescription &task_description)
 {
     RCLCPP_INFO(node_logger_, "Gripper goal, %f", task_description.goal.gripper);
     RCLCPP_INFO(node_logger_, "AS name, %s", gripper_traj_execution_as_name_.c_str());
@@ -313,9 +311,8 @@ void CcAffordancePlannerRos::validate_input_(const cc_affordance_planner::TaskDe
 }
 
 // Helper function to validate input
-void CcAffordancePlannerRos::validate_input_(
-    const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
-    const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions)
+void CcaRos::validate_input_(const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
+                             const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions)
 {
     // Ensure planner configs and task descriptions are of the same size
     if (planner_configs.size() != task_descriptions.size() || planner_configs.empty())
@@ -342,7 +339,7 @@ void CcAffordancePlannerRos::validate_input_(
 }
 
 // Helper function to get the full path to the robot description file.
-std::string CcAffordancePlannerRos::get_cc_affordance_robot_description_(const std::string &robot_name)
+std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robot_name)
 {
     const std::string package_name = "cca_" + robot_name;
     const std::string rel_dir = "/config/";
@@ -351,7 +348,7 @@ std::string CcAffordancePlannerRos::get_cc_affordance_robot_description_(const s
 }
 
 // Callback for joint_states topic.
-void CcAffordancePlannerRos::joint_states_cb_(const JointState::SharedPtr msg)
+void CcaRos::joint_states_cb_(const JointState::SharedPtr msg)
 {
 
     robot_joint_states_ = affordance_util_ros::get_ordered_joint_states(msg, robot_joint_names_);
@@ -359,7 +356,7 @@ void CcAffordancePlannerRos::joint_states_cb_(const JointState::SharedPtr msg)
 }
 
 // Retrieve robot joint states at the start of the affordance.
-KinematicState CcAffordancePlannerRos::read_joint_states_()
+KinematicState CcaRos::read_joint_states_()
 {
     robot_joint_states_.positions.conservativeResize(robot_joint_names_.size());
     gripper_joint_states_.positions.conservativeResize(gripper_joint_names_.size());
@@ -376,10 +373,9 @@ KinematicState CcAffordancePlannerRos::read_joint_states_()
 }
 
 // Visualizes and executes the given trajectory.
-bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
-                                                               const Eigen::VectorXd &w_aff,
-                                                               const Eigen::VectorXd &q_aff,
-                                                               const bool includes_gripper_trajectory)
+bool CcaRos::visualize_and_execute_trajectory_(const std::vector<Eigen::VectorXd> &trajectory,
+                                               const Eigen::VectorXd &w_aff, const Eigen::VectorXd &q_aff,
+                                               const bool includes_gripper_trajectory)
 {
     std::vector<Eigen::VectorXd> gripper_trajectory;
     std::cout << "Here is the gripper trajectory:" << std::endl;
@@ -400,56 +396,55 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
         affordance_util_ros::follow_joint_trajectory_msg_builder(trajectory, Eigen::VectorXd::Zero(6),
                                                                  robot_joint_names_, traj_time_step);
 
-    auto plan_and_viz_serv_req = std::make_shared<MoveItPlanAndViz::Request>();
-    plan_and_viz_serv_req->joint_traj = goal.trajectory;
-    plan_and_viz_serv_req->aff_screw_axis = {w_aff[0], w_aff[1], w_aff[2]};
-    plan_and_viz_serv_req->aff_location = {q_aff[0], q_aff[1], q_aff[2]};
-    plan_and_viz_serv_req->ref_frame = ref_frame_;
-    plan_and_viz_serv_req->tool_frame = tool_frame_;
-    plan_and_viz_serv_req->planning_group = planning_group_;
-    plan_and_viz_serv_req->robot_description = robot_description_parameter_;
-    plan_and_viz_serv_req->rviz_fixed_frame = rviz_fixed_frame_;
+    auto viz_serv_req = std::make_shared<CcaRosViz::Request>();
+    viz_serv_req->joint_traj = goal.trajectory;
+    viz_serv_req->aff_screw_axis = {w_aff[0], w_aff[1], w_aff[2]};
+    viz_serv_req->aff_location = {q_aff[0], q_aff[1], q_aff[2]};
+    viz_serv_req->ref_frame = ref_frame_;
+    viz_serv_req->tool_frame = tool_frame_;
+    viz_serv_req->planning_group = planning_group_;
+    viz_serv_req->robot_description = robot_description_parameter_;
+    viz_serv_req->rviz_fixed_frame = rviz_fixed_frame_;
 
     // Wait for visualization service
-    while (!plan_and_viz_client_->wait_for_service(1s))
+    while (!viz_client_->wait_for_service(1s))
     {
         if (!rclcpp::ok())
         {
-            RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.",
-                         plan_and_viz_ss_name_.c_str());
+            RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.", viz_ss_name_.c_str());
             return false;
         }
-        RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", plan_and_viz_ss_name_.c_str());
+        RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", viz_ss_name_.c_str());
     }
 
     // Send the request to visualize
-    auto result_future = plan_and_viz_client_->async_send_request(plan_and_viz_serv_req);
-    RCLCPP_INFO(node_logger_, "Waiting on %s service to complete", plan_and_viz_ss_name_.c_str());
+    auto result_future = viz_client_->async_send_request(viz_serv_req);
+    RCLCPP_INFO(node_logger_, "Waiting on %s service to complete", viz_ss_name_.c_str());
     auto response = result_future.get();
 
     // Check if the visualization service succeeded
     if (response->success)
     {
-        RCLCPP_INFO(node_logger_, " %s service succeeded", plan_and_viz_ss_name_.c_str());
+        RCLCPP_INFO(node_logger_, " %s service succeeded", viz_ss_name_.c_str());
 
         auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-        robot_send_goal_options.goal_response_callback = std::bind(
-            &CcAffordancePlannerRos::robot_traj_execution_goal_response_callback_, this, std::placeholders::_1);
+        robot_send_goal_options.goal_response_callback =
+            std::bind(&CcaRos::robot_traj_execution_goal_response_callback_, this, std::placeholders::_1);
         robot_send_goal_options.result_callback =
-            std::bind(&CcAffordancePlannerRos::robot_traj_execution_result_callback_, this, std::placeholders::_1);
+            std::bind(&CcaRos::robot_traj_execution_result_callback_, this, std::placeholders::_1);
 
         RCLCPP_INFO(node_logger_, "DEBUG BEFORE FLAGGGGGGGGGG");
         if (includes_gripper_trajectory)
         {
             auto gripper_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-            gripper_send_goal_options.goal_response_callback = std::bind(
-                &CcAffordancePlannerRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
-            gripper_send_goal_options.result_callback = std::bind(
-                &CcAffordancePlannerRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
+            gripper_send_goal_options.goal_response_callback =
+                std::bind(&CcaRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
+            gripper_send_goal_options.result_callback =
+                std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
 
             RCLCPP_INFO(node_logger_, "DEBUG FLAGGGGGGGGGG");
             // Start checking the result status in a separate thread
-            result_status_thread_ = std::thread(&CcAffordancePlannerRos::check_robot_and_gripper_result_status_, this);
+            result_status_thread_ = std::thread(&CcaRos::check_robot_and_gripper_result_status_, this);
             RCLCPP_INFO(node_logger_, "DEBUG THREAD AFTER FLAGGGGGGGGGG");
 
             return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
@@ -467,17 +462,16 @@ bool CcAffordancePlannerRos::visualize_and_execute_trajectory_(const std::vector
     }
     else
     {
-        RCLCPP_ERROR(node_logger_, "%s service call failed", plan_and_viz_ss_name_.c_str());
+        RCLCPP_ERROR(node_logger_, "%s service call failed", viz_ss_name_.c_str());
         return false;
     }
 }
 
 // Executes the planned trajectory.
-bool CcAffordancePlannerRos::execute_trajectory_(
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
-    rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
-    const std::string &traj_execution_as_name, const std::vector<std::string> &joint_names,
-    const std::vector<Eigen::VectorXd> &trajectory, const double &traj_time_step)
+bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
+                                 rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
+                                 const std::string &traj_execution_as_name, const std::vector<std::string> &joint_names,
+                                 const std::vector<Eigen::VectorXd> &trajectory, const double &traj_time_step)
 {
     /* if (traj_execution_as_name == robot_traj_execution_as_name_) */
     /* { */
@@ -513,16 +507,14 @@ bool CcAffordancePlannerRos::execute_trajectory_(
 }
 
 // Callback to handle the result of robot trajectory execution
-void CcAffordancePlannerRos::robot_traj_execution_result_callback_(
-    const GoalHandleFollowJointTrajectory::WrappedResult &result)
+void CcaRos::robot_traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
 {
     // Analyze result
     *robot_result_status_ = this->analyze_as_result_(result.code, robot_traj_execution_as_name_);
 }
 
 // Callback to handle the goal response for robot trajectory execution
-void CcAffordancePlannerRos::robot_traj_execution_goal_response_callback_(
-    const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle)
+void CcaRos::robot_traj_execution_goal_response_callback_(const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle)
 {
     if (!goal_handle)
     {
@@ -536,15 +528,14 @@ void CcAffordancePlannerRos::robot_traj_execution_goal_response_callback_(
 }
 
 // Callback to handle the result of gripper trajectory execution
-void CcAffordancePlannerRos::gripper_traj_execution_result_callback_(
-    const GoalHandleFollowJointTrajectory::WrappedResult &result)
+void CcaRos::gripper_traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
 {
     // Analyze result
     *gripper_result_status_ = this->analyze_as_result_(result.code, gripper_traj_execution_as_name_);
 }
 
 // Callback to handle the goal response for gripper trajectory execution
-void CcAffordancePlannerRos::gripper_traj_execution_goal_response_callback_(
+void CcaRos::gripper_traj_execution_goal_response_callback_(
     const GoalHandleFollowJointTrajectory::SharedPtr &goal_handle)
 {
     if (!goal_handle)
@@ -558,11 +549,10 @@ void CcAffordancePlannerRos::gripper_traj_execution_goal_response_callback_(
     }
 }
 
-Status CcAffordancePlannerRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code,
-                                                  const std::string &as_name)
+Status CcaRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code, const std::string &as_name)
 {
 
-    Status result_status = cc_affordance_planner_ros::Status::UNKNOWN;
+    Status result_status = cca_ros::Status::UNKNOWN;
 
     switch (result_code)
     {
@@ -588,29 +578,27 @@ Status CcAffordancePlannerRos::analyze_as_result_(const rclcpp_action::ResultCod
     return result_status;
 }
 
-void CcAffordancePlannerRos::check_robot_and_gripper_result_status_()
+void CcaRos::check_robot_and_gripper_result_status_()
 {
     // Start statuses as unknown
-    robot_result_status_ =
-        std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::PROCESSING);
-    gripper_result_status_ =
-        std::make_shared<cc_affordance_planner_ros::Status>(cc_affordance_planner_ros::Status::PROCESSING);
+    robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
+    gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
     while (rclcpp::ok())
     {
-        if (*robot_result_status_ != cc_affordance_planner_ros::Status::PROCESSING &&
-            *gripper_result_status_ != cc_affordance_planner_ros::Status::PROCESSING)
+        if (*robot_result_status_ != cca_ros::Status::PROCESSING &&
+            *gripper_result_status_ != cca_ros::Status::PROCESSING)
         {
 
             // Both pointers are not in PROCESSING status, check their values
             std::lock_guard<std::mutex> lock(status_mutex_); // Lock the mutex before modifying status_
-            if (*robot_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED &&
-                *gripper_result_status_ == cc_affordance_planner_ros::Status::SUCCEEDED)
+            if (*robot_result_status_ == cca_ros::Status::SUCCEEDED &&
+                *gripper_result_status_ == cca_ros::Status::SUCCEEDED)
             {
-                *status_ = cc_affordance_planner_ros::Status::SUCCEEDED;
+                *status_ = cca_ros::Status::SUCCEEDED;
             }
             else
             {
-                *status_ = cc_affordance_planner_ros::Status::FAILED;
+                *status_ = cca_ros::Status::FAILED;
             }
             return; // Exit
         }
@@ -620,11 +608,11 @@ void CcAffordancePlannerRos::check_robot_and_gripper_result_status_()
     }
 }
 
-void CcAffordancePlannerRos::cleanup_between_calls()
+void CcaRos::cleanup_between_calls()
 {
     if (result_status_thread_.joinable())
     {
         result_status_thread_.join();
     }
 }
-} // namespace cc_affordance_planner_ros
+} // namespace cca_ros
