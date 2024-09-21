@@ -155,9 +155,19 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
                                              << plannerResult.planning_time.count() << " microseconds.");
         if (plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL)
         {
-            RCLCPP_ERROR(node_logger_, "Trajectory description: PARTIAL.");
-            *status_ = Status::FAILED;
-            return false;
+            const int traj_size_difference =
+                task_description.trajectory_density - static_cast<int>(plannerResult.joint_trajectory.size());
+            if (std::abs(traj_size_difference) <= 3)
+            {
+                RCLCPP_WARN(node_logger_, "PARTIAL trajectory with 3 points less than FULL. Execute with caution.");
+            }
+            else
+            {
+
+                RCLCPP_ERROR(node_logger_, "Trajectory description: PARTIAL.");
+                *status_ = Status::FAILED;
+                return false;
+            }
         }
     }
     else
