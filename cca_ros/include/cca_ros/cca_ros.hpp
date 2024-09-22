@@ -253,9 +253,6 @@ class CcaRos : public rclcpp::Node
     std::string gripper_traj_execution_as_name_;           ///< Action server name for gripper trajectory execution
     std::string robot_and_gripper_traj_execution_as_name_; ///< Action server name for robot and gripper trajectory
                                                            ///< execution together
-    std::string planning_group_;                           ///< MoveIt planning group for visualization
-    std::string robot_description_parameter_;              ///< Parameter for the robot description
-    std::string rviz_fixed_frame_;                         ///< Fixed frame for RViz visualization
 
     // Robot data
     Eigen::MatrixXd robot_slist_;                  ///< Screw axes list for the robot

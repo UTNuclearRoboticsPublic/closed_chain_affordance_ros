@@ -18,9 +18,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     robot_and_gripper_traj_execution_as_name_ =
         this->get_parameter_or<std::string>("cca_robot_and_gripper_as", ""); // optional
 
-    robot_description_parameter_ = this->get_parameter("cca_robot_description_parameter").as_string();
-    planning_group_ = this->get_parameter("cca_planning_group").as_string();
-    rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
     const std::string joint_states_topic = this->get_parameter("cca_joint_states_topic").as_string();
     const std::string robot_name = this->get_parameter("cca_robot").as_string();
 
@@ -34,10 +31,11 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
         robot_slist_ = robotConfig.Slist;             // Robot screw axes
         M_ = robotConfig.M;                           // Home configuration matrix
         ref_frame_ = robotConfig.ref_frame_name;      // Reference frame
-        tool_frame_ = robotConfig.tool_name;          // Tool frame
+        tool_frame_ = robotConfig.tool_name;          // Tool frame, unused atm. TODO
         robot_joint_names_ = robotConfig.joint_names; // Robot joint names
-        gripper_joint_names_ = {"arm0_fingers"};      // Gripper joint names
-                                                      // TODO: Parse gripper joint names from description yaml file
+        gripper_joint_names_ = {
+            robotConfig.gripper_joint_name}; // Gripper joint names
+                                             // TODO: Parse gripper joint names from description yaml file
     }
     catch (const std::exception &e)
     {
@@ -118,13 +116,35 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
     // Get joint states if start configuration is empty
     if (robot_start_config.size() == 0)
     {
-        auto state = read_joint_states_();
+        KinematicState state;
+
+        try
+        {
+            state = read_joint_states_();
+        }
+        catch (const std::runtime_error &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
+            return false;
+        }
+
         robot_start_config = state.robot;
     }
 
     if (includes_gripper_trajectory && std::isnan(gripper_start_config))
     {
-        auto state = read_joint_states_();
+        KinematicState state;
+
+        try
+        {
+            state = read_joint_states_();
+        }
+        catch (const std::runtime_error &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
+            return false;
+        }
+
         gripper_start_config = state.gripper;
     }
 
@@ -270,13 +290,35 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
     // Get joint states if start configuration is empty
     if (robot_start_config.size() == 0)
     {
-        auto state = read_joint_states_();
+        KinematicState state;
+
+        try
+        {
+            state = read_joint_states_();
+        }
+        catch (const std::runtime_error &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
+            return false;
+        }
+
         robot_start_config = state.robot;
     }
 
     if (includes_gripper_trajectory && std::isnan(gripper_start_config))
     {
-        auto state = read_joint_states_();
+        KinematicState state;
+
+        try
+        {
+            state = read_joint_states_();
+        }
+        catch (const std::runtime_error &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
+            return false;
+        }
+
         gripper_start_config = state.gripper;
     }
     // Prepare robot description
@@ -507,7 +549,7 @@ KinematicState CcaRos::read_joint_states_()
     rclcpp::sleep_for(std::chrono::milliseconds(500)); // Give time to read from callback
     if ((robot_joint_states_.positions.hasNaN()) || (gripper_joint_states_.positions.hasNaN()))
     {
-        RCLCPP_ERROR(node_logger_, "Could not read joint states");
+        throw std::runtime_error("Failed to read robot or gripper joint states.");
     }
 
     return KinematicState{robot_joint_states_.positions, gripper_joint_states_.positions[0]};
@@ -581,10 +623,6 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal, const 
     viz_serv_req->aff_screw_axis = {w_aff[0], w_aff[1], w_aff[2]};
     viz_serv_req->aff_location = {q_aff[0], q_aff[1], q_aff[2]};
     viz_serv_req->ref_frame = ref_frame_;
-    viz_serv_req->tool_frame = tool_frame_;
-    viz_serv_req->planning_group = planning_group_;
-    viz_serv_req->robot_description = robot_description_parameter_;
-    viz_serv_req->rviz_fixed_frame = rviz_fixed_frame_;
 
     // Wait for visualization service
     while (!viz_client_->wait_for_service(1s))

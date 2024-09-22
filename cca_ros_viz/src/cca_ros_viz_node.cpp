@@ -50,18 +50,20 @@ class CcaRosVizServer : public rclcpp::Node
 {
   public:
     explicit CcaRosVizServer(const rclcpp::NodeOptions &options)
-        : Node("cca_ros_viz_server_node", options),
-          node_logger_(this->get_logger()),
-          executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>())
+        : Node("cca_ros_viz_server_node", options), node_logger_(this->get_logger())
     {
+
+        // Extract parameters
+        // robot_description and robot_description_semantic automatically extracted during runtime
+        planning_group_ = this->get_parameter("planning_group").as_string();
+        rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
+        joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
+        ee_link_ = this->get_parameter("ee_link").as_string();
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<cca_ros_viz_msgs::srv::CcaRosViz>(
             "/cca_ros_viz_server", std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
                                              std::placeholders::_1, std::placeholders::_2));
-
-        // Create a publisher to publish EE trajectory
-        ee_traj_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/ee_trajectory", 10);
 
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
@@ -69,50 +71,51 @@ class CcaRosVizServer : public rclcpp::Node
         RCLCPP_INFO_STREAM(node_logger_, "/cca_ros_viz service server is active");
     }
 
-    ~CcaRosVizServer() { rclcpp::shutdown(); }
-    void start_and_spin_executor()
+    ~CcaRosVizServer()
     {
-        // Add node to executor and start executor thread
-        node_handle_ = this->shared_from_this();
-        executor_->add_node(this->shared_from_this());
-        std::thread([this]() { executor_->spin(); }).detach();
+        // Cleanup spinner thread
+        if (spinner_thread_.joinable())
+        {
+            spinner_thread_.join();
+        }
+    }
+    void initialize()
+    {
+        // Spin node in a separate thread so we can start reading robot state
+        node_handle = this->shared_from_this();
+        spinner_thread_ = std::thread([this]() { rclcpp::spin(node_handle); });
 
         // Initialize planning parameters
         robot_model_loader::RobotModelLoaderPtr robot_model_loader =
-            std::make_shared<robot_model_loader::RobotModelLoader>(node_handle_);
-        psm_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle_, robot_model_loader);
+            std::make_shared<robot_model_loader::RobotModelLoader>(node_handle);
+        psm_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle, robot_model_loader);
         moveit::core::RobotModelPtr robot_model = robot_model_loader->getModel();
-        /* robot_state = std::make_shared<moveit::core::RobotState>(robot_model); */
         planning_pipeline_ = std::make_shared<planning_pipeline::PlanningPipeline>(
-            robot_model, node_handle_, "planning_plugin", "request_adapters");
+            robot_model, node_handle, "planning_plugin", "request_adapters");
         robot_state_ = std::make_shared<moveit::core::RobotState>(
             planning_scene_monitor::LockedPlanningSceneRO(psm_)
                 ->getCurrentState()); // planning scene is locked while reading robot
-        joint_model_group_ = robot_model->getJointModelGroup("arm");
+        joint_model_group_ = robot_model->getJointModelGroup(planning_group_);
         psm_->startSceneMonitor();
         psm_->startWorldGeometryMonitor(); // listens to world geometry, collision objects and (optionally) octomap
                                            // changes
         psm_->startStateMonitor(
-            "/spot_driver/joint_states"); // listens to joint state updates and attached collision object changes
+            joint_states_topic_); // listens to joint state updates and attached collision object changes
         rviz_visual_tools_.reset(
-            new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_tools", node_handle_));
-        /* dynamic_cast<rclcpp::Node *>(this))); */
+            new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
         rviz_visual_tools_->loadMarkerPub();
         rviz_visual_tools_->enableBatchPublishing();
-        moveit_visual_tools_ = std::make_shared<moveit_visual_tools::MoveItVisualTools>(node_handle_, "arm0_base_link",
+        moveit_visual_tools_ = std::make_shared<moveit_visual_tools::MoveItVisualTools>(node_handle, rviz_fixed_frame_,
                                                                                         "cca_ros_viz", psm_);
     }
 
   private:
     // Variables
-    rclcpp::Node::SharedPtr node_handle_; // handle for the node
+    rclcpp::Node::SharedPtr node_handle;
+    std::thread spinner_thread_; // To spin the node in a separate thread
 
-    rclcpp::Logger node_logger_; // logger associated with the node
-    std::shared_ptr<rclcpp::executors::SingleThreadedExecutor>
-        executor_;                // executor needed for MoveIt robot state checking
-    std::thread executor_thread_; // thread
+    rclcpp::Logger node_logger_;                                       // logger associated with the node
     rclcpp::Service<cca_ros_viz_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr ee_traj_pub_; // publisher for EE trajectory
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
 
@@ -122,6 +125,11 @@ class CcaRosVizServer : public rclcpp::Node
     moveit::core::JointModelGroup *joint_model_group_;
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
     moveit_visual_tools::MoveItVisualToolsPtr moveit_visual_tools_;
+
+    std::string planning_group_;
+    std::string rviz_fixed_frame_;
+    std::string joint_states_topic_;
+    std::string ee_link_;
 
     // Methods
     void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Request> serv_req,
@@ -139,7 +147,7 @@ class CcaRosVizServer : public rclcpp::Node
         // Create motion plan request
         planning_interface::MotionPlanRequest req;
         planning_interface::MotionPlanResponse res;
-        req.group_name = serv_req->planning_group;
+        req.group_name = planning_group_;
 
         // Moveit messages to visualize planned path and hold planning pipeline response
         moveit_msgs::msg::DisplayTrajectory display_trajectory;
@@ -215,7 +223,7 @@ class CcaRosVizServer : public rclcpp::Node
             moveit::core::robotStateToRobotStateMsg(*robot_state_, req.start_state);
 
             // Compute forward kinematics to the EE and store the position and orientation in the marker variable
-            Eigen::Isometry3d ee_htm = robot_state_->getGlobalLinkTransform(serv_req->tool_frame);
+            Eigen::Isometry3d ee_htm = robot_state_->getGlobalLinkTransform(ee_link_);
 
             // Publish the EE frame
             rviz_visual_tools_->publishAxis(ee_htm);
@@ -233,10 +241,12 @@ int main(int argc, char **argv)
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
     auto node = std::make_shared<CcaRosVizServer>(node_options);
-    node->start_and_spin_executor();
+    node->initialize();
 
     while (rclcpp::ok())
     {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep to avoid busy waiting
     }
+    rclcpp::shutdown();
     return 0;
 }
