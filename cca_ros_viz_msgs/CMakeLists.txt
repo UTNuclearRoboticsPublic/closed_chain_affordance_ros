@@ -10,12 +10,14 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(trajectory_msgs)
+find_package(geometry_msgs)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CcaRosViz.srv"
   DEPENDENCIES
   trajectory_msgs
+  geometry_msgs
 )
 
 if(BUILD_TESTING)

@@ -131,6 +131,34 @@ class CcaRosVizServer : public rclcpp::Node
     std::string joint_states_topic_;
     std::string ee_link_;
 
+    // Note, T_w_r is HTM from world frame, usually the root frame of the urdf to the service request reference frame
+    Eigen::Isometry3d transform_pose_to_world_frame(const Eigen::Isometry3d &T_w_r,
+                                                    const geometry_msgs::msg::Pose &pose)
+    {
+        // Convert the pose to an Eigen::Isometry3d type
+        Eigen::Isometry3d eigen_pose;
+        eigen_pose.linear() =
+            Eigen::Quaterniond(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z)
+                .toRotationMatrix();
+        eigen_pose.translation() = Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
+
+        // Translate the pose to the planning frame
+        return T_w_r * eigen_pose; // Return transformed pose
+    }
+
+    bool is_pose_specified(const geometry_msgs::msg::Pose &pose)
+    {
+        // Check if the pose has non-default position and orientation values
+        if (pose.position.x == 0.0 && pose.position.y == 0.0 && pose.position.z == 0.0 && pose.orientation.x == 0.0 &&
+            pose.orientation.y == 0.0 && pose.orientation.z == 0.0 && pose.orientation.w == 1.0)
+        {
+            // Pose is default, likely not specified
+            return false;
+        }
+        // Pose has been specified
+        return true;
+    }
+
     // Methods
     void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Request> serv_req,
                                       std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Response> serv_res)
@@ -155,14 +183,12 @@ class CcaRosVizServer : public rclcpp::Node
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
+        // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request reference
+        // frame
+        Eigen::Isometry3d T_w_r = robot_state_->getGlobalLinkTransform(serv_req->ref_frame);
+
         if (!(serv_req->aff_screw_axis).empty()) // If affordance screw is specified, draw it
         {
-            // Display the affordance screw axis
-            // Note the affordance screw axis in the service request is wrt to the reference frame and here we are
-            // publishing wrt to the planning frame
-            Eigen::Isometry3d T_p_r = robot_state_->getGlobalLinkTransform(
-                serv_req->ref_frame); // planning frame (which is usually the base frame from the URDF) to the reference
-                                      // frame.
 
             // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance screw
             // axis wrt to the x-axis.
@@ -176,13 +202,22 @@ class CcaRosVizServer : public rclcpp::Node
             aff_screw_pose.translation() = Eigen::Vector3d((serv_req->aff_location).data());
 
             // Translate the pose to planning frame
-            aff_screw_pose = T_p_r * aff_screw_pose;
+            aff_screw_pose = T_w_r * aff_screw_pose;
+
+            // If affordance ref frame is specified, draw it
+            if (this->is_pose_specified(serv_req->aff_ref_pose))
+            {
+                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->aff_ref_pose);
+
+                rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
+            }
 
             // Publish
             rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
             rviz_visual_tools_->trigger();
         }
 
+        size_t i = 0;
         for (const auto &point : serv_req->joint_traj.points)
         {
             // copy the joint trajectory point to a std::vector<double> type
@@ -223,11 +258,14 @@ class CcaRosVizServer : public rclcpp::Node
             moveit::core::robotStateToRobotStateMsg(*robot_state_, req.start_state);
 
             // Compute forward kinematics to the EE and store the position and orientation in the marker variable
-            Eigen::Isometry3d ee_htm = robot_state_->getGlobalLinkTransform(ee_link_);
+            /* Eigen::Isometry3d ee_htm = robot_state_->getGlobalLinkTransform(ee_link_); */
 
             // Publish the EE frame
-            rviz_visual_tools_->publishAxis(ee_htm);
+            /* rviz_visual_tools_->publishAxis(ee_htm); */
+            Eigen::Isometry3d tool_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->cartesian_traj[i]);
+            rviz_visual_tools_->publishAxis(tool_pose);
             rviz_visual_tools_->trigger();
+            i++;
         }
 
         RCLCPP_INFO(node_logger_, "Successfully planned and visualized the trajectory");

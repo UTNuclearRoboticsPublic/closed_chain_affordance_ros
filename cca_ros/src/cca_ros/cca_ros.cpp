@@ -204,8 +204,27 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
     // Visualize the trajectory
     if (visualize_trajectory)
     {
-        if (!visualize_trajectory_(robot_goal_msg, task_description.affordance_info.axis,
-                                   task_description.affordance_info.location))
+        // Compute cartesian trajectory
+        const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory =
+            this->compute_cartesian_trajectory_(plannerResult.joint_trajectory);
+
+        // Fill out the affordance reference pose
+        geometry_msgs::msg::Pose aff_ref_pose;
+        if (task_description.motion_type == cc_affordance_planner::MotionType::APPROACH)
+        {
+            Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.grasp_pose.block<3, 3>(0, 0));
+            aff_ref_pose_quat.normalize(); // Ensures it's a valid unit quaternion
+            aff_ref_pose.position.x = task_description.goal.grasp_pose(0, 3);
+            aff_ref_pose.position.y = task_description.goal.grasp_pose(1, 3);
+            aff_ref_pose.position.z = task_description.goal.grasp_pose(2, 3);
+            aff_ref_pose.orientation.w = aff_ref_pose_quat.w();
+            aff_ref_pose.orientation.x = aff_ref_pose_quat.x();
+            aff_ref_pose.orientation.y = aff_ref_pose_quat.y();
+            aff_ref_pose.orientation.z = aff_ref_pose_quat.z();
+        }
+
+        if (!visualize_trajectory_(robot_goal_msg, cartesian_trajectory, task_description.affordance_info.axis,
+                                   task_description.affordance_info.location, aff_ref_pose))
         {
             return false;
         }
@@ -396,7 +415,9 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
     // Visualize the trajectory
     if (visualize_trajectory)
     {
-        if (!visualize_trajectory_(robot_goal_msg, task_descriptions.back().affordance_info.axis,
+        const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory =
+            this->compute_cartesian_trajectory_(solution);
+        if (!visualize_trajectory_(robot_goal_msg, cartesian_trajectory, task_descriptions.back().affordance_info.axis,
                                    task_descriptions.back().affordance_info.location))
         {
             return false;
@@ -555,6 +576,36 @@ KinematicState CcaRos::read_joint_states_()
     return KinematicState{robot_joint_states_.positions, gripper_joint_states_.positions[0]};
 }
 
+std::vector<geometry_msgs::msg::Pose> CcaRos::compute_cartesian_trajectory_(
+    const std::vector<Eigen::VectorXd> &trajectory)
+{
+    std::vector<geometry_msgs::msg::Pose> cartesian_trajectory;
+    cartesian_trajectory.reserve(trajectory.size()); // Corrected typo
+
+    for (const auto &point : trajectory)
+    {
+        // Compute FK
+        Eigen::Matrix4d fk = affordance_util::FKinSpace(M_, robot_slist_, point.head(robot_joint_names_.size()));
+
+        // Fill out the Pose msg
+        Eigen::Quaterniond fk_quat(fk.block<3, 3>(0, 0)); // Extract rotation as quaternion
+        geometry_msgs::msg::Pose pose;
+        pose.position.x = fk(0, 3);
+        pose.position.y = fk(1, 3);
+        pose.position.z = fk(2, 3);
+
+        // Corrected quaternion assignments
+        pose.orientation.w = fk_quat.w();
+        pose.orientation.x = fk_quat.x();
+        pose.orientation.y = fk_quat.y();
+        pose.orientation.z = fk_quat.z();
+
+        // Store in the cartesian trajectory
+        cartesian_trajectory.push_back(pose); // Corrected typo
+    }
+    return cartesian_trajectory;
+}
+
 // Function to create goal messages for robot and optionally for gripper
 std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> CcaRos::create_goal_msg_(
     const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory)
@@ -570,8 +621,8 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
     FollowJointTrajectoryGoal robot_and_gripper_goal;
 
     // Always create the robot goal message
-    robot_goal = affordance_util_ros::follow_joint_trajectory_msg_builder(trajectory, Eigen::VectorXd::Zero(6),
-                                                                          robot_joint_names_, robot_traj_time_step);
+    robot_goal = affordance_util_ros::follow_joint_trajectory_msg_builder(
+        trajectory, Eigen::VectorXd::Zero(robot_joint_names_.size()), robot_joint_names_, robot_traj_time_step);
 
     if (includes_gripper_trajectory)
     {
@@ -613,16 +664,34 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
 }
 
 // Visualizes and executes the given trajectory.
-bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal, const Eigen::VectorXd &w_aff,
-                                   const Eigen::VectorXd &q_aff)
+bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
+                                   const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
+                                   const Eigen::VectorXd &w_aff, const Eigen::VectorXd &q_aff,
+                                   const std::optional<geometry_msgs::msg::Pose> &aff_ref_pose)
 {
 
     // Create visualization request
     auto viz_serv_req = std::make_shared<CcaRosViz::Request>();
     viz_serv_req->joint_traj = goal.trajectory;
+    viz_serv_req->cartesian_traj = cartesian_trajectory;
     viz_serv_req->aff_screw_axis = {w_aff[0], w_aff[1], w_aff[2]};
     viz_serv_req->aff_location = {q_aff[0], q_aff[1], q_aff[2]};
     viz_serv_req->ref_frame = ref_frame_;
+    if (aff_ref_pose.has_value())
+    {
+        viz_serv_req->aff_ref_pose = aff_ref_pose.value();
+    }
+    else
+    {
+        // provide default sentinel values
+        viz_serv_req->aff_ref_pose.position.x = 0;
+        viz_serv_req->aff_ref_pose.position.y = 0;
+        viz_serv_req->aff_ref_pose.position.z = 0;
+        viz_serv_req->aff_ref_pose.orientation.w = 0;
+        viz_serv_req->aff_ref_pose.orientation.x = 0;
+        viz_serv_req->aff_ref_pose.orientation.y = 0;
+        viz_serv_req->aff_ref_pose.orientation.z = 1;
+    }
 
     // Wait for visualization service
     while (!viz_client_->wait_for_service(1s))

@@ -24,6 +24,7 @@ find_package(affordance_util_ros REQUIRED)  # Basic ROS 2 utility functions for 
 find_package(cca_ros_viz_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
 find_package(sensor_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 # Find cc affordance cpp libraries
 FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
@@ -42,10 +43,10 @@ add_library(${PROJECT_NAME}
 )
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs)
+ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs)
 
 # Export ROS dependencies for downstream ROS packages
-ament_export_dependencies(affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs)
+ament_export_dependencies(affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs)
 
 # Link the executable against external libraries
 target_link_libraries(${PROJECT_NAME} affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen

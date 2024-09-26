@@ -45,6 +45,7 @@
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
+#include <geometry_msgs/msg/pose.hpp>
 #include <mutex>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
@@ -316,8 +317,10 @@ class CcaRos : public rclcpp::Node
      * @param q_aff Affordance location.
      * @return True if successful, false otherwise.
      */
-    bool visualize_trajectory_(const FollowJointTrajectoryGoal &goal, const Eigen::VectorXd &w_aff,
-                               const Eigen::VectorXd &q_aff);
+    bool visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
+                               const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
+                               const Eigen::VectorXd &w_aff, const Eigen::VectorXd &q_aff,
+                               const std::optional<geometry_msgs::msg::Pose> &aff_ref_pose = std::nullopt);
 
     /**
      * @brief Executes the given trajectory on the robot.
@@ -388,6 +391,16 @@ class CcaRos : public rclcpp::Node
      */
     std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
         const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory);
+
+    /**
+     * @brief Given a robot joint trajectory computes the corresponding cartesian trajectory that the robot tool will
+     * trace
+     *
+     * @param trajectory robot joint trajectory
+     *
+     * @return
+     */
+    std::vector<geometry_msgs::msg::Pose> compute_cartesian_trajectory_(const std::vector<Eigen::VectorXd> &trajectory);
 
     /**
      * @brief Initializes proper action clients in the constructor

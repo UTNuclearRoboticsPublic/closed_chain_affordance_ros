@@ -33,7 +33,7 @@ include_directories(
 
 # Create executable
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools cca_ros_viz_msgs)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp moveit_core moveit_ros_planning moveit_visual_tools cca_ros_viz_msgs geometry_msgs)
 
 
 # Install the executables
