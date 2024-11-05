@@ -257,11 +257,7 @@ class CcaRosVizServer : public rclcpp::Node
                                                  response.trajectory.joint_trajectory.points.back().positions);
             moveit::core::robotStateToRobotStateMsg(*robot_state_, req.start_state);
 
-            // Compute forward kinematics to the EE and store the position and orientation in the marker variable
-            /* Eigen::Isometry3d ee_htm = robot_state_->getGlobalLinkTransform(ee_link_); */
-
-            // Publish the EE frame
-            /* rviz_visual_tools_->publishAxis(ee_htm); */
+            // Publish the tool frame
             Eigen::Isometry3d tool_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->cartesian_traj[i]);
             rviz_visual_tools_->publishAxis(tool_pose);
             rviz_visual_tools_->trigger();
