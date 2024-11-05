@@ -14,8 +14,7 @@ find_package(affordance_util_ros REQUIRED)
 
 # Non-ROS libraries
 find_package(Eigen3 REQUIRED )
-find_package(yaml-cpp REQUIRED )
-FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
+find_package(affordance_util REQUIRED)
 
 include_directories(
 # include
@@ -25,7 +24,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 ament_target_dependencies(${PROJECT_NAME}_node rclcpp trajectory_msgs sensor_msgs affordance_util_ros)
-target_link_libraries(${PROJECT_NAME}_node affordance_util  yaml-cpp Eigen3::Eigen)
+target_link_libraries(${PROJECT_NAME}_node affordance_util::affordance_util Eigen3::Eigen)
 install(TARGETS
   ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME}

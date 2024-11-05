@@ -12,9 +12,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Find and link required packages
-find_package(Eigen3 REQUIRED)  # Linear algebra library
-find_package(yaml-cpp REQUIRED ) # To parse yaml files
+# Find required packages
 # ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)  # ROS 2 communication library
@@ -26,9 +24,10 @@ find_package(sensor_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-# Find cc affordance cpp libraries
-FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
-FIND_LIBRARY(cc_affordance_planner_LIBRARIES cc_affordance_planner /usr/local/lib)
+# Non-ROS packages
+find_package(Eigen3 REQUIRED)
+find_package(affordance_util REQUIRED)
+find_package(cc_affordance_planner REQUIRED)
 
 # Include directories for headers
 include_directories(
@@ -49,7 +48,7 @@ ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros cca_ros_viz
 ament_export_dependencies(affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs)
 
 # Link the executable against external libraries
-target_link_libraries(${PROJECT_NAME} affordance_util cc_affordance_planner yaml-cpp Eigen3::Eigen
+target_link_libraries(${PROJECT_NAME} affordance_util::affordance_util cc_affordance_planner::cc_affordance_planner Eigen3::Eigen
 )
 
 # Export the library target for visibility to other ROS packages
