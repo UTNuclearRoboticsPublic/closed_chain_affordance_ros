@@ -45,6 +45,7 @@
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
+#include <cmath>
 #include <geometry_msgs/msg/pose.hpp>
 #include <mutex>
 #include <sensor_msgs/msg/joint_state.hpp>

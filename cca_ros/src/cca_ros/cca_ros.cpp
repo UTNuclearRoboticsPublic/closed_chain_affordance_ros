@@ -28,14 +28,12 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     try
     {
         const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
-        robot_slist_ = robotConfig.Slist;             // Robot screw axes
-        M_ = robotConfig.M;                           // Home configuration matrix
-        ref_frame_ = robotConfig.ref_frame_name;      // Reference frame
-        tool_frame_ = robotConfig.tool_name;          // Tool frame, unused atm. TODO
-        robot_joint_names_ = robotConfig.joint_names; // Robot joint names
-        gripper_joint_names_ = {
-            robotConfig.gripper_joint_name}; // Gripper joint names
-                                             // TODO: Parse gripper joint names from description yaml file
+        robot_slist_ = robotConfig.Slist;                        // Robot screw axes
+        M_ = robotConfig.M;                                      // Home configuration matrix
+        ref_frame_ = robotConfig.ref_frame_name;                 // Reference frame
+        tool_frame_ = robotConfig.tool_name;                     // Tool frame, unused atm. TODO
+        robot_joint_names_ = robotConfig.joint_names;            // Robot joint names
+        gripper_joint_names_ = {robotConfig.gripper_joint_name}; // Gripper joint names
     }
     catch (const std::exception &e)
     {
@@ -177,14 +175,23 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
         {
             const int traj_size_difference =
                 task_description.trajectory_density - static_cast<int>(plannerResult.joint_trajectory.size());
-            if (std::abs(traj_size_difference) <= 3)
+            if (std::abs(traj_size_difference) < 3)
             {
-                RCLCPP_WARN(node_logger_, "PARTIAL trajectory with 3 points less than FULL. Execute with caution.");
+                RCLCPP_WARN(
+                    node_logger_,
+                    "Trajectory description: PARTIAL with 3 points less than FULL. Could be due to affordance reaching "
+                    "limit at %f. Try "
+                    "readjusting the task to this limit. Will allow execution of trajectory, but do so with caution.",
+                    std::copysign(plannerResult.joint_trajectory.back().tail(1)(0), task_description.goal.affordance));
             }
             else
             {
 
-                RCLCPP_ERROR(node_logger_, "Trajectory description: PARTIAL.");
+                RCLCPP_ERROR(
+                    node_logger_,
+                    "Trajectory description: PARTIAL. Could be due to affordance reaching limit at %f. Try "
+                    "readjusting the task to this limit.",
+                    std::copysign(plannerResult.joint_trajectory.back().tail(1)(0), task_description.goal.affordance));
                 *status_ = Status::FAILED;
                 return false;
             }
@@ -388,7 +395,12 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
                 ((task_description.trajectory_density - plannerResult.joint_trajectory.size()) > 2))
 
             {
-                RCLCPP_ERROR(node_logger_, "Partial solution at task %zu.", i);
+                RCLCPP_ERROR(
+                    node_logger_,
+                    "Partial solution at task %zu. Could be due to affordance reaching limit at %f. Try "
+                    "readjusting the task to this limit.",
+                    i,
+                    std::copysign(plannerResult.joint_trajectory.back().tail(1)(0), task_description.goal.affordance));
                 *status_ = Status::FAILED;
                 return false;
             }
