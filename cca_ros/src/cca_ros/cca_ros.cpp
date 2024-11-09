@@ -703,10 +703,10 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
         viz_serv_req->aff_ref_pose.position.x = 0;
         viz_serv_req->aff_ref_pose.position.y = 0;
         viz_serv_req->aff_ref_pose.position.z = 0;
-        viz_serv_req->aff_ref_pose.orientation.w = 0;
+        viz_serv_req->aff_ref_pose.orientation.w = 1;
         viz_serv_req->aff_ref_pose.orientation.x = 0;
         viz_serv_req->aff_ref_pose.orientation.y = 0;
-        viz_serv_req->aff_ref_pose.orientation.z = 1;
+        viz_serv_req->aff_ref_pose.orientation.z = 0;
     }
 
     // Wait for visualization service
