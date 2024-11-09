@@ -123,6 +123,7 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
         catch (const std::runtime_error &e)
         {
             RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
+            *status_ = Status::FAILED;
             return false;
         }
 
@@ -140,6 +141,7 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
         catch (const std::runtime_error &e)
         {
             RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
+            *status_ = Status::FAILED;
             return false;
         }
 
@@ -325,6 +327,7 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
         catch (const std::runtime_error &e)
         {
             RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
+            *status_ = Status::FAILED;
             return false;
         }
 
@@ -342,6 +345,7 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
         catch (const std::runtime_error &e)
         {
             RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
+            *status_ = Status::FAILED;
             return false;
         }
 
@@ -741,6 +745,29 @@ bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::S
                                  rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
                                  const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal)
 {
+    // Before execution, ensure current state does not deviate much from trajectory start state
+    try
+    {
+        const KinematicState current_state = read_joint_states_();
+        const Eigen::VectorXd goal_state =
+            Eigen::VectorXd::Map(goal.trajectory.points[0].positions.data(), current_state.robot.size());
+        const double tolerance = 1e-2; // Declare tolerance as double
+
+        // Compare goal state and current state within the tolerance
+        if ((goal_state - current_state.robot).cwiseAbs().maxCoeff() > tolerance)
+        {
+            RCLCPP_ERROR(node_logger_, "Refusing to execute trajectory due to the current robot state being "
+                                       "significantly different from the trajectory start state.");
+            *status_ = Status::FAILED;
+            return false;
+        }
+    }
+    catch (const std::runtime_error &e)
+    {
+        RCLCPP_ERROR(node_logger_, "Robot state unavailable during pre-execution check: %s", e.what());
+        *status_ = Status::FAILED;
+        return false;
+    }
 
     // Wait for the action server to be ready
     if (!traj_execution_client->wait_for_action_server())
