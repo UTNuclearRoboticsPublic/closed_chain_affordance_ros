@@ -1,7 +1,11 @@
 # Closed-Chain Affordance Planning Framework - ROS2 Interface
+This repository contains robot-agnostic ROS2 packages used to interface the Closed-Chain Affordance planner with a robot.
+
+### Notable Dependencies
+1. The `cca_ros_viz` package provides a ROS service to visualize the planned trajectory in Rviz. To utilize this functionality, ensure moveit is installed along with the `moveit_visual_tools` package.
+2. For AprilTag usage, install the ROS apriltag package with `sudo apt install ros-<ROS_DISTRO>-apriltag`.
 
 ## Build Instructions
-This repository contains robot-agnostic ROS2 packages used to interface the Closed-chain Affordance planner with a robot. Follow these steps:
 
 1. Install the Closed-chain Affordance Cpp libraries by following instructions from this repository:</br>
    [Cpp library installation instructions](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
@@ -17,26 +21,16 @@ This repository contains robot-agnostic ROS2 packages used to interface the Clos
    cd ~/<ros_workspace_name>
    ```
    ```
-   colcon build --packages-select affordance_util_ros cca_ros_viz cc_affordance_planner_ros
+   colcon build
    ```
    ```
    source install/setup.bash
    ```
-
-3. If using an AprilTag to detect affordance, also build and source the following packages:
-   ```
-   colcon build --packages-select apriltag_msgs apriltag_ros
-   ```
-   ```
-   source install/setup.bash
-   ```
-### Notable Dependencies
-1. The cca_ros_viz package provides a ROS service to visualize the planned trajectory in Rviz. To utilize this functionality, ensure moveit is installed along with the moveit_visual_tools package.
-2. For AprilTag usage, install the ROS apriltag package with 'sudo apt install ros-<ROS_DISTRO>-apriltag`.
 
 ## Run Instructions
 The entry point for this planner is a launch file in a package named as `cca_<robot>` that contains robot-related information for closed-chain affordance planning. The framework is implemented for the following robots, and the links direct you to the repositories containing those packages and instructions on how to run the planner for each robot.
    - [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_spot.git)
+   - [Kinova Gen3 7DoF arm](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_kinova_gen3_7dof.git)
 
 ## Instructions to Implement the Framework on a New Robot
 
@@ -65,15 +59,14 @@ The package will contain two files in its `config` folder: `cca_<robot>_descript
 
 1. Before running this framework, the following three things need to happen. Since there are numerous ways to accomplish this, depending on your system, we do not provide specific instructions here.
    - A `follow_joint_trajectory` action server is running on the robot to receive joint trajectory commands.
-   - `robot_description` has been loaded onto the parameter server.
-   - `robot_state_publisher` is running to publish TF data to RViz.
+   - `robot_description` is loaded with the `cca_ros_viz` node.
 
 2. Run the service server to visualize the planned trajectory in Rviz with the following command:
    ```
-   ros2 run cca_ros_viz cca_ros_viz_node
+   ros2 launch cca_<robot> cca_<robot>_viz.launch.py
    ```
 
-3. Run the planner, replacing `<robot>` with the robot name used to create the `cca_<robot>` package:
+3. Run the planner:
    ```
    ros2 launch cca_<robot> cca_<robot>.launch.py
    ```
