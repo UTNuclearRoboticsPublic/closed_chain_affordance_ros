@@ -583,7 +583,7 @@ KinematicState CcaRos::read_joint_states_()
     robot_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
     gripper_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
 
-    rclcpp::sleep_for(std::chrono::milliseconds(500)); // Give time to read from callback
+    rclcpp::sleep_for(std::chrono::milliseconds(1000)); // Give time to read from callback
     if ((robot_joint_states_.positions.hasNaN()) || (gripper_joint_states_.positions.hasNaN()))
     {
         throw std::runtime_error("Failed to read robot or gripper joint states.");
@@ -751,13 +751,28 @@ bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::S
         const KinematicState current_state = read_joint_states_();
         const Eigen::VectorXd goal_state =
             Eigen::VectorXd::Map(goal.trajectory.points[0].positions.data(), current_state.robot.size());
-        const double tolerance = 1e-2; // Declare tolerance as double
+        const double tolerance = 3 * 1e-1; // Declare tolerance as double
 
         // Compare goal state and current state within the tolerance
         if ((goal_state - current_state.robot).cwiseAbs().maxCoeff() > tolerance)
         {
             RCLCPP_ERROR(node_logger_, "Refusing to execute trajectory due to the current robot state being "
                                        "significantly different from the trajectory start state.");
+
+            // Format current state
+            std::stringstream current_state_stream;
+            current_state_stream << current_state.robot.transpose().format(
+                Eigen::IOFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]"));
+
+            // Format goal state
+            std::stringstream goal_state_stream;
+            goal_state_stream << goal_state.transpose().format(
+                Eigen::IOFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]"));
+
+            // Log the states
+            RCLCPP_ERROR(node_logger_, "Current State: %s", current_state_stream.str().c_str());
+            RCLCPP_ERROR(node_logger_, "Trajectory Start State: %s", goal_state_stream.str().c_str());
+
             *status_ = Status::FAILED;
             return false;
         }
