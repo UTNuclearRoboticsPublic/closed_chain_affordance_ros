@@ -13,6 +13,8 @@
   <test_depend>ament_lint_common</test_depend>
 
   <depend>rclcpp</depend>
+  <depend>tf2</depend>
+  <depend>static_tf_broadcaster</depend>
   <depend>interactive_markers</depend>
 
   <export>
