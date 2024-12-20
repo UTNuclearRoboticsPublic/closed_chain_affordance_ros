@@ -19,9 +19,12 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
         this->get_parameter_or<std::string>("cca_robot_and_gripper_as", ""); // optional
 
     const std::string joint_states_topic = this->get_parameter("cca_joint_states_topic").as_string();
+    const std::string force_correction_topic = this->get_parameter("cca_force_correction_topic").as_string();
     const std::string robot_name = this->get_parameter("cca_robot").as_string();
 
-    // Get the path for robot configuration file
+    // TODO: Check parameter validity
+
+    //  Get the path for robot configuration file
     const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name);
 
     // Load robot configuration
@@ -51,8 +54,12 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
         this->initialize_action_clients_();
     }
 
+    // Initialize subscribers
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
+
+    force_correction_sub_ = this->create_subscription<TwistStamped>(
+        force_correction_topic, 1000, std::bind(&CcaRos::force_correction_sub_cb_, this, std::placeholders::_1));
 
     // Setup TF buffer and listener for affordance location from apriltag
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -109,6 +116,37 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
             return false;
         }
         task_description.affordance_info.location = aff_htm.translation();
+    }
+
+    // For force mode ensure twist is in the correct frame
+    if (task_description.motion_type == cc_affordance_planner::MotionType::FORCE)
+    {
+
+        std::optional<Eigen::Vector<double, 6, 1>> force_correction_twist;
+        if (!task_description.force.correction.hasNaN())
+        {
+
+            force_correction_twist =
+                this->get_force_correction_twist_(task_description.force_correction, robot_start_config);
+        }
+        else
+        {
+
+            force_correction_twist = this->get_force_correction_twist_();
+        }
+
+        if (force_correction_twist.has_value())
+        {
+
+            task_description.force.correction = force_correction_twist.value();
+        }
+        else
+        {
+
+            RCLCPP_ERROR(node_logger_, "Error occured during force correction");
+            *status_ = Status::FAILED;
+            return false;
+        }
     }
 
     // Get joint states if start configuration is empty
@@ -906,4 +944,78 @@ void CcaRos::cleanup_between_calls()
         result_status_thread_.join();
     }
 }
+void CcaRos::add_force_correction_to_task(
+    cc_affordance_planner::TaskDescription &task_description,
+    const Eigen::VectorXd current_joint_config =
+        Eigen::Matrix<double, 6, 1>::Constant(std::numeric_limits<double>::quiet_NaN()))
+{
+    if (!current_joint_config.hasNaN())
+    {
+        // Verify force correction callback was read
+        if ((body_frame_name_.empty()) || (force_correction_.hasNaN()))
+        {
+            throw std::runtime_error("Failed to lookup force correction data");
+        }
+
+        task_description.force_correction = this->transform_velocity_to_ref_frame_(force_correction_, body_frame_name_);
+    }
+    else
+    {
+        task_description.force_correction =
+            this->transform_velocity_to_ref_frame_(force_correction_, current_joint_config);
+    }
+}
+
+void CcaRos::force_correction_sub_cb_(const TwistStamped::SharedPtr msg) { body_force_twist_msg_ = *msg; }
+
+std::optional<Eigen::Matrix<double, 6, 1>> CcaRos::get_force_correction_twist_(
+    const Eigen::VectorXd &supplied_body_twist const Eigen::VectorXd &joint_states)
+{
+    // If start config is provided, we'll assume supplied twist is in the tool frame
+    if (!supplied_body_twist.hasNaN())
+    {
+        if (joint_states.hasNaN())
+        {
+            RCLCPP_ERROR(node_logger_,
+                         "[task_description]: when force.correction is provided, start config must also be supplied.");
+            return std::nullopt;
+        }
+        RCLCPP_WARN(node_logger_, "Assuming the supplied twist is in the tool frame");
+        const Eigen::Matrix4d Tsb = affordance_util::FKinSpace(M_, robot_slist_, joint_states);
+        return std::make_optional(Eigen::Matrix<double, 6, 1>(affordance_util::Adjoint(Tsb) * supplied_body_twist));
+    }
+
+    // Otherwise, correct based on force correction topic data
+
+    // Extract body frame name and body twist from message
+    const std::string body_frame_name = body_force_twist_msg_->header.frame_id;
+
+    Eigen::VectorXd body_twist(6);
+    body_twist[0] = body_force_twist_msg_->twist.angular.x;
+    body_twist[1] = body_force_twist_msg_->twist.angular.y;
+    body_twist[2] = body_force_twist_msg_->twist.angular.z;
+    body_twist[3] = body_force_twist_msg_->twist.linear.x;
+    body_twist[4] = body_force_twist_msg_->twist.linear.y;
+    body_twist[5] = body_force_twist_msg_->twist.linear.z;
+
+    if (body_frame_name.empty() || body_twist.array().isZero().all()) // Check if all elements are zero
+    {
+        RCLCPP_ERROR(node_logger_, "Could not read force correction data. Either the twist msg frame id or twist is "
+                                   "not specified. Shutting down.");
+        return std::nullopt;
+    }
+
+    // Lookup transform from ref frame to the specified frame
+    const Eigen::Isometry3d Tsb = affordance_util_ros::get_htm(ref_frame_, body_frame_name, *tf_buffer_);
+
+    if (Tsb.matrix().isApprox(Eigen::Matrix4d::Identity()))
+    {
+        RCLCPP_ERROR(node_logger_, "Could not lookup force %s frame. Shutting down.", body_frame_name.c_str());
+        return std::nullopt;
+    }
+
+    // Ensure the result is converted to the expected type
+    return std::make_optional(Eigen::Matrix<double, 6, 1>(affordance_util::Adjoint(Tsb.matrix()) * body_twist));
+}
+
 } // namespace cca_ros

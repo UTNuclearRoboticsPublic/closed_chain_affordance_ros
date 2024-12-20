@@ -86,6 +86,7 @@ class CcaRos : public rclcpp::Node
     using CcaRosViz = cca_ros_viz_msgs::srv::CcaRosViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
+    using TwistStamped = geometry_msgs::msg::TwistStamped;
 
     // Variables
     bool visualize_trajectory;
@@ -246,9 +247,10 @@ class CcaRos : public rclcpp::Node
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
         robot_and_gripper_traj_execution_client_;     ///< Client for executing robot and gripper trajectory together
     rclcpp::Client<CcaRosViz>::SharedPtr viz_client_; ///< Client for visualizing the planned trajectory
-    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;     ///< Subscriber for joint states
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                       ///< TF2 buffer for transformation lookup
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr}; ///< TF2 transform listener
+    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;       ///< Subscriber for joint states
+    rclcpp::Subscription<TwistStamped>::SharedPtr force_correction_sub_; ///< Subscriber for force correction
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                         ///< TF2 buffer for transformation lookup
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};   ///< TF2 transform listener
 
     // Robot ROS setup data
     std::string robot_traj_execution_as_name_;             ///< Action server name for robot trajectory execution
@@ -269,6 +271,8 @@ class CcaRos : public rclcpp::Node
 
     bool unified_executor_available_ =
         false; ///< Indicates whether an action server is available to execute the robot and gripper trajectory together
+
+    geometry_msgs::msg::TwistStamped body_force_twist_msg_; ///< TwistStamped message containing force correction data
 
     /**
      * @brief Validates a single task description for the CC Affordance Planner ROS node.
@@ -407,6 +411,13 @@ class CcaRos : public rclcpp::Node
      * @brief Initializes proper action clients in the constructor
      */
     void initialize_action_clients_();
+
+    void force_correction_sub_cb_(const TwistStamped::SharedPtr msg);
+
+    std::optional<Eigen::Matrix<double, 6, 1>> CcaRos::get_force_correction_twist_(
+        const Eigen::VectorXd &supplied_body_twist =
+            Eigen::VectorXd::Constant(6, std::numeric_limits<double>::quiet_NaN()),
+        const Eigen::VectorXd &joint_states = Eigen::VectorXd::Constant(6, std::numeric_limits<double>::quiet_NaN()));
 };
 
 } // namespace cca_ros
