@@ -16,8 +16,13 @@
   <depend>tf2</depend>
   <depend>static_tf_broadcaster</depend>
   <depend>interactive_markers</depend>
+  <depend>rviz_common</depend>
+  <depend>rviz_rendering</depend>
+  <depend>pluginlib</depend>
+  <depend>Qt5</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
+    <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>

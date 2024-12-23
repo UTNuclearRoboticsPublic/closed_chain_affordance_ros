@@ -8,6 +8,22 @@ from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitut
 from launch_ros.substitutions import FindPackageShare
 from launch.substitutions import FindExecutable
 from launch_ros.descriptions import ParameterValue
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+
+def include_kinova_gen3_launch():
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            FindPackageShare('kortex_bringup'), '/launch', '/gen3.launch.py'
+        ]),
+        launch_arguments={
+            'robot_ip': 'yyy.yyy.yyy.yyy',
+            'use_fake_hardware': 'true',
+            'launch_rviz': 'false'
+        }.items()
+    )
+
 
 def generate_robot_description_content():
     """
@@ -82,8 +98,8 @@ def generate_launch_description():
 
     robot_description_content, description_launch_args = generate_robot_description_content()
 
-    robot_description = {"robot_description": robot_description_content}
-    use_sim_time = {'use_sim_time': LaunchConfiguration('use_sim_time')}
+    # robot_description = {"robot_description": robot_description_content}
+    # use_sim_time = {'use_sim_time': LaunchConfiguration('use_sim_time')}
 
     rviz_config_file = PathJoinSubstitution([
         FindPackageShare('cca_interactive_goals'),
@@ -100,8 +116,8 @@ def generate_launch_description():
                 name='cca_interactive_goals',
                 output='screen',
                 parameters=[
-                    robot_description,
-                    use_sim_time
+                    # robot_description,
+                    # use_sim_time
                 ],
             ),
             # Launch RViz with the specified configuration
@@ -112,9 +128,11 @@ def generate_launch_description():
                 output='screen',
                 arguments=['-d', rviz_config_file],  # Load RViz config file
                 parameters=[
-                    robot_description,
-                    use_sim_time
+                    # robot_description,
+                    # use_sim_time
                 ],
             ),
+            # Launch Kinova Arm
+            include_kinova_gen3_launch(),
         ]
     )
