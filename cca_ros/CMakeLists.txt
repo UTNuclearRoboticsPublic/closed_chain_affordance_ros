@@ -42,14 +42,14 @@ add_library(${PROJECT_NAME}
 )
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} rclcpp affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs)
-
-# Export ROS dependencies for downstream ROS packages
-ament_export_dependencies(affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC affordance_util_ros PUBLIC cca_ros_viz_msgs PUBLIC rclcpp_action PUBLIC tf2_ros sensor_msgs PUBLIC control_msgs PUBLIC geometry_msgs)
 
 # Link the executable against external libraries
-target_link_libraries(${PROJECT_NAME} affordance_util::affordance_util cc_affordance_planner::cc_affordance_planner Eigen3::Eigen
+target_link_libraries(${PROJECT_NAME} PUBLIC affordance_util::affordance_util PUBLIC cc_affordance_planner::cc_affordance_planner PUBLIC Eigen3::Eigen
 )
+
+# Export dependencies for downstream ROS packages
+ament_export_dependencies(affordance_util_ros cca_ros_viz_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs affordance_util cc_affordance_planner Eigen3)
 
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
