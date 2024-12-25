@@ -1,4 +1,4 @@
-#include "cca_ros/cca_ros_behavior.hpp"
+#include "cca_ros_behavior/cca_ros_behavior.hpp"
 
 namespace cca_ros_behavior
 {
@@ -22,49 +22,52 @@ CcaRosAction::~CcaRosAction()
 BT::PortsList CcaRosAction::providedPorts()
 {
     // Define the ports required by this action node
-    return {BT::InputPort<cca_ros::PlanningRequest>("cca_planning_request"),
-            BT::InputPort<cca_ros::PlanningRequests>("cca_planning_requests")};
+    return {BT::InputPort<std::shared_ptr<cca_ros::PlanningRequest>>("cca_planning_request"),
+            BT::InputPort<std::shared_ptr<cca_ros::PlanningRequests>>("cca_planning_requests")};
 }
 
 BT::NodeStatus CcaRosAction::onStart()
 {
+    // Define type aliases for readability
+    using PlanningRequestPtr = std::shared_ptr<cca_ros::PlanningRequest>;
+    using PlanningRequestsPtr = std::shared_ptr<cca_ros::PlanningRequests>;
+
     // Spin this node in a separate thread to handle ROS communication
     spinner_thread_ = std::thread([this]() { rclcpp::spin(this->shared_from_this()); });
 
-    BT::Expected<cca_ros::PlanningRequest> req = getInput<PlanningRequest>("cc_planning_request");
-    BT::Expected<cca_ros::PlanningRequests> reqs = getInput<PlanningRequests>("cc_planning_requests");
+    // Attempt to get inputs from the ports
+    BT::Expected<PlanningRequestPtr> req = getInput<PlanningRequestPtr>("cc_planning_request");
+    BT::Expected<PlanningRequestsPtr> reqs = getInput<PlanningRequestsPtr>("cc_planning_requests");
 
-    // Check if both inputs are provided, which is not allowed
-    if (req.has_value() && reqs.has_value())
+    // Check for !XOR between the two ports
+    if (req.has_value() == reqs.has_value())
     {
-        throw BT::runtime_error(
-            "Error: Both [cca_planning_request] and [cca_planning_requests] cannot be provided simultaneously. "
-            "Please specify only one.");
+        throw BT::RuntimeError(
+            "Error: One of [cca_planning_request] or [cca_planning_requests] must be provided but not both. "
+            "Please specify one and only one.");
     }
 
-    // Assign the final request based on which input is available
-    auto cca_req =
-        req.has_value()
-            ? req.value() // Use the single request if provided
-            : (reqs.has_value()
-                   ? reqs.value() // Use multiple requests if provided
-                   : throw BT::runtime_error("Error: One of [cca_planning_request] or [cca_planning_requests] must be "
-                                             "provided, but neither was found."));
+    // Assign the final request based on available input. One of them is available at this point.
+    using RequestVariant = std::variant<PlanningRequestPtr, PlanningRequestsPtr>;
+    auto cca_req_variant = req.has_value() ? RequestVariant(req.value())   // Use the single request if provided
+                                           : RequestVariant(reqs.value()); // Otherwise, use multiple requests
 
-    // Point to the motion status from the request and use it to monitor this action
-    motion_status_ = cca_req.motion_status;
+    // Lambda to process the requests
+    auto process_request = [this](const auto &cca_req) -> BT::NodeStatus {
+        // Point to the motion status from the request and use it to monitor this action
+        status_ = cca_req->status;
 
-    // Run the CCA planner using the extracted request data
-    if (!this->run_cc_affordance_planner(cca_req.planner_config, cca_req.task_description, cca_req.motion_status,
-                                         cca_req.start_config))
-    {
-        return BT::NodeStatus::FAILURE; // Return failure if planning fails
-    }
+        // Run the CCA planner using the extracted request data
+        if (!this->plan_visualize_and_execute(*cca_req))
+        {
+            return BT::NodeStatus::FAILURE; // Return failure if planning fails
+        }
 
-    // Record start time to monitor for timeout
-    start_time_ = std::chrono::steady_clock::now();
+        return BT::NodeStatus::RUNNING; // Return running status if planning succeeds
+    };
 
-    return BT::NodeStatus::RUNNING; // Return running status to indicate ongoing action
+    // Use std::visit to handle both types
+    return std::visit([this, &process_request](auto &cca_req) { return process_request(cca_req); }, cca_req_variant);
 }
 
 BT::NodeStatus CcaRosAction::onRunning()
@@ -78,12 +81,12 @@ BT::NodeStatus CcaRosAction::onRunning()
     }
 
     // Check the status of the CCA action
-    if (motion_status_ == cca_ros::Status::SUCCEEDED)
+    if (*status_ == cca_ros::Status::SUCCEEDED)
     {
         RCLCPP_INFO(this->get_logger(), "CCA action successfully completed");
         return BT::NodeStatus::SUCCESS;
     }
-    else if (*motion_status_ == cca_ros::Status::UNKNOWN)
+    else if (*status_ == cca_ros::Status::UNKNOWN)
     {
         RCLCPP_ERROR(this->get_logger(), "CCA action was interrupted mid-execution.");
         return BT::NodeStatus::FAILURE;

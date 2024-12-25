@@ -6,6 +6,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <variant>
 
 namespace cca_ros_behavior
 {
@@ -70,7 +71,7 @@ class CcaRosAction : public BT::StatefulActionNode, public cca_ros::CcaRos
 
   private:
     std::thread spinner_thread_;                                    /**< Thread to spin the node. */
-    std::shared_ptr<cca_ros::Status> motion_status_{nullptr};       /**< To check the status of the CCA action. */
+    std::shared_ptr<cca_ros::Status> status_{nullptr};              /**< To check the status of the CCA action. */
     std::chrono::time_point<std::chrono::steady_clock> start_time_; /**< To monitor the timeout. */
     static constexpr int timeout_ = 60; /**< Timeout duration for the CCA action (in seconds). */
 };
