@@ -57,11 +57,37 @@ namespace cca_ros
 using namespace std::chrono_literals;
 using FollowJointTrajectoryGoal = control_msgs::action::FollowJointTrajectory_Goal;
 
+/**
+ * @brief Struct containing the kinematic state of a robot
+ */
 struct KinematicState
 {
     Eigen::VectorXd robot;
     double gripper;
 };
+
+/**
+ * @brief Struct containing planning request for the CCA ROS planner
+ */
+struct PlanningRequest
+{
+    cc_affordance_planner::PlannerConfig planner_config = cc_affordance_planner::PlannerConfig();
+    cc_affordance_planner::TaskDescription task_description;
+    KinematicState kinematic_state;
+    std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
+};
+
+/**
+ * @brief Struct containing planning requests for the CCA ROS planner
+ */
+struct PlanningRequests
+{
+    std::vector<cc_affordance_planner::PlannerConfig> planner_config;
+    std::vector<cc_affordance_planner::TaskDescription> task_description;
+    KinematicState kinematic_state;
+    std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
+};
+
 /**
  * @brief Enum indicating the status of the CC Affordance Planner during execution.
  */
@@ -227,8 +253,15 @@ class CcaRos : public rclcpp::Node
         const std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN),
         const KinematicState &startConfig = KinematicState{Eigen::VectorXd(),
                                                            std::numeric_limits<double>::quiet_NaN()});
+    /**
+     * @brief Joins and cleans up status-checking thread
+     */
+    void cleanup_threads();
 
-    void cleanup_between_calls();
+    /**
+     * @brief Cancels trajectory execution on robot
+     */
+    void cancel_execution();
 
   private:
     std::shared_ptr<Status> status_{nullptr};                 ///< Current status of planning and execution
@@ -269,6 +302,13 @@ class CcaRos : public rclcpp::Node
 
     bool unified_executor_available_ =
         false; ///< Indicates whether an action server is available to execute the robot and gripper trajectory together
+
+    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture
+        unified_gh_future_; ///< Goal handle future for the unified trajectory executor
+    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture
+        robot_gh_future_; ///< Goal handle future for the robot trajectory executor
+    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture
+        gripper_gh_future_; /// Goal handle future for the gripper trajectory executor
 
     /**
      * @brief Validates a single task description for the CC Affordance Planner ROS node.
@@ -330,11 +370,13 @@ class CcaRos : public rclcpp::Node
      * @param send_goal_options Options for sending the trajectory execution goal.
      * @param traj_execution_as_name Name of the action server.
      * @param goal follow_joint_trajectory goal message containing the trajectory to execute
-     * @return True if successful, false otherwise.
+     * @param goal_handle_future follow_joint_trajectory-type action goal handle
+     * @return True if successful, false otherwise. Also, returns the goal handle by reference
      */
     bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                              rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
-                             const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal);
+                             const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
+                             rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture &goal_handle_future);
 
     /**
      * @brief Callback for handling the result of robot trajectory execution.

@@ -62,12 +62,8 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 // Destructor for CcaRos, cleans up.
 CcaRos::~CcaRos()
 {
+    this->cleanup_threads();
     rclcpp::shutdown();
-
-    if (result_status_thread_.joinable())
-    {
-        result_status_thread_.join();
-    }
 }
 
 // Runs the affordance planner for a single task and config.
@@ -257,7 +253,8 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
                 // Set result status and execute unified trajectory
                 robot_result_status_ = status_;
                 return execute_trajectory_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
-                                           robot_and_gripper_traj_execution_as_name_, robot_and_gripper_goal_msg);
+                                           robot_and_gripper_traj_execution_as_name_, robot_and_gripper_goal_msg,
+                                           unified_gh_future_);
             }
             else
             {
@@ -273,9 +270,9 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
 
                 // Execute trajectories for both robot and gripper
                 return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                            robot_traj_execution_as_name_, robot_goal_msg)) &&
+                                            robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_)) &&
                        (execute_trajectory_(gripper_traj_execution_client_, gripper_send_goal_options,
-                                            gripper_traj_execution_as_name_, gripper_goal_msg));
+                                            gripper_traj_execution_as_name_, gripper_goal_msg, gripper_gh_future_));
             }
         }
         else
@@ -283,11 +280,10 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
             // Set result status and execute trajectory for robot only
             robot_result_status_ = status_;
             return execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                       robot_traj_execution_as_name_, robot_goal_msg);
+                                       robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_);
         }
     }
 
-    *status_ = cca_ros::Status::SUCCEEDED;
     return true;
 }
 
@@ -458,7 +454,8 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
                 // Set result status and execute unified trajectory
                 robot_result_status_ = status_;
                 return execute_trajectory_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
-                                           robot_and_gripper_traj_execution_as_name_, robot_and_gripper_goal_msg);
+                                           robot_and_gripper_traj_execution_as_name_,
+                                           robot_and_gripper_goal_msg unified_gh_future_);
             }
             else
             {
@@ -470,13 +467,14 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
                     std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
 
                 // Start a thread to check result status
+                this->cleanup_threads(); // Ensure previous call was properly cleaned up
                 result_status_thread_ = std::thread(&CcaRos::check_robot_and_gripper_result_status_, this);
 
                 // Execute trajectories for both robot and gripper
                 return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                            robot_traj_execution_as_name_, robot_goal_msg)) &&
+                                            robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_)) &&
                        (execute_trajectory_(gripper_traj_execution_client_, gripper_send_goal_options,
-                                            gripper_traj_execution_as_name_, gripper_goal_msg));
+                                            gripper_traj_execution_as_name_, gripper_goal_msg, gripper_gh_future_));
             }
         }
         else
@@ -484,10 +482,9 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
             // Set result status and execute trajectory for robot only
             robot_result_status_ = status_;
             return execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                       robot_traj_execution_as_name_, robot_goal_msg);
+                                       robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_);
         }
     }
-    *status_ = cca_ros::Status::SUCCEEDED;
     return true;
 }
 
@@ -730,6 +727,7 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
     if (response->success)
     {
         RCLCPP_INFO(node_logger_, " %s service succeeded", viz_ss_name_.c_str());
+        *status_ = cca_ros::Status::SUCCEEDED;
         return true;
     }
     else
@@ -741,9 +739,11 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
 }
 
 // Executes the planned trajectory.
-bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
-                                 rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
-                                 const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal)
+bool CcaRos::execute_trajectory_(
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
+    rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
+    const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
+    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture &goal_handle_future)
 {
     // Before execution, ensure current state does not deviate much from trajectory start state
     try
@@ -793,7 +793,7 @@ bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::S
     }
 
     RCLCPP_INFO(node_logger_, "Sending goal to %s action server", traj_execution_as_name.c_str());
-    traj_execution_client->async_send_goal(goal, send_goal_options);
+    goal_handle_future = traj_execution_client->async_send_goal(goal, send_goal_options);
     return true;
 }
 
@@ -871,7 +871,7 @@ Status CcaRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code, 
 
 void CcaRos::check_robot_and_gripper_result_status_()
 {
-    // Start statuses as unknown
+    // Start statuses as processing
     robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
     gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
     while (rclcpp::ok())
@@ -899,11 +899,35 @@ void CcaRos::check_robot_and_gripper_result_status_()
     }
 }
 
-void CcaRos::cleanup_between_calls()
+void CcaRos::cleanup_threads()
 {
     if (result_status_thread_.joinable())
     {
         result_status_thread_.join();
+    }
+}
+
+void CcaRos::cancel_execution()
+{
+    if (unified_gh_future_ && unified_gh_future_->get()->accepted)
+    {
+        robot_and_gripper_traj_execution_client_->async_cancel_goal(unified_gh_future_);
+        RCLCPP_INFO(node_logger_, "Canceling %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+        unified_gh_future_.reset();
+    }
+
+    if (robot_gh_future_ && robot_gh_future_->get()->accepted)
+    {
+        robot_traj_execution_client_->async_cancel_goal(robot_gh_future_);
+        RCLCPP_INFO(node_logger_, "Canceling %s goal", robot_traj_execution_as_name_.c_str());
+        robot_gh_future_.reset();
+    }
+
+    if (gripper_gh_future_ && gripper_gh_future_->get()->accepted)
+    {
+        gripper_traj_execution_client_->async_cancel_goal(gripper_gh_future_);
+        RCLCPP_INFO(node_logger_, "Canceling %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+        gripper_gh_future_.reset();
     }
 }
 } // namespace cca_ros
