@@ -67,17 +67,19 @@ CcaRos::~CcaRos()
 }
 
 // Runs the affordance planner for a single task and config.
-bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfig &planner_config,
-                                       const cc_affordance_planner::TaskDescription &taskDescription,
-                                       const std::shared_ptr<Status> status, const KinematicState &startConfig)
+bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning_request)
 {
-    status_ = status;
+    status_ = planning_request.status;
     *status_ = Status::PROCESSING;
+
+    // Create const references for readability
+    const cc_affordance_planner::PlannerConfig &planner_config = planning_request.planner_config;
+    const cca_ros::KinematicState &start_state = planning_request.start_state;
 
     // Validate input
     try
     {
-        this->validate_input_(taskDescription);
+        this->validate_input_(planning_request.task_description);
     }
     catch (const std::invalid_argument &e)
     {
@@ -87,9 +89,9 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
     }
 
     // Copy task description and start config for potential modifications
-    cc_affordance_planner::TaskDescription task_description = taskDescription;
-    Eigen::VectorXd robot_start_config = startConfig.robot;
-    double gripper_start_config = startConfig.gripper;
+    cc_affordance_planner::TaskDescription task_description = planning_request.task_description;
+    Eigen::VectorXd robot_start_config = start_state.robot;
+    double gripper_start_config = start_state.gripper;
     const bool includes_gripper_trajectory = !std::isnan(task_description.goal.gripper);
 
     // Lookup affordance location if the tag frame is specified
@@ -288,12 +290,16 @@ bool CcaRos::run_cc_affordance_planner(const cc_affordance_planner::PlannerConfi
 }
 
 // Runs the affordance planner for multiple tasks and configurations.
-bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
-                                       const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions,
-                                       const std::shared_ptr<Status> status, const KinematicState &startConfig)
+bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &planning_requests)
+
 {
-    status_ = status;
+    status_ = planning_requests.status;
     *status_ = Status::PROCESSING;
+
+    // Create const references for readability
+    const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions = planning_requests.task_description;
+    const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs = planning_requests.planner_config;
+    const cca_ros::KinematicState &start_state = planning_requests.start_state;
 
     // Validate input
     try
@@ -308,8 +314,8 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
     }
 
     const bool includes_gripper_trajectory = !std::isnan(task_descriptions.front().goal.gripper);
-    Eigen::VectorXd robot_start_config = startConfig.robot;
-    double gripper_start_config = startConfig.gripper;
+    Eigen::VectorXd robot_start_config = start_state.robot;
+    double gripper_start_config = start_state.gripper;
 
     // Get joint states if start configuration is empty
     if (robot_start_config.size() == 0)
