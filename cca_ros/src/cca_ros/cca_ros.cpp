@@ -908,53 +908,62 @@ void CcaRos::cleanup_threads()
 
 void CcaRos::cancel_execution()
 {
+    // Struct to hold the cancel future and corresponding action server name
+    struct CancelRequest
+    {
+        std::shared_future<std::shared_ptr<action_msgs::srv::CancelGoal_Response>> cancel_future;
+        std::string action_server_name;
+
+        CancelRequest(std::shared_future<std::shared_ptr<action_msgs::srv::CancelGoal_Response>> cancel_future_,
+                      const std::string &action_server_name_)
+            : cancel_future(std::move(cancel_future_)), action_server_name(action_server_name_)
+        {
+        }
+    };
+
+    // Create a vector to store cancel requests
+    std::vector<CancelRequest> cancel_requests;
+
+    // Check and send cancellation request for unified goal (robot and gripper)
     if (unified_gh_future_.valid())
     {
-        auto cancel_future = robot_and_gripper_traj_execution_client_->async_cancel_goal(unified_gh_future_.get());
+        cancel_requests.push_back(
+            CancelRequest(robot_and_gripper_traj_execution_client_->async_cancel_goal(unified_gh_future_.get()),
+                          robot_and_gripper_traj_execution_as_name_));
         RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
-
-        // Get the response and check the status of the cancellation
-        if (cancel_future.get()->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
-
-        {
-            RCLCPP_INFO(node_logger_, "%s goal canceled successfully",
-                        robot_and_gripper_traj_execution_as_name_.c_str());
-        }
-        else
-        {
-            RCLCPP_ERROR(node_logger_, "Failed to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
-        }
     }
 
+    // Check and send cancellation request for robot goal
     if (robot_gh_future_.valid())
     {
-        auto cancel_future = robot_traj_execution_client_->async_cancel_goal(robot_gh_future_.get());
+        cancel_requests.push_back(CancelRequest(robot_traj_execution_client_->async_cancel_goal(robot_gh_future_.get()),
+                                                robot_traj_execution_as_name_));
         RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_traj_execution_as_name_.c_str());
-
-        // Get the response and check the status of the cancellation
-        if (cancel_future.get()->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
-        {
-            RCLCPP_INFO(node_logger_, "%s goal canceled successfully", robot_traj_execution_as_name_.c_str());
-        }
-        else
-        {
-            RCLCPP_ERROR(node_logger_, "Failed to cancel %s goal", robot_traj_execution_as_name_.c_str());
-        }
     }
 
+    // Check and send cancellation request for gripper goal
     if (gripper_gh_future_.valid())
     {
-        auto cancel_future = gripper_traj_execution_client_->async_cancel_goal(gripper_gh_future_.get());
-        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+        cancel_requests.push_back(
+            CancelRequest(gripper_traj_execution_client_->async_cancel_goal(gripper_gh_future_.get()),
+                          gripper_traj_execution_as_name_));
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", gripper_traj_execution_as_name_.c_str());
+    }
 
-        // Get the response and check the status of the cancellation
-        if (cancel_future.get()->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
+    // Now check the responses from all cancellation requests
+    for (const auto &cancel_request : cancel_requests)
+    {
+        // Wait for the cancellation response and check the return code
+        auto cancel_response = cancel_request.cancel_future.get();
+        const std::string &action_server_name = cancel_request.action_server_name; // Action server name
+
+        if (cancel_response->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
         {
-            RCLCPP_INFO(node_logger_, "%s goal canceled successfully", gripper_traj_execution_as_name_.c_str());
+            RCLCPP_INFO(node_logger_, "%s goal canceled successfully", action_server_name.c_str());
         }
         else
         {
-            RCLCPP_ERROR(node_logger_, "Failed to cancel %s goal", gripper_traj_execution_as_name_.c_str());
+            RCLCPP_ERROR(node_logger_, "Failed to cancel goal for action server %s", action_server_name.c_str());
         }
     }
 }
