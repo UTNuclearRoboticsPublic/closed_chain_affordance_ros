@@ -454,8 +454,8 @@ bool CcaRos::run_cc_affordance_planner(const std::vector<cc_affordance_planner::
                 // Set result status and execute unified trajectory
                 robot_result_status_ = status_;
                 return execute_trajectory_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
-                                           robot_and_gripper_traj_execution_as_name_,
-                                           robot_and_gripper_goal_msg unified_gh_future_);
+                                           robot_and_gripper_traj_execution_as_name_, robot_and_gripper_goal_msg,
+                                           unified_gh_future_);
             }
             else
             {
@@ -739,11 +739,10 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
 }
 
 // Executes the planned trajectory.
-bool CcaRos::execute_trajectory_(
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
-    rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
-    const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
-    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture &goal_handle_future)
+bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
+                                 rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
+                                 const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
+                                 std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> &goal_handle_future)
 {
     // Before execution, ensure current state does not deviate much from trajectory start state
     try
@@ -909,25 +908,55 @@ void CcaRos::cleanup_threads()
 
 void CcaRos::cancel_execution()
 {
-    if (unified_gh_future_ && unified_gh_future_->get()->accepted)
+    if (unified_gh_future_.valid())
     {
-        robot_and_gripper_traj_execution_client_->async_cancel_goal(unified_gh_future_);
-        RCLCPP_INFO(node_logger_, "Canceling %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
-        unified_gh_future_.reset();
+        auto cancel_future = robot_and_gripper_traj_execution_client_->async_cancel_goal(unified_gh_future_.get());
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+
+        // Get the response and check the status of the cancellation
+        if (cancel_future.get()->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
+
+        {
+            RCLCPP_INFO(node_logger_, "%s goal canceled successfully",
+                        robot_and_gripper_traj_execution_as_name_.c_str());
+        }
+        else
+        {
+            RCLCPP_ERROR(node_logger_, "Failed to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+        }
     }
 
-    if (robot_gh_future_ && robot_gh_future_->get()->accepted)
+    if (robot_gh_future_.valid())
     {
-        robot_traj_execution_client_->async_cancel_goal(robot_gh_future_);
-        RCLCPP_INFO(node_logger_, "Canceling %s goal", robot_traj_execution_as_name_.c_str());
-        robot_gh_future_.reset();
+        auto cancel_future = robot_traj_execution_client_->async_cancel_goal(robot_gh_future_.get());
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_traj_execution_as_name_.c_str());
+
+        // Get the response and check the status of the cancellation
+        if (cancel_future.get()->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
+        {
+            RCLCPP_INFO(node_logger_, "%s goal canceled successfully", robot_traj_execution_as_name_.c_str());
+        }
+        else
+        {
+            RCLCPP_ERROR(node_logger_, "Failed to cancel %s goal", robot_traj_execution_as_name_.c_str());
+        }
     }
 
-    if (gripper_gh_future_ && gripper_gh_future_->get()->accepted)
+    if (gripper_gh_future_.valid())
     {
-        gripper_traj_execution_client_->async_cancel_goal(gripper_gh_future_);
-        RCLCPP_INFO(node_logger_, "Canceling %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
-        gripper_gh_future_.reset();
+        auto cancel_future = gripper_traj_execution_client_->async_cancel_goal(gripper_gh_future_.get());
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+
+        // Get the response and check the status of the cancellation
+        if (cancel_future.get()->return_code == action_msgs::srv::CancelGoal_Response::ERROR_NONE)
+        {
+            RCLCPP_INFO(node_logger_, "%s goal canceled successfully", gripper_traj_execution_as_name_.c_str());
+        }
+        else
+        {
+            RCLCPP_ERROR(node_logger_, "Failed to cancel %s goal", gripper_traj_execution_as_name_.c_str());
+        }
     }
 }
+
 } // namespace cca_ros

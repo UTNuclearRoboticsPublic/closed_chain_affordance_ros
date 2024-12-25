@@ -67,6 +67,17 @@ struct KinematicState
 };
 
 /**
+ * @brief Enum indicating the status of the CC Affordance Planner during execution.
+ */
+enum Status
+{
+    PROCESSING,
+    SUCCEEDED,
+    FAILED,
+    UNKNOWN
+};
+
+/**
  * @brief Struct containing planning request for the CCA ROS planner
  */
 struct PlanningRequest
@@ -86,17 +97,6 @@ struct PlanningRequests
     std::vector<cc_affordance_planner::TaskDescription> task_description;
     KinematicState kinematic_state;
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
-};
-
-/**
- * @brief Enum indicating the status of the CC Affordance Planner during execution.
- */
-enum Status
-{
-    PROCESSING,
-    SUCCEEDED,
-    FAILED,
-    UNKNOWN
 };
 
 /**
@@ -303,11 +303,11 @@ class CcaRos : public rclcpp::Node
     bool unified_executor_available_ =
         false; ///< Indicates whether an action server is available to execute the robot and gripper trajectory together
 
-    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture
+    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
         unified_gh_future_; ///< Goal handle future for the unified trajectory executor
-    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture
+    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
         robot_gh_future_; ///< Goal handle future for the robot trajectory executor
-    rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture
+    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
         gripper_gh_future_; /// Goal handle future for the gripper trajectory executor
 
     /**
@@ -376,7 +376,7 @@ class CcaRos : public rclcpp::Node
     bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                              rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
                              const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
-                             rclcpp::Client<FollowJointTrajectory>::SendGoalRequest::SharedFuture &goal_handle_future);
+                             std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> &goal_handle_future);
 
     /**
      * @brief Callback for handling the result of robot trajectory execution.
