@@ -23,14 +23,20 @@ add_library(${PROJECT_NAME} src/${PROJECT_NAME}/${PROJECT_NAME}.cpp)
 ament_target_dependencies(${PROJECT_NAME} rclcpp behaviortree_cpp cca_ros)
 
 # Install the 'include' directory
-install(DIRECTORY include/
-  DESTINATION include/${PROJECT_NAME}
+install(DIRECTORY include/${PROJECT_NAME}
+  DESTINATION include
 )
 
-# Install the libraries
-install(TARGETS
-  ${PROJECT_NAME}
-  DESTINATION lib/${PROJECT_NAME}
+# Export the library target for visibility to other ROS packages
+ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
+
+# Install the library and its headers
+install(TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME} # Export for visibility with other CMake packages
+  ARCHIVE DESTINATION lib  # Static library installation path
+  LIBRARY DESTINATION lib  # Dynamic library installation path
+  RUNTIME DESTINATION bin  # Executable installation path
+  INCLUDES DESTINATION include # Header files
 )
 
 if(BUILD_TESTING)
