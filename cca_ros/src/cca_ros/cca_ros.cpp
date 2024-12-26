@@ -286,6 +286,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
         }
     }
 
+    *status_ = cca_ros::Status::SUCCEEDED;
     return true;
 }
 
@@ -491,6 +492,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
                                        robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_);
         }
     }
+    *status_ = cca_ros::Status::SUCCEEDED;
     return true;
 }
 
@@ -733,7 +735,6 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
     if (response->success)
     {
         RCLCPP_INFO(node_logger_, " %s service succeeded", viz_ss_name_.c_str());
-        *status_ = cca_ros::Status::SUCCEEDED;
         return true;
     }
     else
