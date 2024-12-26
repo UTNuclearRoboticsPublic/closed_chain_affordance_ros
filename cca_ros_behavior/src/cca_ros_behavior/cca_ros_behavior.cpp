@@ -4,10 +4,11 @@ namespace cca_ros_behavior
 {
 CcaRosAction::CcaRosAction(const std::string &name, const BT::NodeConfig &config,
                            const rclcpp::NodeOptions &node_options, bool visualize_trajectory, bool execute_trajectory)
-    : BT::StatefulActionNode(name, config),
-      cca_ros::CcaRos(name, node_options, visualize_trajectory, execute_trajectory)
+    : BT::StatefulActionNode(name, config)
 {
-    // Constructor initializes the base class and Behavior Tree node
+    // Spin this node in a separate thread to handle ROS communication
+    node_ = std::make_shared<cca_ros::CcaRos>(name, node_options, visualize_trajectory, execute_trajectory);
+    spinner_thread_ = std::thread([this]() { rclcpp::spin(node_); });
 }
 
 CcaRosAction::~CcaRosAction()
@@ -32,18 +33,15 @@ BT::NodeStatus CcaRosAction::onStart()
     using PlanningRequestPtr = std::shared_ptr<cca_ros::PlanningRequest>;
     using PlanningRequestsPtr = std::shared_ptr<cca_ros::PlanningRequests>;
 
-    // Spin this node in a separate thread to handle ROS communication
-    spinner_thread_ = std::thread([this]() { rclcpp::spin(this->shared_from_this()); });
-
     // Attempt to get inputs from the ports
-    BT::Expected<PlanningRequestPtr> req = getInput<PlanningRequestPtr>("cc_planning_request");
-    BT::Expected<PlanningRequestsPtr> reqs = getInput<PlanningRequestsPtr>("cc_planning_requests");
+    BT::Expected<PlanningRequestPtr> req = getInput<PlanningRequestPtr>("cca_planning_request");
+    BT::Expected<PlanningRequestsPtr> reqs = getInput<PlanningRequestsPtr>("cca_planning_requests");
 
     // Check for !XOR between the two ports
     if (req.has_value() == reqs.has_value())
     {
         throw BT::RuntimeError(
-            "Error: One of [cca_planning_request] or [cca_planning_requests] must be provided but not both. "
+            "Error: Either both or none of the [cca_planning_request] or [cca_planning_requests] ports have value."
             "Please specify one and only one.");
     }
 
@@ -58,10 +56,13 @@ BT::NodeStatus CcaRosAction::onStart()
         status_ = cca_req->status;
 
         // Run the CCA planner using the extracted request data
-        if (!this->plan_visualize_and_execute(*cca_req))
+        if (!node_->plan_visualize_and_execute(*cca_req))
         {
             return BT::NodeStatus::FAILURE; // Return failure if planning fails
         }
+
+        // Record start time to monitor timeout
+        start_time_ = std::chrono::steady_clock::now();
 
         return BT::NodeStatus::RUNNING; // Return running status if planning succeeds
     };
@@ -76,19 +77,19 @@ BT::NodeStatus CcaRosAction::onRunning()
     auto current_time = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time_).count() > timeout_)
     {
-        RCLCPP_ERROR(this->get_logger(), "Timed out waiting for CCA action request to complete.");
+        RCLCPP_ERROR(node_->get_logger(), "Timed out waiting for CCA action request to complete.");
         return BT::NodeStatus::FAILURE;
     }
 
     // Check the status of the CCA action
     if (*status_ == cca_ros::Status::SUCCEEDED)
     {
-        RCLCPP_INFO(this->get_logger(), "CCA action successfully completed");
+        RCLCPP_INFO(node_->get_logger(), "CCA action successfully completed");
         return BT::NodeStatus::SUCCESS;
     }
     else if (*status_ == cca_ros::Status::UNKNOWN)
     {
-        RCLCPP_ERROR(this->get_logger(), "CCA action was interrupted mid-execution.");
+        RCLCPP_ERROR(node_->get_logger(), "CCA action was interrupted mid-execution.");
         return BT::NodeStatus::FAILURE;
     }
     else
@@ -100,6 +101,6 @@ BT::NodeStatus CcaRosAction::onRunning()
 void CcaRosAction::onHalted()
 {
     // Attempt to cancel trajectory execution if the action is halted
-    this->cancel_execution();
+    node_->cancel_execution();
 }
 } // namespace cca_ros_behavior

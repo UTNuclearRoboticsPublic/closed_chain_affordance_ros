@@ -17,7 +17,7 @@ namespace cca_ros_behavior
  * The action node requires the planning request(s) to be sent via the input port "cca_planning_request" or
  * "cca_planning_requests."
  */
-class CcaRosAction : public BT::StatefulActionNode, public cca_ros::CcaRos
+class CcaRosAction : public BT::StatefulActionNode
 {
   public:
     /**
@@ -70,6 +70,7 @@ class CcaRosAction : public BT::StatefulActionNode, public cca_ros::CcaRos
     void onHalted() override;
 
   private:
+    std::shared_ptr<cca_ros::CcaRos> node_;                         /**< Node for ROS communication */
     std::thread spinner_thread_;                                    /**< Thread to spin the node. */
     std::shared_ptr<cca_ros::Status> status_{nullptr};              /**< To check the status of the CCA action. */
     std::chrono::time_point<std::chrono::steady_clock> start_time_; /**< To monitor the timeout. */
