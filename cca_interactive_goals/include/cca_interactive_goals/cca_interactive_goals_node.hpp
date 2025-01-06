@@ -11,12 +11,14 @@
 class InteractiveMarkerNode : public rclcpp::Node
 {
 public:
-    InteractiveMarkerNode();
+  InteractiveMarkerNode();
+  void setArrowOn();
+  void setArrowOff();
 
 private:
-    void processFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
+  void processFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
 
-    std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
+  std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
 };
 
-#endif // INTERACTIVE_MARKER_NODE_HPP
+#endif  // INTERACTIVE_MARKER_NODE_HPP

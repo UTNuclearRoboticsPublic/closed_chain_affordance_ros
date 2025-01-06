@@ -31,13 +31,21 @@ public:
     server_->applyChanges();
   }
 
+  void setArrowOn()
+  {
+  }
+
+  void setArrowOff()
+  {
+  }
+
 private:
   void createArrowInteractiveMarker()
   {
     visualization_msgs::msg::InteractiveMarker int_marker;
     int_marker.header.frame_id = "base_link";
     int_marker.name = "arrow_marker";
-    int_marker.description = "Movable-Arrow";
+    int_marker.description = "";
     int_marker.scale = 1.0;
 
     // Create arrow marker
@@ -157,59 +165,6 @@ private:
         server_->setPose(feedback->marker_name, feedback->pose);
         server_->applyChanges();
         break;
-      case visualization_msgs::msg::InteractiveMarkerFeedback::MENU_SELECT:
-        processMenuFeedback(feedback);
-        break;
-    }
-  }
-
-  void processMenuFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback)
-  {
-    uint32_t id = feedback->menu_entry_id;
-    std::string action;
-
-    // Determine the action based on the selected menu entry
-    if (id >= 111 && id <= 115)
-      action = "Translation";
-    else if ((id >= 121 && id <= 124) || (id >= 131 && id <= 134))
-      action = "Rotation";
-    else if (id >= 3211 && id <= 3234)
-      action = "EE Orientation";
-    else if (id >= 411 && id <= 434)
-      action = "Approach Planning";
-    else
-    {
-      RCLCPP_INFO(this->get_logger(), "Unhandled menu entry: %d", id);
-      // return;
-    }
-
-    // Perform the action
-    RCLCPP_INFO(this->get_logger(), "Performing action: %s", action.c_str());
-    // Add your specific action logic here
-
-    // Update the menu to mark the selected option
-    visualization_msgs::msg::InteractiveMarker int_marker;
-
-    if (server_->get(feedback->marker_name, int_marker))
-    {
-      // Reset all menu entries to default color
-      for (auto& entry : int_marker.menu_entries)
-      {
-        if (entry.id == id)
-        {
-          menu_handler_.setCheckState(entry.id, interactive_markers::MenuHandler::CHECKED);
-        }
-        else
-        {
-          menu_handler_.setCheckState(entry.id, interactive_markers::MenuHandler::UNCHECKED);
-        }
-      }
-
-      // Update the interactive marker
-      server_->insert(int_marker);
-      server_->applyChanges();
-
-      RCLCPP_INFO(this->get_logger(), "Menu option %d selected and marked", id);
     }
   }
 
