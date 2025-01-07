@@ -18,6 +18,7 @@
   <depend>interactive_markers</depend>
   <depend>rviz_common</depend>
   <depend>rviz_rendering</depend>
+  <depend>rviz_default_plugins</depend>
   <depend>pluginlib</depend>
   <depend>Qt5</depend>
 

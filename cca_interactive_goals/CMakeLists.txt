@@ -14,29 +14,31 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
+find_package(rviz_default_plugins REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 set(CMAKE_AUTOMOC ON)
 
 # cca_interactive_goals
-add_executable(cca_interactive_goals_node src/cca_interactive_goals_node.cpp)
-ament_target_dependencies(cca_interactive_goals_node
-  rclcpp
-  interactive_markers
-  tf2
-  tf2_geometry_msgs
-  tf2_ros
-)
-target_include_directories(cca_interactive_goals_node PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-target_compile_features(cca_interactive_goals_node PUBLIC c_std_99 cxx_std_17)
+# add_executable(cca_interactive_goals_node src/cca_interactive_goals_node.cpp)
+# ament_target_dependencies(cca_interactive_goals_node
+#   rclcpp
+#   interactive_markers
+#   tf2
+#   tf2_geometry_msgs
+#   tf2_ros
+# )
+# target_include_directories(cca_interactive_goals_node PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include>
+#   ${rviz_common_INCLUDE_DIRS}
+# )
+# target_compile_features(cca_interactive_goals_node PUBLIC c_std_99 cxx_std_17)
 
-install(TARGETS
-  cca_interactive_goals_node
-  DESTINATION lib/${PROJECT_NAME}
-)
+# install(TARGETS
+#   cca_interactive_goals_node
+#   DESTINATION lib/${PROJECT_NAME}
+# )
 
 # rviz_ui_panel
 include_directories(include)
@@ -62,12 +64,19 @@ add_library(${PROJECT_NAME} SHARED
 target_link_libraries(${PROJECT_NAME}
   rviz_common::rviz_common
   Qt5::Widgets
+  ${rviz_default_plugins_LIBRARIES}
+  ${rviz_common_LIBRARIES}
 )
 
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   rviz_common
   rviz_rendering
+  rviz_default_plugins
+  interactive_markers
+  tf2
+  tf2_geometry_msgs
+  tf2_ros
 )
 
 pluginlib_export_plugin_description_file(rviz_common plugin_description.xml)

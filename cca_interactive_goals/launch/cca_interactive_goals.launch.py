@@ -110,16 +110,16 @@ def generate_launch_description():
     return launch.LaunchDescription(
         description_launch_args + launch_args + [
             # Launch cca_ros_viz node
-            launch_ros.actions.Node(
-                package='cca_interactive_goals',
-                executable='cca_interactive_goals_node',
-                name='cca_interactive_goals',
-                output='screen',
-                parameters=[
-                    # robot_description,
-                    # use_sim_time
-                ],
-            ),
+            # launch_ros.actions.Node(
+            #     package='cca_interactive_goals',
+            #     executable='cca_interactive_goals_node',
+            #     name='cca_interactive_goals',
+            #     output='screen',
+            #     parameters=[
+            #         # robot_description,
+            #         # use_sim_time
+            #     ],
+            # ),
             # Launch RViz with the specified configuration
             launch_ros.actions.Node(
                 package='rviz2',

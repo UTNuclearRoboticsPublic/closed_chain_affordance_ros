@@ -142,13 +142,6 @@
      </property>
     </widget>
    </item>
-   <!-- <item>
-    <widget class="QPushButton" name="execute_button">
-     <property name="text">
-      <string>Execute</string>
-     </property>
-    </widget>
-   </item> -->
    <item>
     <widget class="QPushButton" name="plan_viz_exe_button">
      <property name="text">

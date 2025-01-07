@@ -7,13 +7,23 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QString>
+#include <QTimer>
 #include <vector>
 #include <string>
+
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
+#include <interactive_markers/interactive_marker_server.hpp>
+#include <interactive_markers/menu_handler.hpp>
+#include <visualization_msgs/msg/interactive_marker.hpp>
+#include <visualization_msgs/msg/interactive_marker_control.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <std_msgs/msg/color_rgba.hpp>
 
 namespace cca_interactive_goals
 {
 
-Panel::Panel(QWidget* parent) : rviz_common::Panel(parent)
+Panel::Panel(QWidget* parent) : rviz_common::Panel(parent), rclcpp::Node("cca_interactive_goals")
 {
   QVBoxLayout* layout = new QVBoxLayout;
 
@@ -131,10 +141,28 @@ Panel::Panel(QWidget* parent) : rviz_common::Panel(parent)
   connect(conf_place_button_, SIGNAL(clicked()), this, SLOT(confirmPlaceClicked()));
 
   updateUIState();
+
+  // Interactive marker initialization
 }
 
 void Panel::onInitialize()
 {
+  server_ = std::make_shared<interactive_markers::InteractiveMarkerServer>(
+      "simple_marker", this->get_node_base_interface(), this->get_node_clock_interface(),
+      this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
+
+  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
+  createArrowInteractiveMarker();
+  createInvisibleInteractiveMarker();
+  server_->applyChanges();
+
+  disableInteractiveMarkerControls("arrow_marker");
+
+  // Set up timer for spinning the node
+  spin_timer_ = new QTimer(this);
+  connect(spin_timer_, &QTimer::timeout, this, &Panel::spin);
+  spin_timer_->start(10);  // Spin every 10ms
 }
 
 void Panel::load(const rviz_common::Config& config)
@@ -172,45 +200,92 @@ void Panel::confirmPlaceClicked()
   value_input_->setVisible(false);
   value_input_->setEnabled(false);
   value_label_->setVisible(false);
-  // Handle confirm screw placement button click
-  goal_label_->setVisible(true);
-  goal_combo_box_->setEnabled(true);
-  goal_combo_box_->setVisible(true);
-  goal_combo_box_->setCurrentIndex(0);
 
-  if (motion_type_combo_box_->currentText() == "Translation")
+  if (mode_combo_box_->currentText() == "Affordance Planning")
   {
-    goal_label_->setText("Goal Distance(meters)");
-    for (int i = 2; i <= 11; i++)
+    // Handle confirm screw placement button click
+    goal_label_->setVisible(true);
+    goal_combo_box_->setEnabled(true);
+    goal_combo_box_->setVisible(true);
+    goal_combo_box_->setCurrentIndex(0);
+    if (motion_type_combo_box_->currentText() == "Translation")
     {
-      double value = (i - 1) * 0.1;
-      QString text = QString::number(value, 'f', 1);
-      goal_combo_box_->setItemText(i, text);
+      goal_label_->setText("Goal Distance(meters)");
+      for (int i = 2; i <= 11; i++)
+      {
+        double value = (i - 1) * 0.1;
+        QString text = QString::number(value, 'f', 1);
+        goal_combo_box_->setItemText(i, text);
+      }
+    }
+    else if (motion_type_combo_box_->currentText() == "Rotation" ||
+             motion_type_combo_box_->currentText() == "Screw Motion")
+    {
+      goal_label_->setText("Goal Angle(radians)");
+      std::vector<std::string> pi_fractions = {
+        "π/4", "π/2", "3π/4", "π", "5π/4", "3π/2", "7π/4", "2π", "9π/4", "5π/2"
+      };
+      for (int i = 2; i <= 11; i++)
+      {
+        goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
+      }
     }
   }
-  else if (motion_type_combo_box_->currentText() == "Rotation" ||
-           motion_type_combo_box_->currentText() == "Screw Motion")
+  else
   {
-    goal_label_->setText("Goal Angle(radians)");
-    std::vector<std::string> pi_fractions = { "π/4", "π/2", "3π/4", "π", "5π/4", "3π/2", "7π/4", "2π", "9π/4", "5π/2" };
-    for (int i = 2; i <= 11; i++)
-    {
-      goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
-    }
+    frame_place_button_->setVisible(true);
+    frame_place_button_->setEnabled(true);
+
+    // TODO: Enable Axis
   }
 }
 
 void Panel::framePlaceButtonClicked()
 {
-  // Handle confirm frame place button click
+  if (mode_combo_box_->currentText() == "Approach Motion Task")
+  {
+    // Handle confirm frame place button click
+
+    // Handle confirm screw placement button click
+    goal_label_->setVisible(true);
+    goal_combo_box_->setEnabled(true);
+    goal_combo_box_->setVisible(true);
+    goal_combo_box_->setCurrentIndex(0);
+    if (motion_type_combo_box_->currentText() == "Translation")
+    {
+      goal_label_->setText("Goal Distance(meters)");
+      for (int i = 2; i <= 11; i++)
+      {
+        double value = (i - 1) * 0.1;
+        QString text = QString::number(value, 'f', 1);
+        goal_combo_box_->setItemText(i, text);
+      }
+    }
+    else if (motion_type_combo_box_->currentText() == "Rotation" ||
+             motion_type_combo_box_->currentText() == "Screw Motion")
+    {
+      goal_label_->setText("Goal Angle(radians)");
+      std::vector<std::string> pi_fractions = {
+        "π/4", "π/2", "3π/4", "π", "5π/4", "3π/2", "7π/4", "2π", "9π/4", "5π/2"
+      };
+      for (int i = 2; i <= 11; i++)
+      {
+        goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
+      }
+    }
+  }
+  else
+  {
+    plan_exe_button_->setEnabled(true);
+    plan_viz_button_->setEnabled(true);
+    plan_viz_exe_button_->setEnabled(true);
+  }
 }
 
 void Panel::modeSelected(int index)
 {
   // Grey out execute buttons
-
   plan_viz_button_->setEnabled(false);
-  // execute_button_->setEnabled(false);
   plan_viz_exe_button_->setEnabled(false);
   plan_exe_button_->setEnabled(false);
   stop_button_->setEnabled(false);
@@ -218,6 +293,8 @@ void Panel::modeSelected(int index)
   // Setup other widgets based on selection
 
   bool mode_selected = mode_combo_box_->currentIndex() != -1;
+
+  disableInteractiveMarkerControls("arrow_marker");
 
   if (mode_selected)
   {
@@ -240,6 +317,8 @@ void Panel::modeSelected(int index)
       pitch_combo_box_->setVisible(false);
       pitch_value_input_->setVisible(false);
       pitch_value_label_->setVisible(false);
+      frame_place_button_->setVisible(false);
+      frame_place_button_->setEnabled(false);
 
       // Set necessary widgets to visible
       motion_type_label_->setVisible(true);
@@ -274,6 +353,11 @@ void Panel::modeSelected(int index)
       pitch_combo_box_->setVisible(false);
       pitch_value_input_->setVisible(false);
       pitch_value_label_->setVisible(false);
+
+      // Set necessary widgets to visible
+
+      frame_place_button_->setVisible(true);
+      frame_place_button_->setEnabled(true);
     }
     else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
     {
@@ -295,6 +379,8 @@ void Panel::modeSelected(int index)
       pitch_combo_box_->setVisible(false);
       pitch_value_input_->setVisible(false);
       pitch_value_label_->setVisible(false);
+      frame_place_button_->setVisible(false);
+      frame_place_button_->setEnabled(false);
 
       // Set necessary widgets to visible
 
@@ -319,16 +405,20 @@ void Panel::motionTypeSelected(int index)
   pitch_value_input_->setVisible(false);
   pitch_value_label_->setVisible(false);
   pitch_combo_box_->setCurrentIndex(0);
+  frame_place_button_->setVisible(false);
+  frame_place_button_->setEnabled(false);
   if (motion_type_combo_box_->currentText() == "Translation" || motion_type_combo_box_->currentText() == "Rotation" ||
       motion_type_combo_box_->currentText() == "Screw Motion")
   {
     conf_place_button_->setEnabled(true);
     conf_place_button_->setVisible(true);
+    enableInteractiveMarkerControls("arrow_marker");
   }
   else
   {
     conf_place_button_->setEnabled(false);
     conf_place_button_->setVisible(true);
+    disableInteractiveMarkerControls("arrow_marker");
   }
   if (motion_type_combo_box_->currentText() == "Screw Motion")
   {
@@ -352,7 +442,8 @@ void Panel::goalSelected(int index)
     value_label_->setVisible(true);
     value_input_->setEnabled(true);
     value_input_->setVisible(true);
-    if (motion_type_combo_box_->currentText() == "Translation")
+    if (motion_type_combo_box_->currentText() == "Translation" &&
+        mode_combo_box_->currentText() != "In-Place End Effector Orientation Control")
     {
       value_label_->setText("Meters");
     }
@@ -428,48 +519,247 @@ void Panel::axisOptionSelected(int index)
 
 void Panel::updateUIState()
 {
-  bool mode_selected = mode_combo_box_->currentIndex() != -1;
-  motion_type_combo_box_->setEnabled(mode_selected && (mode_combo_box_->currentText() == "Affordance Planning" ||
-                                                       mode_combo_box_->currentText() == "Approach Motion Task"));
-  axis_combo_box_->setEnabled(mode_selected &&
-                              mode_combo_box_->currentText() == "In-Place End Effector Orientation Control");
+  plan_viz_button_->setEnabled(false);
+  plan_viz_exe_button_->setEnabled(false);
+  plan_exe_button_->setEnabled(false);
+  stop_button_->setEnabled(false);
+  axis_combo_box_->setEnabled(false);
+  axis_combo_box_->setVisible(false);
+  axis_label_->setVisible(false);
+  goal_label_->setVisible(false);
+  goal_combo_box_->setEnabled(false);
+  goal_combo_box_->setVisible(false);
+  value_input_->setVisible(false);
+  value_input_->setEnabled(false);
+  value_label_->setVisible(false);
+  frame_place_button_->setVisible(false);
+  pitch_label_->setVisible(false);
+  pitch_combo_box_->setVisible(false);
+  pitch_value_input_->setVisible(false);
+  pitch_value_label_->setVisible(false);
+  frame_place_button_->setVisible(false);
+  frame_place_button_->setEnabled(false);
 
-  bool show_value_input = false;
-  QString value_label_ = "";
-
-  if (mode_selected)
-  {
-    if (mode_combo_box_->currentText() == "Affordance Planning" ||
-        mode_combo_box_->currentText() == "Approach Motion Task")
-    {
-      if (motion_type_combo_box_->currentText() == "Translation")
-      {
-        show_value_input = true;
-        value_label_ = "Distance (meters):";
-      }
-      else if (motion_type_combo_box_->currentText() == "Rotation" ||
-               motion_type_combo_box_->currentText() == "Screw Motion")
-      {
-        show_value_input = true;
-        value_label_ = "Angle (radians):";
-      }
-    }
-    else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
-    {
-      if (axis_combo_box_->currentText() != "Interactive Selection")
-      {
-        show_value_input = true;
-        value_label_ = "Angle (radians):";
-      }
-    }
-  }
-
-  value_input_->setEnabled(show_value_input);
-  value_input_->setVisible(show_value_input);
-  value_input_->parentWidget()->findChild<QLabel*>("Value Label")->setText(value_label_);
-
-  // execute_button_->setEnabled(mode_selected);
+  // Set necessary widgets to visible
+  motion_type_label_->setVisible(true);
+  motion_type_combo_box_->setEnabled(true);
+  motion_type_combo_box_->setVisible(true);
+  motion_type_combo_box_->setCurrentText("");
+  conf_place_button_->setEnabled(false);
+  conf_place_button_->setVisible(true);
 }
+
+void Panel::createArrowInteractiveMarker()
+{
+  visualization_msgs::msg::InteractiveMarker int_marker;
+  int_marker.header.frame_id = "base_link";
+  int_marker.name = "arrow_marker";
+  int_marker.description = "";
+  int_marker.scale = 1.0;
+
+  // Create arrow marker
+  visualization_msgs::msg::Marker arrow;
+  arrow.type = visualization_msgs::msg::Marker::ARROW;
+  arrow.scale.x = 1.0;
+  arrow.scale.y = 0.1;
+  arrow.scale.z = 0.1;
+  arrow.color.r = 0.5;
+  arrow.color.g = 0.5;
+  arrow.color.b = 0.5;
+  arrow.color.a = 1.0;
+
+  // Create a control for the arrow
+  visualization_msgs::msg::InteractiveMarkerControl arrow_control;
+  arrow_control.always_visible = true;
+  arrow_control.markers.push_back(arrow);
+  int_marker.controls.push_back(arrow_control);
+
+  // Create controls for movement and rotation
+  visualization_msgs::msg::InteractiveMarkerControl control;
+
+  control.orientation.w = 1;
+  control.orientation.x = 1;
+  control.orientation.y = 0;
+  control.orientation.z = 0;
+  control.name = "rotate_x";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+  int_marker.controls.push_back(control);
+  control.name = "move_x";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+  int_marker.controls.push_back(control);
+
+  control.orientation.w = 1;
+  control.orientation.x = 0;
+  control.orientation.y = 1;
+  control.orientation.z = 0;
+  control.name = "rotate_z";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+  int_marker.controls.push_back(control);
+  control.name = "move_z";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+  int_marker.controls.push_back(control);
+
+  control.orientation.w = 1;
+  control.orientation.x = 0;
+  control.orientation.y = 0;
+  control.orientation.z = 1;
+  control.name = "rotate_y";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+  int_marker.controls.push_back(control);
+  control.name = "move_y";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+  int_marker.controls.push_back(control);
+
+  server_->insert(int_marker, std::bind(&Panel::processArrowFeedback, this, std::placeholders::_1));
+}
+
+void Panel::processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback)
+{
+  switch (feedback->event_type)
+  {
+    case visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE:
+      RCLCPP_INFO(this->get_logger(),
+                  "Arrow marker moved to position (%.2f, %.2f, %.2f) and orientation(%.2f, %.2f, %.2f, %.2f)",
+                  feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z,
+                  feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
+                  feedback->pose.orientation.w);
+      server_->setPose(feedback->marker_name, feedback->pose);
+      server_->applyChanges();
+      break;
+  }
+}
+
+void Panel::createInvisibleInteractiveMarker()
+{
+  visualization_msgs::msg::InteractiveMarker int_marker;
+  int_marker.header.frame_id = "end_effector_link";
+  int_marker.name = "approach_frame";
+  int_marker.description = "";
+  int_marker.scale = 1.0;
+
+  // Create controls for movement and rotation
+  visualization_msgs::msg::InteractiveMarkerControl control;
+
+  control.orientation.w = 1;
+  control.orientation.x = 1;
+  control.orientation.y = 0;
+  control.orientation.z = 0;
+  control.name = "rotate_x";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+  int_marker.controls.push_back(control);
+  control.name = "move_x";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+  int_marker.controls.push_back(control);
+
+  control.orientation.w = 1;
+  control.orientation.x = 0;
+  control.orientation.y = 1;
+  control.orientation.z = 0;
+  control.name = "rotate_z";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+  int_marker.controls.push_back(control);
+  control.name = "move_z";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+  int_marker.controls.push_back(control);
+
+  control.orientation.w = 1;
+  control.orientation.x = 0;
+  control.orientation.y = 0;
+  control.orientation.z = 1;
+  control.name = "rotate_y";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+  int_marker.controls.push_back(control);
+  control.name = "move_y";
+  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+  int_marker.controls.push_back(control);
+
+  server_->insert(int_marker, std::bind(&Panel::processInvisibleMarkerFeedback, this, std::placeholders::_1));
+}
+
+void Panel::processInvisibleMarkerFeedback(
+    const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback)
+{
+  if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE)
+  {
+    RCLCPP_INFO(this->get_logger(),
+                "Invisible marker moved to position (%.2f, %.2f, %.2f) and orientation(% .2f, % .2f, % .2f, % .2f) ",
+                feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z,
+                feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
+                feedback->pose.orientation.w);
+
+    // Update the marker's pose
+    server_->setPose(feedback->marker_name, feedback->pose);
+    server_->applyChanges();
+
+    // Publish TF frame
+    geometry_msgs::msg::TransformStamped transform;
+    transform.header.stamp = this->now();
+    transform.header.frame_id = "end_effector_link";
+    transform.child_frame_id = "approach_frame";
+    transform.transform.translation.x = feedback->pose.position.x;
+    transform.transform.translation.y = feedback->pose.position.y;
+    transform.transform.translation.z = feedback->pose.position.z;
+    transform.transform.rotation = feedback->pose.orientation;
+
+    tf_broadcaster_->sendTransform(transform);
+  }
+}
+
+void Panel::enableInteractiveMarkerControls(const std::string& marker_name)
+{
+  visualization_msgs::msg::InteractiveMarker int_marker;
+  if (server_->get(marker_name, int_marker))
+  {
+    for (auto& control : int_marker.controls)
+    {
+      if (control.name.find("rotate") != std::string::npos)
+      {
+        control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
+      }
+      else if (control.name.find("move") != std::string::npos)
+      {
+        control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+      }
+
+      // Make the arrow visible
+      if (!control.markers.empty())
+      {
+        control.markers[0].color.a = 1.0;  // Set alpha to 1.0 for full opacity
+      }
+    }
+    server_->insert(int_marker);
+    server_->applyChanges();
+  }
+}
+
+void Panel::disableInteractiveMarkerControls(const std::string& marker_name)
+{
+  visualization_msgs::msg::InteractiveMarker int_marker;
+  if (server_->get(marker_name, int_marker))
+  {
+    for (auto& control : int_marker.controls)
+    {
+      control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::NONE;
+
+      // Make the arrow invisible
+      if (!control.markers.empty())
+      {
+        control.markers[0].color.a = 0.0;  // Set alpha to 0.0 for full transparency
+      }
+    }
+    server_->insert(int_marker);
+    server_->applyChanges();
+  }
+}
+
+void Panel::spin()
+{
+  rclcpp::spin_some(this->get_node_base_interface());
+}
+
+// std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
+interactive_markers::MenuHandler menu_handler_;
+std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
 }  // namespace cca_interactive_goals
 

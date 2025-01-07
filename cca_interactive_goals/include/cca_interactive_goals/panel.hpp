@@ -3,16 +3,28 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <rviz_common/panel.hpp>
+#include <memory>
+#include <interactive_markers/interactive_marker_server.hpp>
+#include <visualization_msgs/msg/interactive_marker.hpp>
+#include <visualization_msgs/msg/interactive_marker_control.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include "tf2/LinearMath/Transform.h"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Vector3.h"
+#include "tf2/transform_datatypes.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/transform_broadcaster.h"
 
 class QLabel;
 class QComboBox;
 class QPushButton;
 class QLineEdit;
+class QTimer;
 
 namespace cca_interactive_goals
 {
 
-class Panel : public rviz_common::Panel
+class Panel : public rviz_common::Panel, public rclcpp::Node
 {
   Q_OBJECT
 public:
@@ -35,9 +47,21 @@ protected Q_SLOTS:
   void goalSelected(int index);
   void pitchSelected(int index);
   void axisOptionSelected(int index);
+  void intMarkerController(visualization_msgs::msg::InteractiveMarker int_marker, bool rotate, bool translate);
+  void createArrowInteractiveMarker();
+  void processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
+  void createInvisibleInteractiveMarker();
+  void
+  processInvisibleMarkerFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
+  void enableInteractiveMarkerControls(const std::string& marker_name);
+  void disableInteractiveMarkerControls(const std::string& marker_name);
+  void spin();
 
 private:
   void updateUIState();
+
+  std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   QComboBox* mode_combo_box_;
   QComboBox* motion_type_combo_box_;
@@ -58,6 +82,7 @@ private:
   QPushButton* plan_exe_button_;
   QPushButton* stop_button_;
   QPushButton* conf_place_button_;
+  QTimer* spin_timer_;
 };
 
 }  // namespace cca_interactive_goals
