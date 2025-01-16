@@ -162,11 +162,13 @@ JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::Cons
     return ordered_joint_states;
 }
 
-Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &body_frame, tf2_ros::Buffer &tf_buffer)
+Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &body_frame, tf2_ros::Buffer &tf_buffer,
+                          double timeout_secs)
 
 {
 
-    using namespace std::chrono_literals;
+    auto timeout = std::chrono::duration_cast<tf2::Duration>(std::chrono::duration<float>(timeout_secs));
+
     Eigen::Isometry3d htm; // Output
 
     geometry_msgs::msg::TransformStamped transform_stamped; // ROS message to hold transform info
@@ -174,7 +176,7 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
     // Query the latest available transform
     try
     {
-        transform_stamped = tf_buffer.lookupTransform(space_frame, body_frame, tf2::TimePointZero, 3000ms);
+        transform_stamped = tf_buffer.lookupTransform(space_frame, body_frame, tf2::TimePointZero, timeout);
     }
     catch (tf2::TransformException &ex)
     {
