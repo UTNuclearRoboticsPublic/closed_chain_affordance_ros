@@ -26,12 +26,9 @@ class CcaRosAction : public BT::StatefulActionNode
      * @param name The name of the action node.
      * @param config Configuration for the Behavior Tree node.
      * @param node_options Node options for the ROS 2 node (default is empty).
-     * @param visualize_trajectory Whether to visualize the planned trajectory (default is true).
-     * @param execute_trajectory Whether to execute the planned trajectory on the robot (default is false).
      */
     CcaRosAction(const std::string &name, const BT::NodeConfig &config,
-                 const rclcpp::NodeOptions &node_options = rclcpp::NodeOptions(), bool visualize_trajectory = true,
-                 bool execute_trajectory = false);
+                 const rclcpp::NodeOptions &node_options = rclcpp::NodeOptions());
 
     /**
      * @brief Destructor for the CcaRosAction class.

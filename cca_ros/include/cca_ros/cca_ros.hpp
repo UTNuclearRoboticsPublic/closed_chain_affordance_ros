@@ -86,6 +86,8 @@ struct PlanningRequest
     cc_affordance_planner::TaskDescription task_description;
     KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
+    bool visualize_trajectory = true;
+    bool execute_trajectory = false;
 };
 
 /**
@@ -97,6 +99,8 @@ struct PlanningRequests
     std::vector<cc_affordance_planner::TaskDescription> task_description;
     KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
+    bool visualize_trajectory = true;
+    bool execute_trajectory = false;
 };
 
 /**
@@ -113,19 +117,13 @@ class CcaRos : public rclcpp::Node
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
 
-    // Variables
-    bool visualize_trajectory;
-    bool execute_trajectory;
     /**
      * @brief Constructs a CcaRos node.
      *
      * @param node_name Name of the ROS node.
      * @param options Options for the node, e.g., parameter overrides.
-     * @param visualize_trajectory Whether to visualize the solved trajectory. Default is true.
-     * @param execute_trajectory Whether to execute the solved trajectory on the robot. Default is false.
      */
-    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options, bool visualize_trajectory = true,
-                    bool execute_trajectory = false);
+    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
     /**
      * @brief Cleans up and destructs a CcaRos node .

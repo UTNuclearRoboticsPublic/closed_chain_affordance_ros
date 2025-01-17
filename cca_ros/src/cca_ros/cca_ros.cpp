@@ -4,13 +4,10 @@ namespace cca_ros
 {
 
 // Constructor for CcaRos, initializes the node and sets up required parameters and clients.
-CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options, bool visualize_trajectory,
-               bool execute_trajectory)
+CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
     : Node(node_name, node_options),
-      visualize_trajectory(visualize_trajectory), // Whether to visualize planned trajectory
-      execute_trajectory(execute_trajectory),     // Whether to execute planned trajectory
-      node_logger_(this->get_logger()),           // Logger for the node
-      viz_ss_name_("/cca_ros_viz_server")         // Name of the MoveIt Plan and Visualization server
+      node_logger_(this->get_logger()),   // Logger for the node
+      viz_ss_name_("/cca_ros_viz_server") // Name of the MoveIt Plan and Visualization server
 {
     // Extract necessary parameters for ROS setup and robot configuration
     robot_traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
@@ -41,16 +38,8 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     }
 
     // Initialize service/action clients and subscribers
-    if (visualize_trajectory)
-    {
-        viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
-    }
-
-    if (execute_trajectory)
-    {
-        this->initialize_action_clients_();
-    }
-
+    viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
+    this->initialize_action_clients_();
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
@@ -209,7 +198,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
         create_goal_msg_(plannerResult.joint_trajectory, includes_gripper_trajectory);
 
     // Visualize the trajectory
-    if (visualize_trajectory)
+    if (planning_request.visualize_trajectory)
     {
         // Compute cartesian trajectory
         const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory =
@@ -238,7 +227,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
     }
 
     // Execute the trajectory
-    if (execute_trajectory)
+    if (planning_request.execute_trajectory)
     {
         // Setup goal options for sending trajectory goals
         auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
@@ -432,7 +421,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
         create_goal_msg_(solution, includes_gripper_trajectory);
 
     // Visualize the trajectory
-    if (visualize_trajectory)
+    if (planning_requests.visualize_trajectory)
     {
         const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory =
             this->compute_cartesian_trajectory_(solution);
@@ -444,7 +433,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
     }
 
     // Execute the trajectory
-    if (execute_trajectory)
+    if (planning_requests.execute_trajectory)
     {
         // Setup goal options for sending trajectory goals
         auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();

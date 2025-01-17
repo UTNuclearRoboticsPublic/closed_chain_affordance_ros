@@ -3,11 +3,11 @@
 namespace cca_ros_behavior
 {
 CcaRosAction::CcaRosAction(const std::string &name, const BT::NodeConfig &config,
-                           const rclcpp::NodeOptions &node_options, bool visualize_trajectory, bool execute_trajectory)
+                           const rclcpp::NodeOptions &node_options)
     : BT::StatefulActionNode(name, config)
 {
     // Spin this node in a separate thread to handle ROS communication
-    node_ = std::make_shared<cca_ros::CcaRos>(name, node_options, visualize_trajectory, execute_trajectory);
+    node_ = std::make_shared<cca_ros::CcaRos>(name, node_options);
     spinner_thread_ = std::thread([this]() { rclcpp::spin(node_); });
 }
 
