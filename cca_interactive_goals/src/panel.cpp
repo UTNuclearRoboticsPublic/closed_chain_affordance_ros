@@ -158,6 +158,7 @@ void Panel::onInitialize()
   server_->applyChanges();
 
   disableInteractiveMarkerControls("arrow_marker");
+  disableInteractiveMarkerControls("approach_frame");
 
   // Set up timer for spinning the node
   spin_timer_ = new QTimer(this);
@@ -235,6 +236,7 @@ void Panel::confirmPlaceClicked()
   {
     frame_place_button_->setVisible(true);
     frame_place_button_->setEnabled(true);
+    enableInteractiveMarkerControls("approach_frame");
 
     // TODO: Enable Axis
   }
@@ -295,6 +297,7 @@ void Panel::modeSelected(int index)
   bool mode_selected = mode_combo_box_->currentIndex() != -1;
 
   disableInteractiveMarkerControls("arrow_marker");
+  disableInteractiveMarkerControls("approach_frame");
 
   if (mode_selected)
   {
@@ -358,6 +361,7 @@ void Panel::modeSelected(int index)
 
       frame_place_button_->setVisible(true);
       frame_place_button_->setEnabled(true);
+      enableInteractiveMarkerControls("approach_frame");
     }
     else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
     {
@@ -419,6 +423,7 @@ void Panel::motionTypeSelected(int index)
     conf_place_button_->setEnabled(false);
     conf_place_button_->setVisible(true);
     disableInteractiveMarkerControls("arrow_marker");
+    disableInteractiveMarkerControls("approach_frame");
   }
   if (motion_type_combo_box_->currentText() == "Screw Motion")
   {
@@ -636,6 +641,72 @@ void Panel::createInvisibleInteractiveMarker()
   int_marker.name = "approach_frame";
   int_marker.description = "";
   int_marker.scale = 1.0;
+
+  visualization_msgs::msg::InteractiveMarkerControl frame_control;
+  frame_control.always_visible = true;
+
+  // X axis (red)
+  visualization_msgs::msg::Marker marker;
+  marker.type = visualization_msgs::msg::Marker::CYLINDER;
+
+  marker.scale.x = 0.05;
+  marker.scale.y = 0.05;
+  marker.scale.z = 0.5;
+  marker.color.a = 1.0;
+
+  marker.color.r = 1.0;
+  marker.color.g = 0.0;
+  marker.color.b = 0.0;
+  marker.pose.position.x = 0.25;
+  marker.pose.orientation.w = 0.7071;
+  marker.pose.orientation.x = 0;
+  marker.pose.orientation.y = 0.7071;
+  marker.pose.orientation.z = 0;
+  frame_control.markers.clear();
+  frame_control.markers.push_back(marker);
+  frame_control.orientation.w = 1;
+  frame_control.orientation.x = 0;
+  frame_control.orientation.y = 0;
+  frame_control.orientation.z = 0;
+  int_marker.controls.push_back(frame_control);
+
+  // Y axis (green)
+  marker.color.r = 0.0;
+  marker.color.g = 1.0;
+  marker.color.b = 0.0;
+  marker.pose.position.x = 0;
+  marker.pose.position.y = 0.25;
+  marker.pose.orientation.w = 0.7071;
+  marker.pose.orientation.x = -0.7071;
+  marker.pose.orientation.y = 0;
+  marker.pose.orientation.z = 0;
+  frame_control.markers.clear();
+  frame_control.markers.push_back(marker);
+  frame_control.orientation.w = 0.7071;
+  frame_control.orientation.x = 0;
+  frame_control.orientation.y = 0;
+  frame_control.orientation.z = 0.7071;
+  frame_control.name = "y_axis";
+  int_marker.controls.push_back(frame_control);
+
+  // Z axis (blue)
+  marker.color.r = 0.0;
+  marker.color.g = 0.0;
+  marker.color.b = 1.0;
+  marker.pose.position.y = 0;
+  marker.pose.position.z = 0.25;
+  marker.pose.orientation.w = 1;
+  marker.pose.orientation.x = 0;
+  marker.pose.orientation.y = 0;
+  marker.pose.orientation.z = 0;
+  frame_control.markers.clear();
+  frame_control.markers.push_back(marker);
+  frame_control.orientation.w = 0.7071;
+  frame_control.orientation.x = -0.7071;
+  frame_control.orientation.y = 0;
+  frame_control.orientation.z = 0;
+  frame_control.name = "z_axis";
+  int_marker.controls.push_back(frame_control);
 
   // Create controls for movement and rotation
   visualization_msgs::msg::InteractiveMarkerControl control;

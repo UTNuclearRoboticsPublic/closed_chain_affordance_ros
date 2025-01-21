@@ -17,28 +17,10 @@ find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
+FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
+FIND_LIBRARY(cc_affordance_planner_LIBRARIES cc_affordance_planner /usr/local/lib)
+
 set(CMAKE_AUTOMOC ON)
-
-# cca_interactive_goals
-# add_executable(cca_interactive_goals_node src/cca_interactive_goals_node.cpp)
-# ament_target_dependencies(cca_interactive_goals_node
-#   rclcpp
-#   interactive_markers
-#   tf2
-#   tf2_geometry_msgs
-#   tf2_ros
-# )
-# target_include_directories(cca_interactive_goals_node PUBLIC
-#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#   $<INSTALL_INTERFACE:include>
-#   ${rviz_common_INCLUDE_DIRS}
-# )
-# target_compile_features(cca_interactive_goals_node PUBLIC c_std_99 cxx_std_17)
-
-# install(TARGETS
-#   cca_interactive_goals_node
-#   DESTINATION lib/${PROJECT_NAME}
-# )
 
 # rviz_ui_panel
 include_directories(include)
