@@ -577,10 +577,26 @@ KinematicState CcaRos::read_joint_states_()
     robot_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
     gripper_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
 
-    rclcpp::sleep_for(std::chrono::milliseconds(1000)); // Give time to read from callback
-    if ((robot_joint_states_.positions.hasNaN()) || (gripper_joint_states_.positions.hasNaN()))
+    auto start_time = this->now();
+    rclcpp::Rate loop_rate(10); // 10 Hz loop rate
+    const auto timeout = std::chrono::seconds(5);
+
+    while (rclcpp::ok())
     {
-        throw std::runtime_error("Failed to read robot or gripper joint states.");
+        // Check joint states for NaN values
+        if (!robot_joint_states_.positions.hasNaN() && !gripper_joint_states_.positions.hasNaN())
+        {
+            break;
+        }
+
+        // Check for timeout
+        if ((this->now() - start_time) > rclcpp::Duration(timeout))
+        {
+            throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
+        }
+
+        // Allow for callback processing and sleep
+        loop_rate.sleep();
     }
 
     return KinematicState{robot_joint_states_.positions, gripper_joint_states_.positions[0]};
