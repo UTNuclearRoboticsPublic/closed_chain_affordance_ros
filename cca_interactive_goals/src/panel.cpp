@@ -519,6 +519,88 @@ void Panel::axisOptionSelected(int index)
     {
       goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
     }
+    enableInteractiveMarkerControls("arrow_marker");
+  }
+  if (index == 1)
+  {
+  }
+  else if (index == 2)
+  {
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    if (server_->get("arrow_marker", int_marker))
+    {
+      int_marker.pose.orientation.w = 1;
+      int_marker.pose.orientation.x = 1;
+      int_marker.pose.orientation.y = 0;
+      int_marker.pose.orientation.z = 0;
+      server_->insert(int_marker);
+      server_->applyChanges();
+    }
+  }
+  else if (index == 3)
+  {
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    if (server_->get("arrow_marker", int_marker))
+    {
+      int_marker.pose.orientation.w = 1;
+      int_marker.pose.orientation.x = 0;
+      int_marker.pose.orientation.y = 1;
+      int_marker.pose.orientation.z = 0;
+      server_->insert(int_marker);
+      server_->applyChanges();
+    }
+  }
+  else if (index == 4)
+  {
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    if (server_->get("arrow_marker", int_marker))
+    {
+      int_marker.pose.orientation.w = 1;
+      int_marker.pose.orientation.x = 0;
+      int_marker.pose.orientation.y = 0;
+      int_marker.pose.orientation.z = 1;
+      server_->insert(int_marker);
+      server_->applyChanges();
+    }
+  }
+  else if (index == 5)
+  {
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    if (server_->get("arrow_marker", int_marker))
+    {
+      int_marker.pose.orientation.w = -1;
+      int_marker.pose.orientation.x = 1;
+      int_marker.pose.orientation.y = 0;
+      int_marker.pose.orientation.z = 0;
+      server_->insert(int_marker);
+      server_->applyChanges();
+    }
+  }
+  else if (index == 6)
+  {
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    if (server_->get("arrow_marker", int_marker))
+    {
+      int_marker.pose.orientation.w = -1;
+      int_marker.pose.orientation.x = 0;
+      int_marker.pose.orientation.y = 1;
+      int_marker.pose.orientation.z = 0;
+      server_->insert(int_marker);
+      server_->applyChanges();
+    }
+  }
+  else if (index == 7)
+  {
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    if (server_->get("arrow_marker", int_marker))
+    {
+      int_marker.pose.orientation.w = -1;
+      int_marker.pose.orientation.x = 0;
+      int_marker.pose.orientation.y = 0;
+      int_marker.pose.orientation.z = 1;
+      server_->insert(int_marker);
+      server_->applyChanges();
+    }
   }
 }
 
