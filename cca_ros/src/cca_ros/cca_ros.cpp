@@ -579,7 +579,7 @@ KinematicState CcaRos::read_joint_states_()
 
     auto start_time = this->now();
     rclcpp::Rate loop_rate(10); // 10 Hz loop rate
-    const auto timeout = std::chrono::seconds(5);
+    const auto timeout = std::chrono::seconds(10);
 
     while (rclcpp::ok())
     {
