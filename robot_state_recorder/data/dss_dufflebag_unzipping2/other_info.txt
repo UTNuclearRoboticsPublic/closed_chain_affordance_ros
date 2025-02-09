@@ -1,0 +1,15 @@
+ROS Time : 1739073268.627459049 seconds
+EE pose:
+exp_ee_pose->header.frame_id = "arm0_base_link";
+exp_ee_pose->pose.position.x = 0.705944;
+exp_ee_pose->pose.position.y = 0.0353738;
+exp_ee_pose->pose.position.z = -0.465464;
+exp_ee_pose->pose.orientation.x = -0.0642029;
+exp_ee_pose->pose.orientation.y = 0.425873;
+exp_ee_pose->pose.orientation.z = 0.0643334;
+exp_ee_pose->pose.orientation.w = 0.900206;
+Screw axis =  0 -1  0;
+Screw location =  0.705944 0.0353738 -0.465464;
+Screw goal = 0.3;
+Planning time(us) = 373206;
+Joint distance = 2.12366;
