@@ -13,3 +13,9 @@ Screw location =  0.945425 -0.133055 -0.464318;
 Screw goal = 0.628319;
 Planning time(us) = 973024;
 Joint distance = 2.83846;
+
+#CCA
+Update method = "transpose";
+Planning time(us) = 681;
+Joint distance = 1.04777;
+Max screw goal = 1.392689;

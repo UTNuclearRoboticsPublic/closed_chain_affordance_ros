@@ -356,6 +356,8 @@ class CcaRos : public rclcpp::Node
      * @brief Initializes proper action clients in the constructor
      */
     void initialize_action_clients_();
+
+    double calculate_joint_distance(const std::vector<Eigen::VectorXd>& traj);
 };
 
 } // namespace cca_ros

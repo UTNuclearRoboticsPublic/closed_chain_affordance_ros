@@ -160,6 +160,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
         RCLCPP_INFO_STREAM(node_logger_, "Planner succeeded with update trail '"
                                              << plannerResult.update_trail << "' and took "
                                              << plannerResult.planning_time.count() << " microseconds.");
+	RCLCPP_INFO_STREAM(node_logger_, "The trajectory has joint distance: "<<this->calculate_joint_distance(plannerResult.joint_trajectory));
         if (plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL)
         {
             const int traj_size_difference =
@@ -979,5 +980,29 @@ void CcaRos::cancel_execution()
         }
     }
 }
+
+double CcaRos::calculate_joint_distance(const std::vector<Eigen::VectorXd> &traj)
+{
+    if (traj.size() < 2) return 0.0; // No distance if less than 2 waypoints
+
+    double total_joint_space_distance = 0.0;
+
+    for (size_t i = 1; i < traj.size(); ++i)
+    {
+        const Eigen::VectorXd &prev_wp = traj[i - 1];
+        const Eigen::VectorXd &curr_wp = traj[i];
+
+        if (prev_wp.size() != curr_wp.size())
+        {
+            throw std::runtime_error("Mismatched joint vector when computing joint distance");
+        }
+
+        double distance = (curr_wp - prev_wp).squaredNorm();
+        total_joint_space_distance += std::sqrt(distance);
+    }
+
+    return total_joint_space_distance;
+}
+
 
 } // namespace cca_ros
