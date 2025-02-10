@@ -19,3 +19,9 @@ Update method = 'inverse';
 Planning time(us) = 1838;
 Joint distance = 0.721726;
 Max screw goal = 0.32;
+
+#SPS
+Screw goal = 0.2;
+Planning time(us) = 17351;
+Joint distance = 1.04007;
+Max screw goal = 0.275;

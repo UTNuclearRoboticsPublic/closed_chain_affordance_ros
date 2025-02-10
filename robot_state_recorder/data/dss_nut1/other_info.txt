@@ -21,3 +21,9 @@ Planning time(us) = 833;
 Joint distance = 0.953152;
 Max screw goal = 2.642888;
 Note: For all of these experiments, for rotation and screw cases, the CCA screw axis is negative of DSS or SPS to indicate the same direction
+
+#SPS
+Screw goal = 0.628318;
+Planning time(us) = 54149;
+Joint distance = 1.07019;
+Max screw goal = less than DSS, same as screw goal

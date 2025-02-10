@@ -19,3 +19,6 @@ Update method = 'transpose';
 Planning time(us) = 986;
 Joint distance = 0.334535;
 Max screw goal = 0.23;
+
+#SPS
+FAIL
