@@ -1,0 +1,16 @@
+Planner type: DSS 
+ROS Time : 1739146747.170573235 seconds
+EE pose:
+exp_ee_pose->header.frame_id = "arm0_base_link";
+exp_ee_pose->pose.position.x = 0.864756;
+exp_ee_pose->pose.position.y = -0.287491;
+exp_ee_pose->pose.position.z = 0.0217763;
+exp_ee_pose->pose.orientation.x = 0.0204031;
+exp_ee_pose->pose.orientation.y = -0.0142725;
+exp_ee_pose->pose.orientation.z = -0.26349;
+exp_ee_pose->pose.orientation.w = 0.964341;
+Screw axis = -1  0  0;
+Screw location =  0.864756 -0.367491 0.0217763;
+Screw goal = 0.785398;
+Planning time(us) = 111394;
+Joint distance = 0.80663;
