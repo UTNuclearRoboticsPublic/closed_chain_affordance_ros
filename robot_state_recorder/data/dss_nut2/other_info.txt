@@ -12,7 +12,7 @@ exp_ee_pose->pose.orientation.w = 0.866496;
 Screw axis = 1 0 0;
 Screw location =   0.82715  0.323029 0.0522127;
 Screw goal = 0.785398;
-Planning time(us) = 156296;
+Planning time(us) = 125327;
 Joint distance = 3.3032;
 
 #CCA
