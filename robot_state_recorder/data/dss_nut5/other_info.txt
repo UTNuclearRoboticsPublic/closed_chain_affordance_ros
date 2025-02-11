@@ -1,4 +1,11 @@
 Planner type: DSS 
+IK Solver: kdl
+Motion planner: PRM
+Goal Joint tolerance: 0.0001
+Goal Orientation tolerance: 0.001
+Goal position tolerance: 0.0001
+Kinematics solver search resolution: 0.005
+Kinematics solver timeout: 0.005
 ROS Time : 1739146992.770371199 seconds
 EE pose:
 exp_ee_pose->header.frame_id = "arm0_base_link";
