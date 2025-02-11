@@ -17,7 +17,7 @@ Joint distance = 3.43797;
 
 #CCA
 Update method = 'transpose';
-Planning time(us) = 833;
+Planning time(us) = 2201;
 Joint distance = 0.953152;
 Max screw goal = 2.642888;
 Note: For all of these experiments, for rotation and screw cases, the CCA screw axis is negative of DSS or SPS to indicate the same direction

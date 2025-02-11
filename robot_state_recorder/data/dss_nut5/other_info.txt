@@ -23,8 +23,10 @@ Planning time(us) = 111814;
 Joint distance = 1.08784;
 
 #CCA
+Accuracy = 1% 
+Trajectory density = 50
 Update method = 'transpose';
-Planning time(us) = 791;
+Planning time(us) = 2278;
 Joint distance = 1.31254;
 Max screw goal = 1.861276;
 

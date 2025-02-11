@@ -16,7 +16,7 @@ Joint distance = 2.12366;
 
 #CCA
 Update method = 'inverse';
-Planning time(us) = 1031 ;
+Planning time(us) = 9341;
 Joint distance = 0.679076;
 Max screw goal = 0.438907;
 

@@ -16,7 +16,7 @@ Joint distance = 2.83846;
 
 #CCA
 Update method = "transpose";
-Planning time(us) = 681;
+Planning time(us) = 4788;
 Joint distance = 1.04777;
 Max screw goal = 1.392689;
 
