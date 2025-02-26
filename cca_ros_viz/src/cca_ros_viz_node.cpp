@@ -44,6 +44,7 @@
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
 #include <moveit_visual_tools/moveit_visual_tools.h>
+#include <fmt/core.h>
 
 using namespace std::chrono_literals;
 class CcaRosVizServer : public rclcpp::Node
@@ -164,6 +165,8 @@ class CcaRosVizServer : public rclcpp::Node
                                       std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Response> serv_res)
     {
 
+        serv_res->success = false;// start as false
+
         bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
         if (!has_sub)
             RCLCPP_INFO(node_logger_, "/rviz_visual_tools does not have a subscriber. Visualizations may be lost. "
@@ -217,6 +220,8 @@ class CcaRosVizServer : public rclcpp::Node
             rviz_visual_tools_->trigger();
         }
 
+	long total_viol_check_duration = 0; // for joint limits and collision checking
+
         size_t i = 0;
         for (const auto &point : serv_req->joint_traj.points)
         {
@@ -234,7 +239,63 @@ class CcaRosVizServer : public rclcpp::Node
             // Acquire read-only lock on the planning scene before planning and generate plan
             {
                 planning_scene_monitor::LockedPlanningSceneRO lscene(psm_);
+
+		// Check for joint limit and self-collision violation
+		auto start_time = std::chrono::high_resolution_clock::now(); // start time for this point in traj
+
+		// Set up collision requests and results
+		collision_detection::CollisionRequest collision_request;
+		collision_request.contacts = true;
+		collision_request.max_contacts = 1000;
+		collision_detection::CollisionResult collision_result;
+		collision_result.clear();
+
+		// Check and store violation check
+		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group_);
+		psm_->getPlanningScene()->checkSelfCollision(collision_request, collision_result, goal_state);
+		bool self_collision_violation = collision_result.collision;
+
+		// Capture how long it took to check for violations
+		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
+		long point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+		total_viol_check_duration += point_duration;
+
+		// Log violation
+		if (joint_limit_violation || self_collision_violation) {
+
+		    std::string violation_type =
+                    (joint_limit_violation && self_collision_violation) ? "Joint Limit Violation & Self-Collision" :
+                    joint_limit_violation ? "Joint Limit Violation" : "Self-Collision";
+
+		    
+		    const double* goal_positions = goal_state.getVariablePositions();
+		    size_t num_joints = goal_state.getVariableCount();  // Get the number of joint values
+
+		    std::ostringstream oss;
+		    for (size_t k = 0; k < num_joints; ++k) {
+		        if (k > 0) oss << ", ";
+		        oss << goal_positions[k];
+		    }
+
+		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point: [%s]",
+		    	     violation_type.c_str(), oss.str().c_str());
+
+		    // If self-collision occurs, print the contacts
+		    if (self_collision_violation){
+			    collision_detection::CollisionResult::ContactMap::const_iterator it;
+			    for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it)
+			    {
+			      RCLCPP_ERROR(node_logger_, "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str());
+			    }
+		    
+		    }
+
+		    return;
+
+		}
+		else { // plan
                 planning_pipeline_->generatePlan(lscene, req, res);
+		}
             }
 
             // Check if planning was successful, exit if not
@@ -265,6 +326,7 @@ class CcaRosVizServer : public rclcpp::Node
         }
 
         RCLCPP_INFO(node_logger_, "Successfully planned and visualized the trajectory");
+	RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration);
         serv_res->success = true;
     }
 };
