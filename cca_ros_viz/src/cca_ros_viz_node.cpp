@@ -227,6 +227,7 @@ class CcaRosVizServer : public rclcpp::Node
         {
             // copy the joint trajectory point to a std::vector<double> type
             std::vector<double> planning_end_state(point.positions.begin(), point.positions.end());
+	    // std::vector<double> planning_end_state = {10.0, -5.0, 7.0, -8.0, 12.0, -15.0};  // To test violation
 
             // Set the planning goal state to that trajectory point
             moveit::core::RobotState goal_state(*robot_state_);
@@ -255,6 +256,7 @@ class CcaRosVizServer : public rclcpp::Node
 		psm_->getPlanningScene()->checkSelfCollision(collision_request, collision_result, goal_state);
 		bool self_collision_violation = collision_result.collision;
 
+		if (joint_limit_violation || self_collision_violation) {return;} // For experiment purposes
 		// Capture how long it took to check for violations
 		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
 		long point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
