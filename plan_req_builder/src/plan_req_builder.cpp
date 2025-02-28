@@ -1,4 +1,6 @@
 #include <plan_req_builder/plan_req_builder.hpp>
+#include <Eigen/Dense>
+#include<sstream>
 
 CcaPanel::CcaPanel(const std::string& node_name, const rclcpp::NodeOptions& node_options)
   : cca_ros::CcaRos(node_name, node_options)
@@ -180,6 +182,19 @@ void CcaPanel::block_until_trajectory_execution()
 bool CcaPanel::run(const cca_ros::PlanningRequest& planning_request)
 {
   auto motion_status_ = planning_request.status;
+
+// Define an Eigen format for pretty printing
+  Eigen::IOFormat clean_fmt(4, 0, ", ", "\n", "[", "]");
+
+  // Convert Eigen vectors to string for logging
+  std::stringstream axis_ss, location_ss;
+  axis_ss << planning_request.task_description.affordance_info.axis.transpose().format(clean_fmt);
+  location_ss << planning_request.task_description.affordance_info.location.transpose().format(clean_fmt);
+
+  // Use ROS2 logging instead of std::cout
+  RCLCPP_INFO(rclcpp::get_logger("plan_req_builder"), "Here is the screw axis: %s", axis_ss.str().c_str());
+  RCLCPP_INFO(rclcpp::get_logger("plan_req_builder"), "Here is the screw location: %s", location_ss.str().c_str());
+  RCLCPP_INFO(rclcpp::get_logger("plan_req_builder"), "Here is the affordance goal: %f", planning_request.task_description.goal.affordance);
 
   return this->plan_visualize_and_execute(planning_request);
 }
