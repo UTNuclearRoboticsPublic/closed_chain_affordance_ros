@@ -379,7 +379,7 @@ void CcaInteractiveGoals::screwInfoBuilder()
       }
       else
       {
-        plan_description.goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 0.25;
+        plan_description.goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
       }
     }
     else
@@ -903,7 +903,7 @@ void CcaInteractiveGoals::updateUIState()
 void CcaInteractiveGoals::createArrowInteractiveMarker()
 {
   visualization_msgs::msg::InteractiveMarker int_marker;
-  int_marker.header.frame_id = "base_link";
+  int_marker.header.frame_id = "arm0_base_link";
   int_marker.name = "arrow_marker";
   int_marker.description = "";
   int_marker.scale = 1.0;
@@ -986,7 +986,7 @@ void CcaInteractiveGoals::processArrowFeedback(
 void CcaInteractiveGoals::createInvisibleInteractiveMarker()
 {
   visualization_msgs::msg::InteractiveMarker int_marker;
-  int_marker.header.frame_id = "base_link";
+  int_marker.header.frame_id = "arm0_base_link";
   int_marker.name = "approach_frame";
   int_marker.description = "";
   int_marker.scale = 1.0;
@@ -1115,7 +1115,7 @@ void CcaInteractiveGoals::processInvisibleMarkerFeedback(
     // Publish TF frame
     geometry_msgs::msg::TransformStamped transform;
     transform.header.stamp = this->now();
-    transform.header.frame_id = "end_effector_link";
+    transform.header.frame_id = "arm0_base_link";
     transform.child_frame_id = "approach_frame";
     transform.transform.translation.x = feedback->pose.position.x;
     transform.transform.translation.y = feedback->pose.position.y;
