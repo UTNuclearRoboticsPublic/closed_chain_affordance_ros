@@ -8,13 +8,12 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>interactive_goal_interfaces</build_depend>
-
-  <exec_depend>interactive_goal_interfaces</exec_depend>
 
   <depend>rclcpp</depend>
   <depend>interactive_markers</depend>
   <depend>rclcpp_action</depend>
+  <depend>cca_ros</depend>
+  <depend>interactive_goal_interfaces</depend>
   <depend>tf2_eigen</depend>
 
   <test_depend>ament_lint_auto</test_depend>
