@@ -1,0 +1,8 @@
+# Goal
+int32 button_pressed
+---
+# Result
+bool success
+---
+# Feedback
+bool running

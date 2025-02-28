@@ -1,0 +1,9 @@
+<library path="cca_interactive_goals">
+  <class name="cca_interactive_goals/CcaInteractiveGoals"
+         type="cca_interactive_goals::CcaInteractiveGoals"
+         base_class_type="rviz_common::Panel">
+    <description>
+      A custom panel for RViz with basic UI elements.
+    </description>
+  </class>
+</library>

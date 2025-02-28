@@ -1,0 +1,37 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/john/jbliv/ros2_ws/install/ur_slicer/include/**",
+        "/home/john/jbliv/ros2_ws/install/moveit_visual_tools/include/**",
+        "/home/john/jbliv/ros2_ws/install/rviz_visual_tools/include/**",
+        "/home/john/jbliv/ros2_ws/install/cca_interactive_goals/include/**",
+        "/home/john/jbliv/ros2_ws/install/interactive_goal_interfaces/include/**",
+        "/home/john/jbliv/ros2_ws/install/graph_msgs/include/**",
+        "/home/john/jbliv/ros2_ws/install/cca_ros/include/**",
+        "/home/john/jbliv/ros2_ws/install/cca_ros_viz_msgs/include/**",
+        "/home/john/jbliv/ros2_ws/install/affordance_util_ros/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/john/jbliv/ros2_ws/src/nrg/closed_chain_affordance_ros/affordance_util_ros/include/**",
+        "/home/john/jbliv/ros2_ws/src/nrg/closed_chain_affordance_ros/cca_interactive_goals/include/**",
+        "/home/john/jbliv/ros2_ws/src/nrg/closed_chain_affordance_ros/cca_ros/include/**",
+        "/home/john/jbliv/ros2_ws/src/nrg/closed_chain_affordance_ros/cca_ros_behavior/include/**",
+        "/home/john/jbliv/ros2_ws/src/nrg/closed_chain_affordance_ros/interactive_goal_interfaces/include/**",
+        "/home/john/jbliv/ros2_ws/src/nrg/closed_chain_affordance_ros/plan_req_builder/include/**",
+        "/home/john/jbliv/ros2_ws/src/senior_design/ur_slicer/include/**",
+        "include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
