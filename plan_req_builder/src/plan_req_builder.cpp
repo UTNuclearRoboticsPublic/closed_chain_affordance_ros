@@ -7,37 +7,24 @@ CcaPanel::CcaPanel(const std::string& node_name, const rclcpp::NodeOptions& node
 {
   // Initialize subscribers
   button_press_subscriber_ = this->create_subscription<interactive_goal_interfaces::msg::ButtonPress>(
-      "button_press", 10, std::bind(&CcaPanel::buttonPressCallback, this, std::placeholders::_1));
+      "/button_press", 10, std::bind(&CcaPanel::buttonPressCallback, this, std::placeholders::_1));
 
   screw_info_subscriber_ = this->create_subscription<interactive_goal_interfaces::msg::ScrewInfo>(
-      "screw_info", 10, std::bind(&CcaPanel::screwInfoCallback, this, std::placeholders::_1));
+      "/screw_info", 10, std::bind(&CcaPanel::screwInfoCallback, this, std::placeholders::_1));
 
   settings_subscriber_ = this->create_subscription<interactive_goal_interfaces::msg::AdvancedSettings>(
-      "settings", 10, std::bind(&CcaPanel::settingsCallback, this, std::placeholders::_1));
+      "/settings", 10, std::bind(&CcaPanel::settingsCallback, this, std::placeholders::_1));
 
   // Subscribe to interactive marker feedback
   interactive_marker_feedback_subscriber_ =
       this->create_subscription<visualization_msgs::msg::InteractiveMarkerFeedback>(
-          "/interactive_markers/feedback", 10,
+          "/interactive_goals/feedback", 10,
           std::bind(&CcaPanel::interactiveMarkerFeedbackCallback, this, std::placeholders::_1));
 
   // Initialize publisher
   process_success_publisher_ =
       this->create_publisher<interactive_goal_interfaces::msg::ButtonPress>("process_success", 10);
 
-  rclcpp::Subscription<interactive_goal_interfaces::msg::ButtonPress>::SharedPtr button_press_subscriber_;
-  rclcpp::Subscription<interactive_goal_interfaces::msg::ScrewInfo>::SharedPtr screw_info_subscriber_;
-  rclcpp::Subscription<visualization_msgs::msg::InteractiveMarkerFeedback>::SharedPtr
-      interactive_marker_feedback_subscriber_;
-  rclcpp::Publisher<interactive_goal_interfaces::msg::ButtonPress>::SharedPtr process_success_publisher_;
-
-  interactive_goal_interfaces::msg::ScrewInfo current_screw_info_;       // Store current screw info
-  interactive_goal_interfaces::msg::AdvancedSettings current_settings_;  // Store current settings
-  geometry_msgs::msg::Pose current_arrow_pose_;                          // Store current arrow pose
-  geometry_msgs::msg::Pose current_frame_pose_;                          // Store current frame pose
-  cc_affordance_planner::PlannerConfig config;
-  int current_trajectory_density = 10;
-  affordance_util::VirtualScrewOrder current_screw_order = affordance_util::VirtualScrewOrder::XYZ;
 }
 
 void CcaPanel::buttonPressCallback(const interactive_goal_interfaces::msg::ButtonPress::SharedPtr msg)
@@ -74,6 +61,8 @@ void CcaPanel::buttonPressCallback(const interactive_goal_interfaces::msg::Butto
 void CcaPanel::screwInfoCallback(const interactive_goal_interfaces::msg::ScrewInfo::SharedPtr msg)
 {
   current_screw_info_ = *msg;  // Update current screw info
+   RCLCPP_INFO(this->get_logger(), "Received Screw Info:\n Category: %d\n Type: %d (0 = translation, 1 = rotation, 2 = screw)\n Location Frame: %s\n Pitch: %f\n Goal: %f",
+              msg->category, msg->type, msg->location_frame.c_str(), msg->pitch, msg->goal);
 }
 
 void CcaPanel::settingsCallback(const interactive_goal_interfaces::msg::AdvancedSettings::SharedPtr msg)
@@ -131,11 +120,12 @@ void CcaPanel::settingsCallback(const interactive_goal_interfaces::msg::Advanced
 void CcaPanel::interactiveMarkerFeedbackCallback(
     const visualization_msgs::msg::InteractiveMarkerFeedback::SharedPtr feedback)
 {
+    RCLCPP_WARN(this->get_logger(), "Interactive marker feedback callback triggered");
   if (feedback->marker_name == "arrow_marker")
   {
     current_arrow_pose_ = feedback->pose;
-    RCLCPP_INFO(this->get_logger(), "Arrow marker position updated to: [%f, %f, %f]", feedback->pose.position.x,
-                feedback->pose.position.y, feedback->pose.position.z);
+    RCLCPP_INFO(this->get_logger(), "Arrow marker position updated to: [%f, %f, %f]", current_arrow_pose_.position.x,
+                current_arrow_pose_.position.y, current_arrow_pose_.position.z);
   }
   else if (feedback->marker_name == "approach_frame")
   {
@@ -208,55 +198,80 @@ cca_ros::PlanningRequest CcaPanel::preparePlanningRequest(const bool visualize, 
 
   req.task_description.trajectory_density = current_trajectory_density;
   req.task_description.vir_screw_order = current_screw_order;
+   RCLCPP_ERROR(this->get_logger(), "Current Screw Info:\n Category: %d\n Type: %d (0 = translation, 1 = rotation, 2 = screw)\n Location Frame: %s\n Pitch: %f\n Goal: %f",
+              current_screw_info_.category, current_screw_info_.type, current_screw_info_.location_frame.c_str(), current_screw_info_.pitch, current_screw_info_.goal);
 
   if (current_screw_info_.category == 0)
   {
+      RCLCPP_ERROR(this->get_logger(), "Cateory is affordance");
     req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
   }
   else if (current_screw_info_.category == 1)
   {
+      RCLCPP_ERROR(this->get_logger(), "Cateory is CGP");
     req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
   }
   else if (current_screw_info_.category == 2)
   {
+      RCLCPP_ERROR(this->get_logger(), "Cateory is EE Orientation");
     req.task_description =
         cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
   }
   else if (current_screw_info_.category == 3)
   {
+      RCLCPP_ERROR(this->get_logger(), "Cateory is APPROACH");
     req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::APPROACH);
   }
 
   // Set affordance info types and pitch for screw in affordance and approach motion
   if (current_screw_info_.category == 0 || current_screw_info_.category == 3)
   {
+      RCLCPP_ERROR(this->get_logger(), "Setting affordance screw types and pitch for affordance and APPROACH types");
     if (current_screw_info_.type == 0)
     {
+      RCLCPP_ERROR(this->get_logger(), "Screw is translation");
       req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
     }
     else if (current_screw_info_.type == 1)
     {
+      RCLCPP_ERROR(this->get_logger(), "Screw is rotation");
       req.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
     }
     else if (current_screw_info_.type == 2)
     {
+      RCLCPP_ERROR(this->get_logger(), "Screw is screw");
       req.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
       req.task_description.affordance_info.pitch = current_screw_info_.pitch;
     }
   }
 
+      RCLCPP_ERROR(this->get_logger(), "Setting affordance axes and goals");
   // Set goals and axis/location(not for in-place) for everything except for cgp
   if (current_screw_info_.category != 1)
   {
+      RCLCPP_ERROR(this->get_logger(), "Category is not CGP. Calculating axis");
+    RCLCPP_INFO(this->get_logger(), "Current arrow marker position updated to: [%f, %f, %f]", current_arrow_pose_.position.x,
+                current_arrow_pose_.position.y, current_arrow_pose_.position.z);
     req.task_description.goal.affordance = current_screw_info_.goal;
-    // Convert quaternion to axis form
-    Eigen::Quaterniond q(current_arrow_pose_.orientation.w, current_arrow_pose_.orientation.x,
-                         current_arrow_pose_.orientation.y, current_arrow_pose_.orientation.z);
-    Eigen::AngleAxisd angle_axis(q);
-    req.task_description.affordance_info.axis = angle_axis.axis();
+    Eigen::Quaterniond q(current_arrow_pose_.orientation.w, 
+    		     current_arrow_pose_.orientation.x,
+    		     current_arrow_pose_.orientation.y,
+    		     current_arrow_pose_.orientation.z);
+    
+    // Normalize to avoid numerical errors
+    q.normalize();
+    
+    // Original direction of the arrow (aligned with X-axis)
+    Eigen::Vector3d original_dir(1.0, 0.0, 0.0);
+    
+    // Apply quaternion rotation to get the new direction
+    Eigen::Vector3d new_axis = q * original_dir;
+    
+    req.task_description.affordance_info.axis = new_axis;
 
     if (current_screw_info_.category != 2)
     {
+      RCLCPP_ERROR(this->get_logger(), "Category is not CGP and EE orientation. Setting location");
       // Set location
       req.task_description.affordance_info.location = Eigen::Vector3d(
           current_arrow_pose_.position.x, current_arrow_pose_.position.y, current_arrow_pose_.position.z);
@@ -266,6 +281,7 @@ cca_ros::PlanningRequest CcaPanel::preparePlanningRequest(const bool visualize, 
   // Set HTM for CGP and Approach motion task
   if (current_screw_info_.category == 1 || current_screw_info_.category == 3)
   {
+      RCLCPP_ERROR(this->get_logger(), "Category is CGP or APPROACH. Looking up frame info.");
     Eigen::Isometry3d transform;
     tf2::convert(current_arrow_pose_, transform);
     req.task_description.goal.grasp_pose = transform.matrix();
