@@ -12,14 +12,41 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(trajectory_msgs)
 find_package(geometry_msgs)
 
+set(msg_files
+  "msg/Goal.msg"
+  "msg/GripperGoalType.msg"
+  "msg/KinematicState.msg"
+  "msg/MotionType.msg"
+  "msg/PlannerConfig.msg"
+  "msg/ScrewInfo.msg"
+  "msg/ScrewLocationMethod.msg"
+  "msg/ScrewType.msg"
+  "msg/TaskDescription.msg"
+  "msg/UpdateMethod.msg"
+  "msg/VirtualScrewOrder.msg"
+)
+
+set(srv_files
+  "srv/CcaRosViz.srv"
+)
+
+set(action_files
+  "action/CcaRosAction.action"
+)
+
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/CcaRosViz.srv"
+  ${msg_files}
+  ${action_files}
+)
+
+# Generate interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${srv_files}
   DEPENDENCIES
   trajectory_msgs
   geometry_msgs
 )
-
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

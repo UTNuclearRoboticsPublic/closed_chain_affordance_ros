@@ -1,0 +1,6 @@
+cca_ros_viz_msgs/ScrewInfo affordance_info
+cca_ros_viz_msgs/Goal goal
+int32 trajectory_density 10
+cca_ros_viz_msgs/MotionType motion_type AFFORDANCE
+cca_ros_viz_msgs/VirtualScrewOrder vir_screw_order XYZ
+cca_ros_viz_msgs/GripperGoalType gripper_goal_type CONSTANT

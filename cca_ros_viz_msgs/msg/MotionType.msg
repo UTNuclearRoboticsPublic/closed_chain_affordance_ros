@@ -1,0 +1,2 @@
+int32 AFFORDANCE = 0
+int32 APPROACH = 1

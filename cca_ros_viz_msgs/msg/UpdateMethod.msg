@@ -1,0 +1,3 @@
+uint8 INVERSE=1
+uint8 TRANSPOSE=2
+uint8 BEST=0
