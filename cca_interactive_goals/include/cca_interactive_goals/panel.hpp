@@ -102,6 +102,10 @@ private:
   QComboBox* screw_order_combo_;
   QComboBox* cca_type_combo_;
   QPushButton* apply_button_;
+
+  // ROS clients
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
+        cca_action_client_; ///< Client for planning and executing with CCA
 };
 
 }  // namespace cca_interactive_goals

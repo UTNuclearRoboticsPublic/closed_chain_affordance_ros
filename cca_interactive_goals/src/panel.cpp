@@ -228,11 +228,15 @@ void CcaInteractiveGoals::onInitialize()
 
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
-  screw_info_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ScrewInfo>("screw_info", 10);
+  screw_info_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ScrewInfo>("/screw_info", 10);
 
-  button_press_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ButtonPress>("button_press", 10);
+  button_press_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ButtonPress>("/button_press", 10);
 
-  settings_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::AdvancedSettings>("settings", 10);
+  settings_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::AdvancedSettings>("/settings", 10);
+
+  // Initialize CCA action client
+  cca_action_client_ =
+      rclcpp_action::create_client<FollowJointTrajectory>(this, robot_traj_execution_as_name_);
 
   // Create and hide interactive markers
   createArrowInteractiveMarker();
@@ -376,6 +380,7 @@ void CcaInteractiveGoals::screwInfoBuilder()
       if (plan_description.type == 0)
       {
         plan_description.goal = std::stof(goal_combo_box_->currentText().toStdString());
+        RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<plan_description.goal);
       }
       else
       {
