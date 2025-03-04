@@ -1,4 +1,4 @@
-float64 affordance nan
-float64[4] ee_orientation [nan, nan, nan, nan]
-float64[16] grasp_pose [nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan]
-float64 gripper nan
+float64 affordance
+float64[3] ee_orientation
+float64[16] grasp_pose
+float64 gripper
