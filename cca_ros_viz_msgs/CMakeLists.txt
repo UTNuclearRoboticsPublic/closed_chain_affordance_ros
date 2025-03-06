@@ -25,6 +25,7 @@ set(msg_files
   "msg/TaskDescription.msg"
   "msg/UpdateMethod.msg"
   "msg/VirtualScrewOrder.msg"
+  "msg/PlanningRequest.msg"
 )
 
 set(srv_files
