@@ -777,8 +777,8 @@ bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::S
       RCLCPP_ERROR(node_logger_, "Current State: %s", current_state_stream.str().c_str());
       RCLCPP_ERROR(node_logger_, "Trajectory Start State: %s", goal_state_stream.str().c_str());
 
-      *status_ = Status::FAILED;
-      return false;
+      // *status_ = Status::FAILED;
+      // return false;
     }
   }
   catch (const std::runtime_error& e)
