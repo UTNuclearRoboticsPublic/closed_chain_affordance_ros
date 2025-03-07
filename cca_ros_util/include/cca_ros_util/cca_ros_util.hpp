@@ -17,17 +17,17 @@ namespace cca_ros_util {
 // Converts a ROS action to a cca_ros PlanningRequest
 cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_viz_msgs::msg::PlanningRequest& msg);
 
-cc_affordance_planner::UpdateMethod convert_ros_update_method_enum_to_cca(int update_method);
+cc_affordance_planner::UpdateMethod convert_ros_update_method_enum_to_cca(uint8_t update_method);
 
-cc_affordance_planner::MotionType convert_ros_motion_type_enum_to_cca(int motion_type);
+cc_affordance_planner::MotionType convert_ros_motion_type_enum_to_cca(uint8_t motion_type);
 
-affordance_util::ScrewLocationMethod convert_ros_screw_location_method_enum_to_affordance_util(int location_method);
+affordance_util::ScrewLocationMethod convert_ros_screw_location_method_enum_to_affordance_util(uint8_t location_method);
 
-affordance_util::GripperGoalType convert_ros_gripper_goal_type_enum_to_affordance_util(int gripper_goal_type);
+affordance_util::GripperGoalType convert_ros_gripper_goal_type_enum_to_affordance_util(uint8_t gripper_goal_type);
 
-affordance_util::ScrewType convert_ros_screw_type_enum_to_affordance_util(int screw_type);
+affordance_util::ScrewType convert_ros_screw_type_enum_to_affordance_util(uint8_t screw_type);
 
-affordance_util::VirtualScrewOrder convert_ros_virtual_screw_order_enum_to_affordance_util(int virtual_screw_order);
+affordance_util::VirtualScrewOrder convert_ros_virtual_screw_order_enum_to_affordance_util(uint8_t virtual_screw_order);
 
 // Function to convert cca_ros::PlanningRequest to CcaRosAction
 cca_ros_viz_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::PlanningRequest& req);
