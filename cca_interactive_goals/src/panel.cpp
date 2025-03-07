@@ -320,23 +320,31 @@ void CcaInteractiveGoals::stopClicked()
 
 void CcaInteractiveGoals::screwInfoBuilder()
 {
-  interactive_goal_interfaces::msg::ScrewInfo plan_description;
+  // interactive_goal_interfaces::msg::ScrewInfo plan_description;
+	cca_ros::PlanningRequest req;
 
-  if (mode_combo_box_->currentIndex() == 0)
+  if (mode_combo_box_->currentIndex() == 0) // Affordance Planning
   {
-    plan_description.category = 0;
+    // plan_description.category = 0;
+    req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
+
   }
   else if (mode_combo_box_->currentIndex() == 1)
   {
-    plan_description.category = 1;
+    // plan_description.category = 1;
+    req.task_description =
+    cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
   }
   else if (mode_combo_box_->currentIndex() == 2)
   {
-    plan_description.category = 2;
+    // plan_description.category = 2;
+   req.task_description =
+    cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
   }
   else if (mode_combo_box_->currentIndex() == 3)
   {
-    plan_description.category = 3;
+    // plan_description.category = 3;
+  req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::APPROACH);
   }
 
   // Determine motion type for affordance and approach motion
@@ -344,25 +352,33 @@ void CcaInteractiveGoals::screwInfoBuilder()
   {
     if (motion_type_combo_box_->currentIndex() == 1)
     {
-      plan_description.type = 0;  // Translation
+      // plan_description.type = 0;  // Translation
+      req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
+
     }
     else if (motion_type_combo_box_->currentIndex() == 2)
     {
-      plan_description.type = 1;  // Rotation
+      // plan_description.type = 1;  // Rotation
+      req.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
     }
     else if (motion_type_combo_box_->currentIndex() == 3)
     {
-      plan_description.type = 2;  // Screw Motion
+      // plan_description.type = 2;  // Screw Motion
+      req.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
+
       // Determine pitch value
       if (pitch_combo_box_->currentIndex() != 1)
       {
-        plan_description.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
+        // plan_description.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
+      req.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
+
       }
       else
       {
         try
         {
-          plan_description.pitch = std::stof(pitch_value_input_->text().toStdString());
+          // plan_description.pitch = std::stof(pitch_value_input_->text().toStdString());
+req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
         }
         catch (int)
         {
@@ -377,21 +393,27 @@ void CcaInteractiveGoals::screwInfoBuilder()
   {
     if (goal_combo_box_->currentIndex() != 1)
     {
-      if (plan_description.type == 0)
+      // if (plan_description.type == 0)
+	if (motion_type_combo_box_->currentIndex() == 1)// Translation
       {
-        plan_description.goal = std::stof(goal_combo_box_->currentText().toStdString());
+        // plan_description.goal = std::stof(goal_combo_box_->currentText().toStdString());
+	req.task_description.goal.affordance= std::stof(goal_combo_box_->currentText().toStdString());
+
         RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<plan_description.goal);
       }
-      else
+      else // Rotation or Screw
       {
-        plan_description.goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
+        // plan_description.goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
+        req.task_description.goal.affordance= M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
       }
     }
-    else
+    else 
     {
       try
       {
-        plan_description.goal = std::stof(value_input_->text().toStdString());
+        // plan_description.goal = std::stof(value_input_->text().toStdString());
+	req.task_description.goal.affordance= std::stof(value_input_->text().toStdString());
+
       }
       catch (int)
       {
@@ -399,7 +421,7 @@ void CcaInteractiveGoals::screwInfoBuilder()
       }
     }
   }
-  screw_info_publisher_->publish(plan_description);
+  // screw_info_publisher_->publish(plan_description);
 }
 
 void CcaInteractiveGoals::confirmPlaceClicked()
@@ -1113,6 +1135,16 @@ void CcaInteractiveGoals::processInvisibleMarkerFeedback(
                 feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
                 feedback->pose.orientation.w);
 
+    // Update affordance axis and location
+    Eigen::Quaterniond q(feedback->pose.orientation.w,
+			feedback->pose.orientation.x,
+			feedback->pose.orientation.y,
+			feedback->pose.orientation.z);
+    Eigen::Vector3d X_AXIS(1.0, 0.0, 0.0);//Starts as oriented along x
+    affordance_axis_ = q * X_AXIS;
+    affordance_location_ = Eigen::Vector3d(
+          feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z);
+
     // Update the marker's pose
     server_->setPose(feedback->marker_name, feedback->pose);
     server_->applyChanges();
@@ -1121,7 +1153,7 @@ void CcaInteractiveGoals::processInvisibleMarkerFeedback(
     geometry_msgs::msg::TransformStamped transform;
     transform.header.stamp = this->now();
     transform.header.frame_id = "arm0_base_link";
-    transform.child_frame_id = "approach_frame";
+    transform.child_frame_id = "approach_frame"; // NOTE: This may be wrong
     transform.transform.translation.x = feedback->pose.position.x;
     transform.transform.translation.y = feedback->pose.position.y;
     transform.transform.translation.z = feedback->pose.position.z;
