@@ -122,10 +122,7 @@ private:
         cca_action_client_; ///< Client for planning and executing with CCA
     const std::string cca_as_name_= "/cca_ros_action";
 
-void cca_action_client_goal_response_cb_(std::shared_future<GoalHandleCcaRosAction::SharedPtr> future);
-  void cca_action_client_feedback_cb_(
-    GoalHandleCcaRosAction::SharedPtr,
-    const std::shared_ptr<const CcaRosAction::Feedback> feedback);
+  void cca_action_client_goal_response_cb_(std::shared_future<GoalHandleCcaRosAction::SharedPtr> future);
   void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult & result);
 };
 
