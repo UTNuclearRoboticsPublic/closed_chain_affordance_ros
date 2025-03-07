@@ -17,6 +17,12 @@
 #include "interactive_goal_interfaces/msg/button_press.hpp"
 #include "interactive_goal_interfaces/msg/screw_info.hpp"
 #include "interactive_goal_interfaces/msg/advanced_settings.hpp"
+#include <Eigen/Dense>
+#include <cc_affordance_planner/cc_affordance_planner.hpp>
+#include <cca_ros/cca_ros.hpp>
+#include <cca_ros_util/cca_ros_util.hpp>
+#include <cca_ros_action/cca_ros_action.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 
 class QLabel;
 class QComboBox;
@@ -102,6 +108,10 @@ private:
   QComboBox* screw_order_combo_;
   QComboBox* cca_type_combo_;
   QPushButton* apply_button_;
+
+  // CCA parameters
+  Eigen::Vector3d affordance_axis_;
+  Eigen::Vector3d affordance_location_;
 
   // ROS clients
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
