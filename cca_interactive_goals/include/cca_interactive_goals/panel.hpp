@@ -23,6 +23,7 @@
 #include <cca_ros_util/cca_ros_util.hpp>
 #include <cca_ros_action/cca_ros_action.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <cca_ros_viz_msgs/action/cca_ros_action.hpp>
 
 class QLabel;
 class QComboBox;
@@ -114,8 +115,9 @@ private:
   Eigen::Vector3d affordance_location_;
 
   // ROS clients
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
+    rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
         cca_action_client_; ///< Client for planning and executing with CCA
+    const std::string cca_as_name_= "/cca_ros_action";
 };
 
 }  // namespace cca_interactive_goals
