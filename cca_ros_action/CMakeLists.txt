@@ -36,8 +36,11 @@ add_library(${PROJECT_NAME}
 # Specify ROS dependencies
 ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp rclcpp_action cca_ros cca_ros_util cca_ros_viz_msgs)
 
+# Export the library target for visibility to other ROS packages
+ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
+
 # Add executable
-add_library(${PROJECT_NAME}_node
+add_executable(${PROJECT_NAME}_node
   src/${PROJECT_NAME}_node.cpp 
 )
 
@@ -49,9 +52,6 @@ ament_target_dependencies(${PROJECT_NAME}_node PUBLIC rclcpp)
 
 # Export dependencies for downstream ROS packages
 ament_export_dependencies(rclcpp_action cca_ros cca_ros_util cca_ros_viz_msgs)
-
-# Export the library target for visibility to other ROS packages
-ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
 # Install include directory
 install(
