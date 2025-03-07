@@ -7,6 +7,8 @@ project(cca_ros_util)
 # Set C++ standard to 17
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Enable stricter warnings for GCC and Clang compilers
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
