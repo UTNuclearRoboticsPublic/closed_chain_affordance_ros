@@ -17,9 +17,15 @@ find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(interactive_goal_interfaces REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(cca_ros REQUIRED)
+find_package(cca_ros_action REQUIRED)
+find_package(cca_ros_util REQUIRED)
+find_package(cca_ros_viz_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
 
-FIND_LIBRARY(affordance_util_LIBRARIES affordance_util /usr/local/lib)
-FIND_LIBRARY(cc_affordance_planner_LIBRARIES cc_affordance_planner /usr/local/lib)
+# Non-ROS packages
+find_package(Eigen3 REQUIRED)
+find_package(cc_affordance_planner REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 
@@ -49,6 +55,8 @@ target_link_libraries(${PROJECT_NAME}
   Qt5::Widgets
   ${rviz_default_plugins_LIBRARIES}
   ${rviz_common_LIBRARIES}
+  cc_affordance_planner
+  Eigen3::Eigen
 )
 
 ament_target_dependencies(${PROJECT_NAME}
@@ -61,6 +69,10 @@ ament_target_dependencies(${PROJECT_NAME}
   tf2
   tf2_geometry_msgs
   tf2_ros
+  rclcpp_action
+  cca_ros
+  cca_ros_util
+  cca_ros_action
 )
 
 pluginlib_export_plugin_description_file(rviz_common plugin_description.xml)

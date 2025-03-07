@@ -24,6 +24,10 @@
   <depend>rviz_default_plugins</depend>
   <depend>pluginlib</depend>
   <depend>Qt5</depend>
+  <depend>cca_ros</depend>
+  <depend>cca_ros_util</depend>
+  <depend>cca_ros_viz_msgs</depend>
+  <depend>cca_ros_action</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
