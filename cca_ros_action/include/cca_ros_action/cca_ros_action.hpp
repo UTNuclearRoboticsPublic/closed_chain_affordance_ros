@@ -5,6 +5,10 @@
 #include "cca_ros_viz_msgs/action/cca_ros_action.hpp"  // Include your action definition
 #include "cca_ros/cca_ros.hpp"  // Include your CcaRos node class
 #include "cca_ros_action/visibility_control.h"
+#include <cca_ros_util/cca_ros_util.hpp>
+#include <cca_ros_viz_msgs/action/cca_ros_action.hpp>
+#include <memory>
+#include <thread>
 
 namespace cca_ros_action
 {
@@ -16,7 +20,7 @@ namespace cca_ros_action
 
         // Constructor that initializes the ROS 2 action server
 	CCA_ROS_ACTION_CPP_PUBLIC
-	explicit CcaRosActionServer(const std::string &node_name, const rclcpp::NodeOptions &node_options);
+	explicit CcaRosActionServer(const std::string& node_name, const rclcpp::NodeOptions &node_options);
 
     private:
         rclcpp_action::Server<CcaRosAction>::SharedPtr action_server_;
