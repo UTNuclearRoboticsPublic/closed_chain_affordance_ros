@@ -33,6 +33,7 @@ namespace cca_ros_action
         RCLCPP_INFO(this->get_logger(), "Received a cancel request on action server '%s'.", as_server_name_.c_str());
         (void)goal_handle;
 
+	this->cancel_execution();
         return rclcpp_action::CancelResponse::ACCEPT;
     }
 
