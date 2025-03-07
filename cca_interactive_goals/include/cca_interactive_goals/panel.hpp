@@ -121,6 +121,8 @@ private:
   // ROS clients
     rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
         cca_action_client_; ///< Client for planning and executing with CCA
+    std::shared_future<GoalHandleCcaRosAction::SharedPtr>
+        cca_action_goal_future_; ///< Goal handle future for the CCA action 
     const std::string cca_as_name_= "/cca_ros_action";
 
   void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr & goal_handle);

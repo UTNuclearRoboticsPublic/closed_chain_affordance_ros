@@ -275,6 +275,9 @@ void CcaInteractiveGoals::planVizClicked()
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planViz button pressed");
+  req_.visualize_trajectory=true;
+  req_.execute_trajectory=false;
+  this->send_cca_action_goal_();
 }
 
 void CcaInteractiveGoals::planVizExeClicked()
@@ -290,6 +293,9 @@ void CcaInteractiveGoals::planVizExeClicked()
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planVizExe button pressed");
+  req_.visualize_trajectory=true;
+  req_.execute_trajectory=true;
+  this->send_cca_action_goal_();
 }
 
 void CcaInteractiveGoals::planExeClicked()
@@ -306,6 +312,9 @@ void CcaInteractiveGoals::planExeClicked()
 
   stop_button_->setEnabled(true);
   RCLCPP_INFO(this->get_logger(), "planExe button pressed");
+  req_.visualize_trajectory=false;
+  req_.execute_trajectory=true;
+  this->send_cca_action_goal_();
 }
 
 void CcaInteractiveGoals::stopClicked()
@@ -316,6 +325,22 @@ void CcaInteractiveGoals::stopClicked()
   stop_command.plan = false;
   stop_command.visualize = false;
   stop_command.stop = true;
+
+if (cca_action_goal_future_.valid()) {
+    auto goal_handle = cca_action_goal_future_.get();  // Extracts the goal handle
+    if (goal_handle) {
+        cca_action_client_->async_cancel_goal(goal_handle);  // Cancel the goal
+    } else {
+        RCLCPP_WARN(this->get_logger(),
+            "Cannot cancel goal because it was not accepted by the server: %s", cca_as_name_.c_str());
+    }
+}
+else{
+        RCLCPP_WARN(this->get_logger(),
+            "Unable to cancel %s server goal due to the goal future being invalid ", cca_as_name_.c_str());
+}
+
+
 }
 
 void CcaInteractiveGoals::screwInfoBuilder()
@@ -1238,7 +1263,7 @@ void CcaInteractiveGoals::send_cca_action_goal_(){
       std::bind(&CcaInteractiveGoals::cca_action_client_goal_response_cb_, this, _1);
     send_goal_options.result_callback =
       std::bind(&CcaInteractiveGoals::cca_action_client_result_cb_, this, _1);
-    this->cca_action_client_->async_send_goal(goal_msg, send_goal_options);
+    cca_action_goal_future_ = this->cca_action_client_->async_send_goal(goal_msg, send_goal_options);
 }
 void CcaInteractiveGoals::cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr & goal_handle)
   {
