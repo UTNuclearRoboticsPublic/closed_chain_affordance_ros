@@ -236,7 +236,7 @@ void CcaInteractiveGoals::onInitialize()
 
   // Initialize CCA action client
   cca_action_client_ =
-      rclcpp_action::create_client<FollowJointTrajectory>(this, robot_traj_execution_as_name_);
+      rclcpp_action::create_client<CcaRosAction>(this, cca_as_name_);
 
   // Create and hide interactive markers
   createArrowInteractiveMarker();
@@ -321,30 +321,29 @@ void CcaInteractiveGoals::stopClicked()
 void CcaInteractiveGoals::screwInfoBuilder()
 {
   // interactive_goal_interfaces::msg::ScrewInfo plan_description;
-	cca_ros::PlanningRequest req;
 
   if (mode_combo_box_->currentIndex() == 0) // Affordance Planning
   {
     // plan_description.category = 0;
-    req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
+    req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
 
   }
   else if (mode_combo_box_->currentIndex() == 1)
   {
     // plan_description.category = 1;
-    req.task_description =
+    req_.task_description =
     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
   }
   else if (mode_combo_box_->currentIndex() == 2)
   {
     // plan_description.category = 2;
-   req.task_description =
+   req_.task_description =
     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
   }
   else if (mode_combo_box_->currentIndex() == 3)
   {
     // plan_description.category = 3;
-  req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::APPROACH);
+  req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::APPROACH);
   }
 
   // Determine motion type for affordance and approach motion
@@ -353,24 +352,24 @@ void CcaInteractiveGoals::screwInfoBuilder()
     if (motion_type_combo_box_->currentIndex() == 1)
     {
       // plan_description.type = 0;  // Translation
-      req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
+      req_.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
 
     }
     else if (motion_type_combo_box_->currentIndex() == 2)
     {
       // plan_description.type = 1;  // Rotation
-      req.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
+      req_.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
     }
     else if (motion_type_combo_box_->currentIndex() == 3)
     {
       // plan_description.type = 2;  // Screw Motion
-      req.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
+      req_.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
 
       // Determine pitch value
       if (pitch_combo_box_->currentIndex() != 1)
       {
         // plan_description.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
-      req.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
+      req_.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
 
       }
       else
@@ -378,7 +377,7 @@ void CcaInteractiveGoals::screwInfoBuilder()
         try
         {
           // plan_description.pitch = std::stof(pitch_value_input_->text().toStdString());
-req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
+req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
         }
         catch (int)
         {
@@ -397,14 +396,14 @@ req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text(
 	if (motion_type_combo_box_->currentIndex() == 1)// Translation
       {
         // plan_description.goal = std::stof(goal_combo_box_->currentText().toStdString());
-	req.task_description.goal.affordance= std::stof(goal_combo_box_->currentText().toStdString());
+	req_.task_description.goal.affordance= std::stof(goal_combo_box_->currentText().toStdString());
 
         RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<plan_description.goal);
       }
       else // Rotation or Screw
       {
         // plan_description.goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
-        req.task_description.goal.affordance= M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
+        req_.task_description.goal.affordance= M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
       }
     }
     else 
@@ -412,7 +411,7 @@ req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text(
       try
       {
         // plan_description.goal = std::stof(value_input_->text().toStdString());
-	req.task_description.goal.affordance= std::stof(value_input_->text().toStdString());
+	req_.task_description.goal.affordance= std::stof(value_input_->text().toStdString());
 
       }
       catch (int)
@@ -421,6 +420,7 @@ req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text(
       }
     }
   }
+
   // screw_info_publisher_->publish(plan_description);
 }
 
@@ -1221,5 +1221,50 @@ std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
 }  // namespace cca_interactive_goals
 
+void CcaInteractiveGoals::send_cca_action_goal_(){
+    // Create goal	
+    auto goal_ptr = std::make_shared<cca_ros_action::action::CcaRosAction>();
+    goal_ptr->req = req_;
+
+    if (!this->client_ptr_->wait_for_action_server()) {
+    RCLCPP_ERROR(this->get_logger(), "%s action server not available after waiting", cca_as_name_.c_str());
+    rclcpp::shutdown();
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Sending goal to %s action server."cca_as_name_.c_str());
+
+    auto send_goal_options = rclcpp_action::Client<CcaRosAction>::SendGoalOptions();
+    send_goal_options.goal_response_callback =
+      std::bind(&CcaInteractiveGoals::cca_action_client_goal_response_cb_, this, _1);
+    send_goal_options.result_callback =
+      std::bind(&CcaInteractiveGoals::cca_action_client_result_cb_, this, _1);
+    this->cca_action_client_->async_send_goal(goal_ptr, send_goal_options);
+}
+void CcaInteractiveGoals::cca_action_client_goal_response_cb_(std::shared_future<GoalHandleCcaRosAction::SharedPtr> future)
+  {
+    auto goal_handle = future.get();
+    if (!goal_handle) {
+      RCLCPP_ERROR(this->get_logger(), "Goal was rejected by action server, %s", cca_as_name_.c_str());
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Goal accepted by %s server, waiting for result", cca_as_name_.c_str());
+    }
+  }
+
+  void CcaInteractiveGoals::cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult & result)
+  {
+    switch (result.code) {
+      case rclcpp_action::ResultCode::SUCCEEDED:
+        break;
+      case rclcpp_action::ResultCode::ABORTED:
+        RCLCPP_ERROR(this->get_logger(), "Goal was aborted by %s server", cca_as_name_.c_str());
+        return;
+      case rclcpp_action::ResultCode::CANCELED:
+        RCLCPP_ERROR(this->get_logger(), "Goal was canceled by %s server", cca_as_name_.c_str());
+        return;
+      default:
+        RCLCPP_ERROR(this->get_logger(), "Unknown result code from %s server", cca_as_name_.c_str());
+        return;
+    }
+  }
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(cca_interactive_goals::CcaInteractiveGoals, rviz_common::Panel)
