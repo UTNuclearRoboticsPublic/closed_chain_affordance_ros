@@ -39,7 +39,8 @@ class CcaInteractiveGoals : public rviz_common::Panel, public rclcpp::Node
   Q_OBJECT
 public:
   using CcaRosAction = cca_ros_viz_msgs::action::CcaRosAction;
-  using GoalHandleCcaRosAction = rclcpp_action::ServerGoalHandle<CcaRosAction>;
+  using GoalHandleCcaRosAction = rclcpp_action::ClientGoalHandle<CcaRosAction>;
+
   explicit CcaInteractiveGoals(QWidget* parent = nullptr);
 
   virtual void onInitialize() override;
@@ -122,8 +123,10 @@ private:
         cca_action_client_; ///< Client for planning and executing with CCA
     const std::string cca_as_name_= "/cca_ros_action";
 
-  void cca_action_client_goal_response_cb_(std::shared_future<GoalHandleCcaRosAction::SharedPtr> future);
+  void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr & goal_handle);
   void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult & result);
+  void send_cca_action_goal_();
+
 };
 
 }  // namespace cca_interactive_goals

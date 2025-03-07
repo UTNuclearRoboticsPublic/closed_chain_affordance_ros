@@ -398,7 +398,7 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
         // plan_description.goal = std::stof(goal_combo_box_->currentText().toStdString());
 	req_.task_description.goal.affordance= std::stof(goal_combo_box_->currentText().toStdString());
 
-        RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<plan_description.goal);
+        RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<req_.task_description.goal.affordance);
       }
       else // Rotation or Screw
       {
@@ -751,7 +751,7 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     {
       for (auto& marker : control.markers)
       {
-        if (marker.id = 8)
+        if (marker.id == 8)
         {
           RCLCPP_INFO(this->get_logger(), "Arrow Located");
           arrow = control;
@@ -1219,30 +1219,29 @@ std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
 interactive_markers::MenuHandler menu_handler_;
 std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
-}  // namespace cca_interactive_goals
 
 void CcaInteractiveGoals::send_cca_action_goal_(){
     // Create goal	
-    auto goal_ptr = std::make_shared<cca_ros_action::action::CcaRosAction>();
-    goal_ptr->req = req_;
+    auto goal_msg = cca_ros_viz_msgs::action::CcaRosAction::Goal();
+    goal_msg.req = cca_ros_util::convert_req_to_cca_ros_action(req_);
 
-    if (!this->client_ptr_->wait_for_action_server()) {
+    if (!this->cca_action_client_->wait_for_action_server()) {
     RCLCPP_ERROR(this->get_logger(), "%s action server not available after waiting", cca_as_name_.c_str());
     rclcpp::shutdown();
     }
 
-    RCLCPP_INFO(this->get_logger(), "Sending goal to %s action server."cca_as_name_.c_str());
+    RCLCPP_INFO(this->get_logger(), "Sending goal to %s action server.", cca_as_name_.c_str());
 
+    using namespace std::placeholders;
     auto send_goal_options = rclcpp_action::Client<CcaRosAction>::SendGoalOptions();
     send_goal_options.goal_response_callback =
       std::bind(&CcaInteractiveGoals::cca_action_client_goal_response_cb_, this, _1);
     send_goal_options.result_callback =
       std::bind(&CcaInteractiveGoals::cca_action_client_result_cb_, this, _1);
-    this->cca_action_client_->async_send_goal(goal_ptr, send_goal_options);
+    this->cca_action_client_->async_send_goal(goal_msg, send_goal_options);
 }
-void CcaInteractiveGoals::cca_action_client_goal_response_cb_(std::shared_future<GoalHandleCcaRosAction::SharedPtr> future)
+void CcaInteractiveGoals::cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr & goal_handle)
   {
-    auto goal_handle = future.get();
     if (!goal_handle) {
       RCLCPP_ERROR(this->get_logger(), "Goal was rejected by action server, %s", cca_as_name_.c_str());
     } else {
@@ -1266,5 +1265,7 @@ void CcaInteractiveGoals::cca_action_client_goal_response_cb_(std::shared_future
         return;
     }
   }
+
+}  // namespace cca_interactive_goals
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(cca_interactive_goals::CcaInteractiveGoals, rviz_common::Panel)
