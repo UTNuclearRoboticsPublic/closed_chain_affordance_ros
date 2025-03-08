@@ -1261,6 +1261,7 @@ void CcaInteractiveGoals::send_cca_action_goal_(){
     goal_msg.req = cca_ros_util::convert_req_to_cca_ros_action(req_);
     RCLCPP_INFO_STREAM(this->get_logger(), "Axis is: "<<req_.task_description.affordance_info.axis.transpose());
     RCLCPP_INFO_STREAM(this->get_logger(), "Location is: "<<req_.task_description.affordance_info.location.transpose());
+    RCLCPP_INFO_STREAM(this->get_logger(), "EE orientation is: "<<req_.task_description.goal.ee_orientation.transpose());
 
     if (!this->cca_action_client_->wait_for_action_server()) {
     RCLCPP_ERROR(this->get_logger(), "%s action server not available after waiting", cca_as_name_.c_str());
