@@ -238,6 +238,13 @@ void CcaInteractiveGoals::onInitialize()
   cca_action_client_ =
       rclcpp_action::create_client<CcaRosAction>(this, cca_as_name_);
 
+  // Set planning request start state for testing purposes
+  const Eigen::VectorXd READY_CONFIG =
+      (Eigen::VectorXd(6) << -0.00015592575073242188, -0.8980185389518738, 1.8094338178634644, 0.000377655029296875,
+       -0.8991076946258545, 0.0015475749969482422)
+          .finished();
+  req_.start_state.robot = READY_CONFIG;
+
   // Create and hide interactive markers
   createArrowInteractiveMarker();
   createInvisibleInteractiveMarker();
@@ -447,6 +454,8 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
   }
 
   // screw_info_publisher_->publish(plan_description);
+      req_.task_description.affordance_info.axis = affordance_axis_;
+      req_.task_description.affordance_info.location = affordance_location_;
 }
 
 void CcaInteractiveGoals::confirmPlaceClicked()
@@ -1029,6 +1038,17 @@ void CcaInteractiveGoals::processArrowFeedback(
                   feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z,
                   feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
                   feedback->pose.orientation.w);
+
+      // Update affordance axis and location in the planning request
+      Eigen::Quaterniond q(feedback->pose.orientation.w,
+          		feedback->pose.orientation.x,
+          		feedback->pose.orientation.y,
+          		feedback->pose.orientation.z);
+      Eigen::Vector3d X_AXIS(1.0, 0.0, 0.0);//Starts as oriented along x
+      affordance_axis_ = q * X_AXIS;
+      affordance_location_= Eigen::Vector3d(
+            feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z);
+
       server_->setPose(feedback->marker_name, feedback->pose);
       server_->applyChanges();
       break;
@@ -1160,16 +1180,6 @@ void CcaInteractiveGoals::processInvisibleMarkerFeedback(
                 feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
                 feedback->pose.orientation.w);
 
-    // Update affordance axis and location
-    Eigen::Quaterniond q(feedback->pose.orientation.w,
-			feedback->pose.orientation.x,
-			feedback->pose.orientation.y,
-			feedback->pose.orientation.z);
-    Eigen::Vector3d X_AXIS(1.0, 0.0, 0.0);//Starts as oriented along x
-    affordance_axis_ = q * X_AXIS;
-    affordance_location_ = Eigen::Vector3d(
-          feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z);
-
     // Update the marker's pose
     server_->setPose(feedback->marker_name, feedback->pose);
     server_->applyChanges();
@@ -1249,6 +1259,8 @@ void CcaInteractiveGoals::send_cca_action_goal_(){
     // Create goal	
     auto goal_msg = cca_ros_viz_msgs::action::CcaRosAction::Goal();
     goal_msg.req = cca_ros_util::convert_req_to_cca_ros_action(req_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Axis is: "<<req_.task_description.affordance_info.axis.transpose());
+    RCLCPP_INFO_STREAM(this->get_logger(), "Location is: "<<req_.task_description.affordance_info.location.transpose());
 
     if (!this->cca_action_client_->wait_for_action_server()) {
     RCLCPP_ERROR(this->get_logger(), "%s action server not available after waiting", cca_as_name_.c_str());

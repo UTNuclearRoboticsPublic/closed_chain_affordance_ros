@@ -114,9 +114,9 @@ private:
   QPushButton* apply_button_;
 
   // CCA parameters
+  cca_ros::PlanningRequest req_;
   Eigen::Vector3d affordance_axis_;
   Eigen::Vector3d affordance_location_;
-  cca_ros::PlanningRequest req_;
 
   // ROS clients
     rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
