@@ -53,6 +53,35 @@ namespace cca_ros_action
 	// Convert the ROS message to cca_ros planning request struct
 	cca_ros::PlanningRequest req = cca_ros_util::convert_cca_ros_action_to_req(goal->req); 
 
+        RCLCPP_INFO_STREAM(this->get_logger(), "Here is the converted planning request: ");
+        RCLCPP_INFO_STREAM(this->get_logger(), "Affordance axis: "<<req.task_description.affordance_info.axis.transpose());
+        RCLCPP_INFO_STREAM(this->get_logger(), "Affordance location: "<<req.task_description.affordance_info.location.transpose());
+        RCLCPP_INFO_STREAM(this->get_logger(), "Affordance goal: "<<req.task_description.goal.affordance);
+        RCLCPP_INFO_STREAM(this->get_logger(), "Start state: "<<req.start_state.robot.transpose());
+        RCLCPP_INFO_STREAM(this->get_logger(), "Trajectory density: "<<req.task_description.trajectory_density);
+        RCLCPP_INFO_STREAM(this->get_logger(), "Accuracy: "<<req.planner_config.accuracy);
+	std::string type;
+	if (req.task_description.affordance_info.type == affordance_util::ScrewType::TRANSLATION) {
+	    type = "translation";
+	} else if (req.task_description.affordance_info.type == affordance_util::ScrewType::ROTATION) {
+	    type = "rotation";
+	} else if (req.task_description.affordance_info.type == affordance_util::ScrewType::SCREW) {
+	    type = "screw";
+	} else {
+	    type = "unset";
+	}
+
+	std::string motion_type;
+	if (req.task_description.motion_type == cc_affordance_planner::MotionType::AFFORDANCE) {
+	    motion_type = "affordance";
+	} else {
+	    motion_type = "approach";
+	}
+        RCLCPP_INFO_STREAM(this->get_logger(), "type: "<<type);
+        RCLCPP_INFO_STREAM(this->get_logger(), "motion type: "<<motion_type);
+
+			
+
         if (!this->plan_visualize_and_execute(req)) 
         {
             RCLCPP_ERROR(this->get_logger(), "Execution failed on action server '%s'.", as_server_name_.c_str());
