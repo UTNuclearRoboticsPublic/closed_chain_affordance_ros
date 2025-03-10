@@ -295,4 +295,112 @@ uint8_t convert_affordance_util_virtual_screw_order_to_ros(affordance_util::Virt
     }
 }
 
+std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest& req) {
+    std::stringstream log;
+    log << "CcaRos Planning Request:\n";
+    log << "-------------------------\n";
+
+    // Inline helper functions for enum-to-string conversions
+    auto updateMethodToString = [](cc_affordance_planner::UpdateMethod method) {
+        switch (method) {
+            case cc_affordance_planner::UpdateMethod::INVERSE: return "INVERSE";
+            case cc_affordance_planner::UpdateMethod::TRANSPOSE: return "TRANSPOSE";
+            case cc_affordance_planner::UpdateMethod::BEST: return "BEST";
+            default: return "UNKNOWN";
+        }
+    };
+
+    auto motionTypeToString = [](cc_affordance_planner::MotionType type) {
+        switch (type) {
+            case cc_affordance_planner::MotionType::APPROACH: return "APPROACH";
+            case cc_affordance_planner::MotionType::AFFORDANCE: return "AFFORDANCE";
+            default: return "UNKNOWN";
+        }
+    };
+
+    auto screwLocationMethodToString = [](affordance_util::ScrewLocationMethod method) {
+        switch (method) {
+            case affordance_util::ScrewLocationMethod::FROM_FK: return "FROM_FK";
+            case affordance_util::ScrewLocationMethod::FROM_FRAME_NAME: return "FROM_FRAME_NAME";
+            case affordance_util::ScrewLocationMethod::PROVIDED: return "PROVIDED";
+            default: return "UNKNOWN";
+        }
+    };
+
+    auto gripperGoalTypeToString = [](affordance_util::GripperGoalType type) {
+        switch (type) {
+            case affordance_util::GripperGoalType::CONTINUOUS: return "CONTINUOUS";
+            case affordance_util::GripperGoalType::CONSTANT: return "CONSTANT";
+            default: return "UNKNOWN";
+        }
+    };
+
+    auto screwTypeToString = [](affordance_util::ScrewType type) {
+        switch (type) {
+            case affordance_util::ScrewType::ROTATION: return "ROTATION";
+            case affordance_util::ScrewType::TRANSLATION: return "TRANSLATION";
+            case affordance_util::ScrewType::SCREW: return "SCREW";
+            case affordance_util::ScrewType::UNSET: return "UNSET";
+            default: return "UNKNOWN";
+        }
+    };
+
+    auto virtualScrewOrderToString = [](affordance_util::VirtualScrewOrder order) {
+        switch (order) {
+            case affordance_util::VirtualScrewOrder::XYZ: return "XYZ";
+            case affordance_util::VirtualScrewOrder::YZX: return "YZX";
+            case affordance_util::VirtualScrewOrder::ZXY: return "ZXY";
+            case affordance_util::VirtualScrewOrder::XY: return "XY";
+            case affordance_util::VirtualScrewOrder::YZ: return "YZ";
+            case affordance_util::VirtualScrewOrder::ZX: return "ZX";
+            case affordance_util::VirtualScrewOrder::NONE: return "NONE";
+            default: return "UNKNOWN";
+        }
+    };
+
+    // Planner Config
+    log << "Planner Config:\n";
+    log << "  Accuracy: " << req.planner_config.accuracy << "\n";
+    log << "  Closure error threshold (angular): " << req.planner_config.closure_err_threshold_ang << "\n";
+    log << "  Closure error threshold (linear): " << req.planner_config.closure_err_threshold_lin << "\n";
+    log << "  IK max iterations: " << req.planner_config.ik_max_itr << "\n";
+    log << "  Update method: " << updateMethodToString(req.planner_config.update_method) << "\n";
+
+    // Task Description - Affordance Info
+    log << "Task Description - Affordance Info:\n";
+    log << "  Type: " << screwTypeToString(req.task_description.affordance_info.type) << "\n";
+    log << "  Axis: " << req.task_description.affordance_info.axis.transpose() << "\n";
+    log << "  Location: " << req.task_description.affordance_info.location.transpose() << "\n";
+    log << "  Screw: " << req.task_description.affordance_info.screw.transpose() << "\n";
+    log << "  Location Frame: " << req.task_description.affordance_info.location_frame << "\n";
+    log << "  Pitch: " << req.task_description.affordance_info.pitch << "\n";
+    log << "  Location Method: " << screwLocationMethodToString(req.task_description.affordance_info.location_method) << "\n";
+
+    // Task Description - Goal
+    log << "Task Description - Goal:\n";
+    log << "  Affordance: " << req.task_description.goal.affordance << "\n";
+    log << "  EE Orientation: " << req.task_description.goal.ee_orientation.transpose() << "\n";
+    log << "  Grasp Pose:\n" << req.task_description.goal.grasp_pose << "\n";
+    log << "  Gripper: " << req.task_description.goal.gripper << "\n";
+
+    // Task Description - Other Fields
+    log << "  Trajectory Density: " << req.task_description.trajectory_density << "\n";
+    log << "  Motion Type: " << motionTypeToString(req.task_description.motion_type) << "\n";
+    log << "  Virtual Screw Order: " << virtualScrewOrderToString(req.task_description.vir_screw_order) << "\n";
+    log << "  Gripper Goal Type: " << gripperGoalTypeToString(req.task_description.gripper_goal_type) << "\n";
+
+    // Start State
+    log << "Start State:\n";
+    log << "  Robot: " << req.start_state.robot.transpose() << "\n";
+    log << "  Gripper: " << req.start_state.gripper << "\n";
+
+    // Execution Options
+    log << "Execution Options:\n";
+    log << "  Visualize Trajectory: " << std::boolalpha << req.visualize_trajectory << "\n";
+    log << "  Execute Trajectory: " << std::boolalpha << req.execute_trajectory << "\n";
+    log << "-------------------------\n";
+
+    return log;
+}
+
 }

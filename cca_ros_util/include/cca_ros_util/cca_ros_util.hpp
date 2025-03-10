@@ -39,6 +39,7 @@ uint8_t convert_affordance_util_screw_location_method_to_ros(affordance_util::Sc
 uint8_t convert_affordance_util_gripper_goal_type_to_ros(affordance_util::GripperGoalType gripper_goal_type);
 uint8_t convert_affordance_util_screw_type_to_ros(affordance_util::ScrewType screw_type);
 uint8_t convert_affordance_util_virtual_screw_order_to_ros(affordance_util::VirtualScrewOrder virtual_screw_order);
+std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest& req);
 
 } // namespace cca_ros_util
 
