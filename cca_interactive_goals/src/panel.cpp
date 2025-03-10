@@ -141,8 +141,18 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
 
   // Dropdown menus
   screw_order_combo_ = new QComboBox();
-  QStringList screw_options = { "XYZ", "YZX", "ZXY", "XY", "YZ", "ZX" };
+
+  // Create a QStringList from screw_order_map_
+  QStringList screw_options;
+  for (const auto& pair : screw_order_map_) {
+      screw_options.append(pair.first); 
+  }
+
+  // Add the screw options to the QComboBox
   screw_order_combo_->addItems(screw_options);
+
+  // Set XYZ as default option for screw order
+  screw_order_combo_->setCurrentText(QString("XYZ"));
 
   cca_type_combo_ = new QComboBox();
   cca_type_combo_->addItems({ "Affordance Control", "Affordance and EE Control" });
@@ -393,6 +403,13 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
     req_.task_description.affordance_info.axis = affordance_axis_;
     req_.task_description.affordance_info.location = affordance_location_;
 }
+
+// The following two parameters come from advanced settings
+    if (trajectory_density_->text().toInt() != 0) {
+        req_.task_description.trajectory_density = trajectory_density_->text().toInt();
+    }
+
+    req_.task_description.vir_screw_order = screw_order_map_.at(screw_order_combo_->currentText());
 
 }
 
@@ -799,70 +816,24 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 
 void CcaInteractiveGoals::applySettingsClicked()
 {
+    if (accuracy_->text().toFloat() != 0) {
+        req_.planner_config.accuracy = accuracy_->text().toFloat();
+    }
 
-  bool conversion_ok = true;
+    if (closure_angle_->text().toFloat() != 0) {
+        req_.planner_config.closure_err_threshold_ang = closure_angle_->text().toFloat();
+    }
 
-  // Convert float values with error checking
-  // settings.accuracy = accuracy_->text().toFloat(&conversion_ok);
-  if (!conversion_ok)
-  {
-    RCLCPP_ERROR(this->get_logger(), "Invalid float value in Accuracy field");
-    // settings.change_accuracy = false;
-  }
-  else
-  {
-    // settings.change_accuracy = true;
-  }
+    if (closure_linear_->text().toFloat() != 0) {
+        req_.planner_config.closure_err_threshold_lin = closure_linear_->text().toFloat();
+    }
 
-  // settings.closure_err_threshold_ang = closure_angle_->text().toFloat(&conversion_ok);
-  if (!conversion_ok)
-  {
-    RCLCPP_ERROR(this->get_logger(), "Invalid float value in Closure Angle field");
-    // settings.change_close_ang = false;
-  }
-  else
-  {
-    // settings.change_close_ang = true;
-  }
+    if (ik_iterations_->text().toInt() != 0) {
+        req_.planner_config.ik_max_itr = ik_iterations_->text().toInt();
+    }
 
-  // settings.closure_err_threshold_lin = closure_linear_->text().toFloat(&conversion_ok);
-  if (!conversion_ok)
-  {
-    RCLCPP_ERROR(this->get_logger(), "Invalid float value in Closure Linear field");
-    // settings.change_close_lin = false;
-  }
-  else
-  {
-    // settings.change_close_lin = true;
-  }
 
-  // Convert integer values with error checking
-  // settings.ik_max_itr = ik_iterations_->text().toInt(&conversion_ok);
-  if (!conversion_ok)
-  {
-    RCLCPP_ERROR(this->get_logger(), "Invalid integer value in IK Iterations field");
-    // settings.change_ik = false;
-  }
-  else
-  {
-    // settings.change_ik = true;
-  }
-
-  // settings.trajectory_density = trajectory_density_->text().toInt(&conversion_ok);
-  if (!conversion_ok)
-  {
-    RCLCPP_ERROR(this->get_logger(), "Invalid integer value in Trajectory Density field");
-    // settings.change_trajectory = false;
-  }
-  else
-  {
-    // settings.change_trajectory = true;
-  }
-
-  // settings.virtual_screw_order = screw_order_combo_->currentIndex();
-  // settings.cca_type = cca_type_combo_->currentIndex();
-
-  RCLCPP_INFO(this->get_logger(), "Advanced Settings Modified");
+    RCLCPP_INFO(this->get_logger(), "Advanced Settings Modified");
 }
 
 void CcaInteractiveGoals::updateUIState()

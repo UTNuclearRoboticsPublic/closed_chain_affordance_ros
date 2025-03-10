@@ -123,6 +123,16 @@ private:
   QComboBox* cca_type_combo_;
   QPushButton* apply_button_;
 
+  const std::map<QString, affordance_util::VirtualScrewOrder> screw_order_map_ = {
+    { QString("NONE"), affordance_util::VirtualScrewOrder::NONE },
+    { QString("YZX"), affordance_util::VirtualScrewOrder::YZX },
+    { QString("ZXY"), affordance_util::VirtualScrewOrder::ZXY },
+    { QString("XY"), affordance_util::VirtualScrewOrder::XY },
+    { QString("YZ"), affordance_util::VirtualScrewOrder::YZ },
+    { QString("ZX"), affordance_util::VirtualScrewOrder::ZX },
+    { QString("XYZ"), affordance_util::VirtualScrewOrder::XYZ }
+  };// virtual screw order to Qstring map for the advanced settings menu
+
   // CCA parameters
   cca_ros::PlanningRequest req_;
   Eigen::Vector3d affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
