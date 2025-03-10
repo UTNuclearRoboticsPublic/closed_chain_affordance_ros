@@ -967,18 +967,19 @@ void CcaInteractiveGoals::createArrowInteractiveMarker()
   int_marker.header.frame_id = "arm0_base_link";
   int_marker.name = "arrow_marker";
   int_marker.description = "";
-  int_marker.scale = 1.0;
+  const double arrow_scale = 0.25;
+  int_marker.scale = arrow_scale;
 
   // Create arrow marker
   visualization_msgs::msg::Marker arrow;
   arrow.ns = "interactive_goals";
   arrow.type = visualization_msgs::msg::Marker::ARROW;
-  arrow.scale.x = 1.0;
-  arrow.scale.y = 0.1;
-  arrow.scale.z = 0.1;
-  arrow.color.r = 0.5;
-  arrow.color.g = 0.5;
-  arrow.color.b = 0.5;
+  arrow.scale.x = arrow_scale;
+  arrow.scale.y = arrow_scale/10.0;
+  arrow.scale.z = arrow_scale/10.0;
+  arrow.color.r = 0.251;
+  arrow.color.g = 0.878;
+  arrow.color.b = 0.816;
   arrow.color.a = 1.0;
   arrow.id = 8;
 
@@ -1305,5 +1306,9 @@ void CcaInteractiveGoals::cca_action_client_goal_response_cb_(const GoalHandleCc
   }
 
 }  // namespace cca_interactive_goals
+//TODO: get marker frame id from outside to make this robot-agnostic
+//TODO: EE orientation issue. Right now it is set to size 3 and 0 even in Affordance Control.
+//TODO: Log full planning request on the action server side for debugging ease
+//TODO: What about the TF issue? Do we need to publish TF in this code?
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(cca_interactive_goals::CcaInteractiveGoals, rviz_common::Panel)
