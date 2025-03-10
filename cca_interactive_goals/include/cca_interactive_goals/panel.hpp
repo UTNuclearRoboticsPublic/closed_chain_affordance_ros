@@ -1,28 +1,46 @@
 #ifndef RVIZ_UI_PANEL_PANEL_HPP_
 #define RVIZ_UI_PANEL_PANEL_HPP_
 
-#include <rclcpp/rclcpp.hpp>
-#include <rviz_common/panel.hpp>
+//CPP headers
 #include <memory>
-#include <interactive_markers/interactive_marker_server.hpp>
-#include <visualization_msgs/msg/interactive_marker.hpp>
-#include <visualization_msgs/msg/interactive_marker_control.hpp>
-#include <visualization_msgs/msg/marker.hpp>
+#include <vector>
+#include <string>
+#include <Eigen/Dense>
+
+//CCA headers
+#include <cc_affordance_planner/cc_affordance_planner.hpp>
+#include <cca_ros/cca_ros.hpp>
+#include <cca_ros_util/cca_ros_util.hpp>
+#include <cca_ros_action/cca_ros_action.hpp>
+#include <cca_ros_viz_msgs/action/cca_ros_action.hpp>
+
+//ROS headers
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 #include "tf2/LinearMath/Transform.h"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Vector3.h"
 #include "tf2/transform_datatypes.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include <rviz_common/panel.hpp>
+#include <interactive_markers/interactive_marker_server.hpp>
+#include <interactive_markers/menu_handler.hpp>
+#include <visualization_msgs/msg/interactive_marker.hpp>
+#include <visualization_msgs/msg/interactive_marker_control.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <std_msgs/msg/color_rgba.hpp>
 #include "interactive_goal_interfaces/msg/button_press.hpp"
 #include "interactive_goal_interfaces/msg/screw_info.hpp"
 #include "interactive_goal_interfaces/msg/advanced_settings.hpp"
-#include <Eigen/Dense>
-#include <cc_affordance_planner/cc_affordance_planner.hpp>
-#include <cca_ros/cca_ros.hpp>
-#include <cca_ros_util/cca_ros_util.hpp>
-#include <cca_ros_action/cca_ros_action.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
-#include <cca_ros_viz_msgs/action/cca_ros_action.hpp>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QComboBox>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QString>
+#include <QTimer>
+#include <QFormLayout>
 
 class QLabel;
 class QComboBox;
@@ -75,7 +93,7 @@ private:
   void updateUIState();
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-
+  interactive_markers::MenuHandler menu_handler_;
   rclcpp::Publisher<interactive_goal_interfaces::msg::ScrewInfo>::SharedPtr screw_info_publisher_;
   rclcpp::Publisher<interactive_goal_interfaces::msg::ButtonPress>::SharedPtr button_press_publisher_;
   rclcpp::Publisher<interactive_goal_interfaces::msg::AdvancedSettings>::SharedPtr settings_publisher_;

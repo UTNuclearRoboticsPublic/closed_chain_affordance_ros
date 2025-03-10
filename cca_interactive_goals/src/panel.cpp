@@ -1,26 +1,5 @@
 #include "cca_interactive_goals/panel.hpp"
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QComboBox>
-#include <QPushButton>
-#include <QLineEdit>
-#include <QString>
-#include <QTimer>
-#include <QFormLayout>
-#include <vector>
-#include <string>
-
-#include <memory>
-#include <rclcpp/rclcpp.hpp>
-#include <interactive_markers/interactive_marker_server.hpp>
-#include <interactive_markers/menu_handler.hpp>
-#include <visualization_msgs/msg/interactive_marker.hpp>
-#include <visualization_msgs/msg/interactive_marker_control.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-#include <std_msgs/msg/color_rgba.hpp>
-
 namespace cca_interactive_goals
 {
 
@@ -1244,10 +1223,6 @@ void CcaInteractiveGoals::spin()
 {
   rclcpp::spin_some(this->get_node_base_interface());
 }
-
-std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-interactive_markers::MenuHandler menu_handler_;
-
 
 void CcaInteractiveGoals::send_cca_action_goal_(){
     // Create goal	
