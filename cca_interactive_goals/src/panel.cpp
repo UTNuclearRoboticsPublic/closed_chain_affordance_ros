@@ -454,8 +454,16 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
   }
 
   // screw_info_publisher_->publish(plan_description);
-      req_.task_description.affordance_info.axis = affordance_axis_;
-      req_.task_description.affordance_info.location = affordance_location_;
+  if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
+    RCLCPP_WARN(this->get_logger(),
+                 "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
+    req_.task_description.affordance_info.axis = default_affordance_axis_;
+    req_.task_description.affordance_info.location = default_affordance_location_;
+} else {
+    req_.task_description.affordance_info.axis = affordance_axis_;
+    req_.task_description.affordance_info.location = affordance_location_;
+}
+
 }
 
 void CcaInteractiveGoals::confirmPlaceClicked()
@@ -967,7 +975,7 @@ void CcaInteractiveGoals::createArrowInteractiveMarker()
   int_marker.header.frame_id = "arm0_base_link";
   int_marker.name = "arrow_marker";
   int_marker.description = "";
-  const double arrow_scale = 0.25;
+  const double arrow_scale = 0.5;
   int_marker.scale = arrow_scale;
 
   // Create arrow marker
