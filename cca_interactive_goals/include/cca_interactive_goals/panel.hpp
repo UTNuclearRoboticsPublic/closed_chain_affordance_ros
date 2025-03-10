@@ -13,7 +13,6 @@
 #include "tf2/LinearMath/Vector3.h"
 #include "tf2/transform_datatypes.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2_ros/transform_broadcaster.h"
 #include "interactive_goal_interfaces/msg/button_press.hpp"
 #include "interactive_goal_interfaces/msg/screw_info.hpp"
 #include "interactive_goal_interfaces/msg/advanced_settings.hpp"
@@ -76,7 +75,6 @@ private:
   void updateUIState();
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Publisher<interactive_goal_interfaces::msg::ScrewInfo>::SharedPtr screw_info_publisher_;
   rclcpp::Publisher<interactive_goal_interfaces::msg::ButtonPress>::SharedPtr button_press_publisher_;

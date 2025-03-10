@@ -226,8 +226,6 @@ void CcaInteractiveGoals::onInitialize()
       "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
       this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-
   screw_info_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ScrewInfo>("/screw_info", 10);
 
   button_press_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ButtonPress>("/button_press", 10);
@@ -1192,18 +1190,6 @@ void CcaInteractiveGoals::processInvisibleMarkerFeedback(
     // Update the marker's pose
     server_->setPose(feedback->marker_name, feedback->pose);
     server_->applyChanges();
-
-    // Publish TF frame
-    geometry_msgs::msg::TransformStamped transform;
-    transform.header.stamp = this->now();
-    transform.header.frame_id = "arm0_base_link";
-    transform.child_frame_id = "approach_frame"; // NOTE: This may be wrong
-    transform.transform.translation.x = feedback->pose.position.x;
-    transform.transform.translation.y = feedback->pose.position.y;
-    transform.transform.translation.z = feedback->pose.position.z;
-    transform.transform.rotation = feedback->pose.orientation;
-
-    tf_broadcaster_->sendTransform(transform);
   }
 }
 
@@ -1261,7 +1247,6 @@ void CcaInteractiveGoals::spin()
 
 std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
 interactive_markers::MenuHandler menu_handler_;
-std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
 
 void CcaInteractiveGoals::send_cca_action_goal_(){
@@ -1315,8 +1300,5 @@ void CcaInteractiveGoals::cca_action_client_goal_response_cb_(const GoalHandleCc
 
 }  // namespace cca_interactive_goals
 //TODO: get marker frame id from outside to make this robot-agnostic
-//TODO: EE orientation issue. Right now it is set to size 3 and 0 even in Affordance Control.
-//TODO: Log full planning request on the action server side for debugging ease
-//TODO: What about the TF issue? Do we need to publish TF in this code?
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(cca_interactive_goals::CcaInteractiveGoals, rviz_common::Panel)

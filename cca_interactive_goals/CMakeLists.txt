@@ -11,7 +11,6 @@ find_package(interactive_markers REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(tf2_ros REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
@@ -68,7 +67,6 @@ ament_target_dependencies(${PROJECT_NAME}
   interactive_goal_interfaces
   tf2
   tf2_geometry_msgs
-  tf2_ros
   rclcpp_action
   cca_ros
   cca_ros_util
