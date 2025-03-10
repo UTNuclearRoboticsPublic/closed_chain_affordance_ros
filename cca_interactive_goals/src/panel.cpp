@@ -941,11 +941,6 @@ void CcaInteractiveGoals::processArrowFeedback(
   switch (feedback->event_type)
   {
     case visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE:
-      RCLCPP_INFO(this->get_logger(),
-                  "Arrow marker moved to position (%.2f, %.2f, %.2f) and orientation(%.2f, %.2f, %.2f, %.2f)",
-                  feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z,
-                  feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
-                  feedback->pose.orientation.w);
 
       // Update affordance axis and location in the planning request
       Eigen::Quaterniond q(feedback->pose.orientation.w,
