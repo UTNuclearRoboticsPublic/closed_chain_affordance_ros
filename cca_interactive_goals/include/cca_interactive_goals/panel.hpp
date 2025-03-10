@@ -29,9 +29,6 @@
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
-#include "interactive_goal_interfaces/msg/button_press.hpp"
-#include "interactive_goal_interfaces/msg/screw_info.hpp"
-#include "interactive_goal_interfaces/msg/advanced_settings.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -94,9 +91,6 @@ private:
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
   interactive_markers::MenuHandler menu_handler_;
-  rclcpp::Publisher<interactive_goal_interfaces::msg::ScrewInfo>::SharedPtr screw_info_publisher_;
-  rclcpp::Publisher<interactive_goal_interfaces::msg::ButtonPress>::SharedPtr button_press_publisher_;
-  rclcpp::Publisher<interactive_goal_interfaces::msg::AdvancedSettings>::SharedPtr settings_publisher_;
 
   QComboBox* mode_combo_box_;
   QComboBox* motion_type_combo_box_;

@@ -15,7 +15,6 @@ find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
-find_package(interactive_goal_interfaces REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(cca_ros REQUIRED)
 find_package(cca_ros_action REQUIRED)
@@ -64,7 +63,6 @@ ament_target_dependencies(${PROJECT_NAME}
   rviz_rendering
   rviz_default_plugins
   interactive_markers
-  interactive_goal_interfaces
   tf2
   tf2_geometry_msgs
   rclcpp_action

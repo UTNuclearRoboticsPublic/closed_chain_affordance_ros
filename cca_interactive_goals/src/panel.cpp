@@ -205,12 +205,6 @@ void CcaInteractiveGoals::onInitialize()
       "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
       this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-  screw_info_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ScrewInfo>("/screw_info", 10);
-
-  button_press_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::ButtonPress>("/button_press", 10);
-
-  settings_publisher_ = this->create_publisher<interactive_goal_interfaces::msg::AdvancedSettings>("/settings", 10);
-
   // Initialize CCA action client
   cca_action_client_ =
       rclcpp_action::create_client<CcaRosAction>(this, cca_as_name_);
@@ -249,13 +243,7 @@ void CcaInteractiveGoals::save(rviz_common::Config config) const
 void CcaInteractiveGoals::planVizClicked()
 {
   // Handle plan viz button click
-  interactive_goal_interfaces::msg::ButtonPress buttons;
-  buttons.execute = false;
-  buttons.plan = true;
-  buttons.visualize = true;
-  buttons.stop = false;
   screwInfoBuilder();
-  button_press_publisher_->publish(buttons);
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planViz button pressed");
@@ -267,13 +255,7 @@ void CcaInteractiveGoals::planVizClicked()
 void CcaInteractiveGoals::planVizExeClicked()
 {
   // Handle plan viz execute button click
-  interactive_goal_interfaces::msg::ButtonPress buttons;
-  buttons.execute = true;
-  buttons.plan = true;
-  buttons.visualize = true;
-  buttons.stop = false;
   screwInfoBuilder();
-  button_press_publisher_->publish(buttons);
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planVizExe button pressed");
@@ -285,16 +267,9 @@ void CcaInteractiveGoals::planVizExeClicked()
 void CcaInteractiveGoals::planExeClicked()
 {
   // Handle plan execute button click
-  interactive_goal_interfaces::msg::ScrewInfo screw;
-  interactive_goal_interfaces::msg::ButtonPress buttons;
-  buttons.execute = false;
-  buttons.plan = true;
-  buttons.visualize = false;
-  buttons.stop = false;
   screwInfoBuilder();
-  button_press_publisher_->publish(buttons);
-
   stop_button_->setEnabled(true);
+
   RCLCPP_INFO(this->get_logger(), "planExe button pressed");
   req_.visualize_trajectory=false;
   req_.execute_trajectory=true;
@@ -303,13 +278,6 @@ void CcaInteractiveGoals::planExeClicked()
 
 void CcaInteractiveGoals::stopClicked()
 {
-  // Handle stop button click
-  interactive_goal_interfaces::msg::ButtonPress stop_command;
-  stop_command.execute = false;
-  stop_command.plan = false;
-  stop_command.visualize = false;
-  stop_command.stop = true;
-
 if (cca_action_goal_future_.valid()) {
     auto goal_handle = cca_action_goal_future_.get();  // Extracts the goal handle
     if (goal_handle) {
@@ -329,29 +297,24 @@ else{
 
 void CcaInteractiveGoals::screwInfoBuilder()
 {
-  // interactive_goal_interfaces::msg::ScrewInfo plan_description;
 
   if (mode_combo_box_->currentIndex() == 0) // Affordance Planning
   {
-    // plan_description.category = 0;
     req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
 
   }
   else if (mode_combo_box_->currentIndex() == 1)
   {
-    // plan_description.category = 1;
     req_.task_description =
     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
   }
   else if (mode_combo_box_->currentIndex() == 2)
   {
-    // plan_description.category = 2;
    req_.task_description =
     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
   }
   else if (mode_combo_box_->currentIndex() == 3)
   {
-    // plan_description.category = 3;
   req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::APPROACH);
   }
 
@@ -360,24 +323,20 @@ void CcaInteractiveGoals::screwInfoBuilder()
   {
     if (motion_type_combo_box_->currentIndex() == 1)
     {
-      // plan_description.type = 0;  // Translation
       req_.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
 
     }
     else if (motion_type_combo_box_->currentIndex() == 2)
     {
-      // plan_description.type = 1;  // Rotation
       req_.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
     }
     else if (motion_type_combo_box_->currentIndex() == 3)
     {
-      // plan_description.type = 2;  // Screw Motion
       req_.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
 
       // Determine pitch value
       if (pitch_combo_box_->currentIndex() != 1)
       {
-        // plan_description.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
       req_.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
 
       }
@@ -385,7 +344,6 @@ void CcaInteractiveGoals::screwInfoBuilder()
       {
         try
         {
-          // plan_description.pitch = std::stof(pitch_value_input_->text().toStdString());
 req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
         }
         catch (int)
@@ -401,17 +359,14 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
   {
     if (goal_combo_box_->currentIndex() != 1)
     {
-      // if (plan_description.type == 0)
 	if (motion_type_combo_box_->currentIndex() == 1)// Translation
       {
-        // plan_description.goal = std::stof(goal_combo_box_->currentText().toStdString());
 	req_.task_description.goal.affordance= std::stof(goal_combo_box_->currentText().toStdString());
 
         RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<req_.task_description.goal.affordance);
       }
       else // Rotation or Screw
       {
-        // plan_description.goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
         req_.task_description.goal.affordance= M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
       }
     }
@@ -419,7 +374,6 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
     {
       try
       {
-        // plan_description.goal = std::stof(value_input_->text().toStdString());
 	req_.task_description.goal.affordance= std::stof(value_input_->text().toStdString());
 
       }
@@ -430,7 +384,6 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
     }
   }
 
-  // screw_info_publisher_->publish(plan_description);
   if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
     RCLCPP_WARN(this->get_logger(),
                  "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
@@ -846,72 +799,70 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 
 void CcaInteractiveGoals::applySettingsClicked()
 {
-  interactive_goal_interfaces::msg::AdvancedSettings settings;
 
   bool conversion_ok = true;
 
   // Convert float values with error checking
-  settings.accuracy = accuracy_->text().toFloat(&conversion_ok);
+  // settings.accuracy = accuracy_->text().toFloat(&conversion_ok);
   if (!conversion_ok)
   {
     RCLCPP_ERROR(this->get_logger(), "Invalid float value in Accuracy field");
-    settings.change_accuracy = false;
+    // settings.change_accuracy = false;
   }
   else
   {
-    settings.change_accuracy = true;
+    // settings.change_accuracy = true;
   }
 
-  settings.closure_err_threshold_ang = closure_angle_->text().toFloat(&conversion_ok);
+  // settings.closure_err_threshold_ang = closure_angle_->text().toFloat(&conversion_ok);
   if (!conversion_ok)
   {
     RCLCPP_ERROR(this->get_logger(), "Invalid float value in Closure Angle field");
-    settings.change_close_ang = false;
+    // settings.change_close_ang = false;
   }
   else
   {
-    settings.change_close_ang = true;
+    // settings.change_close_ang = true;
   }
 
-  settings.closure_err_threshold_lin = closure_linear_->text().toFloat(&conversion_ok);
+  // settings.closure_err_threshold_lin = closure_linear_->text().toFloat(&conversion_ok);
   if (!conversion_ok)
   {
     RCLCPP_ERROR(this->get_logger(), "Invalid float value in Closure Linear field");
-    settings.change_close_lin = false;
+    // settings.change_close_lin = false;
   }
   else
   {
-    settings.change_close_lin = true;
+    // settings.change_close_lin = true;
   }
 
   // Convert integer values with error checking
-  settings.ik_max_itr = ik_iterations_->text().toInt(&conversion_ok);
+  // settings.ik_max_itr = ik_iterations_->text().toInt(&conversion_ok);
   if (!conversion_ok)
   {
     RCLCPP_ERROR(this->get_logger(), "Invalid integer value in IK Iterations field");
-    settings.change_ik = false;
+    // settings.change_ik = false;
   }
   else
   {
-    settings.change_ik = true;
+    // settings.change_ik = true;
   }
 
-  settings.trajectory_density = trajectory_density_->text().toInt(&conversion_ok);
+  // settings.trajectory_density = trajectory_density_->text().toInt(&conversion_ok);
   if (!conversion_ok)
   {
     RCLCPP_ERROR(this->get_logger(), "Invalid integer value in Trajectory Density field");
-    settings.change_trajectory = false;
+    // settings.change_trajectory = false;
   }
   else
   {
-    settings.change_trajectory = true;
+    // settings.change_trajectory = true;
   }
 
-  settings.virtual_screw_order = screw_order_combo_->currentIndex();
-  settings.cca_type = cca_type_combo_->currentIndex();
+  // settings.virtual_screw_order = screw_order_combo_->currentIndex();
+  // settings.cca_type = cca_type_combo_->currentIndex();
 
   RCLCPP_INFO(this->get_logger(), "Advanced Settings Modified");
-  settings_publisher_->publish(settings);
 }
 
 void CcaInteractiveGoals::updateUIState()
