@@ -32,7 +32,7 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_viz_msgs::m
 
     // Copy additional task description fields
     req.task_description.goal.affordance = msg.task_description.goal.affordance;
-    req.task_description.goal.ee_orientation = Eigen::VectorXd::Map(msg.task_description.goal.ee_orientation.data(), 3);
+    req.task_description.goal.ee_orientation = Eigen::VectorXd::Map(msg.task_description.goal.ee_orientation.data(), msg.task_description.goal.ee_orientation.size());
     req.task_description.goal.grasp_pose = Eigen::MatrixXd::Map(msg.task_description.goal.grasp_pose.data(), 4, 4);  // Assuming 4x4 grasp pose
     req.task_description.goal.gripper = msg.task_description.goal.gripper;
 

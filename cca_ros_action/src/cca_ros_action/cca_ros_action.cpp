@@ -60,7 +60,7 @@ namespace cca_ros_action
         RCLCPP_INFO_STREAM(this->get_logger(), "Start state: "<<req.start_state.robot.transpose());
         RCLCPP_INFO_STREAM(this->get_logger(), "Trajectory density: "<<req.task_description.trajectory_density);
         RCLCPP_INFO_STREAM(this->get_logger(), "Accuracy: "<<req.planner_config.accuracy);
-	req.task_description.goal.ee_orientation.conservativeResize(0); 
+	// req.task_description.goal.ee_orientation.conservativeResize(0); 
 	
         RCLCPP_INFO_STREAM(this->get_logger(), "EE orientation: "<<req.task_description.goal.ee_orientation.transpose());
 	std::string type;
