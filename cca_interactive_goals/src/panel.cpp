@@ -716,6 +716,7 @@ void CcaInteractiveGoals::pitchSelected(int index)
 
 void CcaInteractiveGoals::axisOptionSelected(int index)
 {
+          RCLCPP_INFO(this->get_logger(), "Arrow index is: %i", index);
   if (index != 0)
   {
     goal_label_->setVisible(true);
@@ -733,84 +734,69 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 
   visualization_msgs::msg::InteractiveMarker int_marker;
   server_->get("arrow_marker", int_marker);
-  visualization_msgs::msg::InteractiveMarkerControl arrow;
+  // visualization_msgs::msg::InteractiveMarkerControl arrow;
   for (auto& control : int_marker.controls)
+{
+  if (!control.markers.empty())
   {
-    if (!control.markers.empty())
+    for (auto& marker : control.markers)
     {
-      for (auto& marker : control.markers)
+      if (marker.id == 8) // Found the arrow marker
       {
-        if (marker.id == 8)
+        RCLCPP_INFO(this->get_logger(), "Arrow Located");
+
+        // Set the new orientation of the arrow marker
+        if (index == 2)
         {
-          RCLCPP_INFO(this->get_logger(), "Arrow Located");
-          arrow = control;
+          marker.pose.orientation.w = 1;
+          marker.pose.orientation.x = 0;
+          marker.pose.orientation.y = 0;
+          marker.pose.orientation.z = 0;
+        }
+        else if (index == 3)
+        {
+          marker.pose.orientation.w = 0.707;
+          marker.pose.orientation.x = 0;
+          marker.pose.orientation.y = 0;
+          marker.pose.orientation.z = 0.707;
+        }
+        else if (index == 4)
+        {
+          marker.pose.orientation.w = 0.707;
+          marker.pose.orientation.x = 0;
+          marker.pose.orientation.y = -0.707;
+          marker.pose.orientation.z = 0;
+        }
+        else if (index == 5)
+        {
+          marker.pose.orientation.w = 0;
+          marker.pose.orientation.x = 0;
+          marker.pose.orientation.y = 0;
+          marker.pose.orientation.z = 1;
+        }
+        else if (index == 6)
+        {
+          marker.pose.orientation.w = 0.707;
+          marker.pose.orientation.x = 0;
+          marker.pose.orientation.y = 0;
+          marker.pose.orientation.z = -0.707;
+        }
+        else if (index == 7)
+        {
+          marker.pose.orientation.w = 0.707;
+          marker.pose.orientation.x = 0;
+          marker.pose.orientation.y = 0.707;
+          marker.pose.orientation.z = 0;
         }
       }
     }
   }
-  if (index == 1)
-  {
-  }
-  else if (index == 2)
-  {
-    arrow.orientation.w = 1;
-    arrow.orientation.x = 0;
-    arrow.orientation.y = 0;
-    arrow.orientation.z = 0;
+}
 
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
-  else if (index == 3)
-  {
-    arrow.orientation.w = 0.707;
-    arrow.orientation.x = 0;
-    arrow.orientation.y = 0;
-    arrow.orientation.z = 0.707;
+// Update the interactive marker with the new arrow orientation
+server_->insert(int_marker);
+server_->applyChanges();
 
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
-  else if (index == 4)
-  {
-    arrow.orientation.w = 0.707;
-    arrow.orientation.x = 0;
-    arrow.orientation.y = -0.707;
-    arrow.orientation.z = 0;
-
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
-  else if (index == 5)
-  {
-    arrow.orientation.w = 0;
-    arrow.orientation.x = 0;
-    arrow.orientation.y = 0;
-    arrow.orientation.z = 1;
-
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
-  else if (index == 6)
-  {
-    arrow.orientation.w = 0.707;
-    arrow.orientation.x = 0;
-    arrow.orientation.y = 0;
-    arrow.orientation.z = -0.707;
-
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
-  else if (index == 7)
-  {
-    arrow.orientation.w = 0.707;
-    arrow.orientation.x = 0;
-    arrow.orientation.y = 0.707;
-    arrow.orientation.z = 0;
-
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
   enableInteractiveMarkerControls("arrow_marker");
 }
 
