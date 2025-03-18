@@ -85,8 +85,10 @@ protected Q_SLOTS:
   void disableInteractiveMarkerControls(const std::string& marker_name);
   void applySettingsClicked();
   void spin();
+  visualization_msgs::msg::InteractiveMarker resetArrowControlPose(const cc_affordance_planner::PlanningType& planning_type);
 
 private:
+  const int marker_id_=8;
   void updateUIState();
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
@@ -150,6 +152,7 @@ private:
   void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr & goal_handle);
   void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult & result);
   void send_cca_action_goal_();
+  affordance_util::ScrewInfo getAffordancePose_();
 
 };
 

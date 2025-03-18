@@ -397,8 +397,11 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
   if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
     RCLCPP_WARN(this->get_logger(),
                  "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
-    req_.task_description.affordance_info.axis = default_affordance_axis_;
-    req_.task_description.affordance_info.location = default_affordance_location_;
+    // req_.task_description.affordance_info.axis = default_affordance_axis_;
+    // req_.task_description.affordance_info.location = default_affordance_location_;
+    auto screw_info = getAffordancePose_();
+    req_.task_description.affordance_info.axis = screw_info.axis;
+    req_.task_description.affordance_info.location = screw_info.location;
 } else {
     req_.task_description.affordance_info.axis = affordance_axis_;
     req_.task_description.affordance_info.location = affordance_location_;
@@ -410,6 +413,59 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
     }
 
     req_.task_description.vir_screw_order = screw_order_map_.at(screw_order_combo_->currentText());
+
+}
+
+// void CcaInteractiveGoals::buildInPlaceEeOrientationControlPlanningRequest(){
+
+//    req_.task_description =
+//     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
+
+// }
+
+
+affordance_util::ScrewInfo CcaInteractiveGoals::getAffordancePose_() {
+    affordance_util::ScrewInfo screw_info;
+
+    // Create an InteractiveMarker to retrieve data
+    visualization_msgs::msg::InteractiveMarker int_marker;
+
+    // Retrieve the marker 
+    server_->get("arrow_marker", int_marker);
+
+    // Search through all controls and markers to find the one with the correct ID
+    for (auto& control : int_marker.controls) {
+        for (auto& marker : control.markers) {
+            if (marker.id == marker_id_) { 
+
+                // Extract the marker pose (position and orientation)
+                const geometry_msgs::msg::Pose& marker_pose = marker.pose;
+
+                // Extract position and orientation from the marker pose
+                Eigen::Vector3d affordance_location(
+                    marker_pose.position.x,
+                    marker_pose.position.y,
+                    marker_pose.position.z
+                );
+
+                Eigen::Quaterniond arrow_quaternion(
+                    marker_pose.orientation.w,
+                    marker_pose.orientation.x,
+                    marker_pose.orientation.y,
+                    marker_pose.orientation.z
+                );
+
+                // Rotate the default axis using the quaternion from the marker's orientation
+                Eigen::Vector3d affordance_axis = arrow_quaternion * default_affordance_axis_;
+
+                // Populate the screw_info struct
+                screw_info.axis = affordance_axis;
+                screw_info.location = affordance_location;
+
+                return screw_info;
+            }
+        }
+    }
 
 }
 
@@ -729,11 +785,28 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     {
       goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
     }
-    enableInteractiveMarkerControls("arrow_marker");
+    // enableInteractiveMarkerControls("arrow_marker");
   }
 
   visualization_msgs::msg::InteractiveMarker int_marker;
   server_->get("arrow_marker", int_marker);
+
+  enum class AxisOption {
+    Manual = 1,
+    X = 2,
+    Y = 3,
+    Z = 4,
+    XMinus = 5,
+    YMinus = 6,
+    ZMinus = 7
+};
+// if (static_cast<AxisOption>(index)!=AxisOption::Manual){int_marker = resetArrowControlPose();
+//           RCLCPP_INFO(this->get_logger(), "Not Manual Mode");
+
+// } // If not manual mode, reset the arrow control pose
+  if (static_cast<AxisOption>(index)!=AxisOption::Manual){
+	  int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
+
   // visualization_msgs::msg::InteractiveMarkerControl arrow;
   for (auto& control : int_marker.controls)
 {
@@ -745,49 +818,56 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
       {
         RCLCPP_INFO(this->get_logger(), "Arrow Located");
 
-        // Set the new orientation of the arrow marker
-        if (index == 2)
-        {
-          marker.pose.orientation.w = 1;
-          marker.pose.orientation.x = 0;
-          marker.pose.orientation.y = 0;
-          marker.pose.orientation.z = 0;
-        }
-        else if (index == 3)
-        {
-          marker.pose.orientation.w = 0.707;
-          marker.pose.orientation.x = 0;
-          marker.pose.orientation.y = 0;
-          marker.pose.orientation.z = 0.707;
-        }
-        else if (index == 4)
-        {
-          marker.pose.orientation.w = 0.707;
-          marker.pose.orientation.x = 0;
-          marker.pose.orientation.y = -0.707;
-          marker.pose.orientation.z = 0;
-        }
-        else if (index == 5)
-        {
-          marker.pose.orientation.w = 0;
-          marker.pose.orientation.x = 0;
-          marker.pose.orientation.y = 0;
-          marker.pose.orientation.z = 1;
-        }
-        else if (index == 6)
-        {
-          marker.pose.orientation.w = 0.707;
-          marker.pose.orientation.x = 0;
-          marker.pose.orientation.y = 0;
-          marker.pose.orientation.z = -0.707;
-        }
-        else if (index == 7)
-        {
-          marker.pose.orientation.w = 0.707;
-          marker.pose.orientation.x = 0;
-          marker.pose.orientation.y = 0.707;
-          marker.pose.orientation.z = 0;
-        }
+	switch (static_cast<AxisOption>(index)) {
+	    case AxisOption::X:
+		marker.pose.orientation.w = 1.0;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = 0.0;
+		marker.pose.orientation.z = 0.0;
+		break;
+
+	    case AxisOption::Y:
+		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = 0.0;
+		marker.pose.orientation.z = 0.707;
+		break;
+
+	    case AxisOption::Z:
+		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = -0.707;
+		marker.pose.orientation.z = 0.0;
+		break;
+
+	    case AxisOption::XMinus:
+		marker.pose.orientation.w = 0.0;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = 0.0;
+		marker.pose.orientation.z = 1.0;
+		break;
+
+	    case AxisOption::YMinus:
+		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = 0.0;
+		marker.pose.orientation.z = -0.707;
+		break;
+
+	    case AxisOption::ZMinus:
+		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = 0.707;
+		marker.pose.orientation.z = 0.0;
+		break;
+
+	    // default: // Manual Mode
+		// marker.pose.orientation.w = 1.0;
+		// marker.pose.orientation.x = 0.0;
+		// marker.pose.orientation.y = 0.0;
+		// marker.pose.orientation.z = 0.0;
+		// break;
+	}
       }
     }
   }
@@ -797,7 +877,7 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 server_->insert(int_marker);
 server_->applyChanges();
 
-  enableInteractiveMarkerControls("arrow_marker");
+  // enableInteractiveMarkerControls("arrow_marker");
 }
 
 void CcaInteractiveGoals::applySettingsClicked()
@@ -856,6 +936,13 @@ void CcaInteractiveGoals::updateUIState()
 
 void CcaInteractiveGoals::createArrowInteractiveMarker()
 {
+  auto int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+
+  server_->insert(int_marker, std::bind(&CcaInteractiveGoals::processArrowFeedback, this, std::placeholders::_1));
+}
+
+visualization_msgs::msg::InteractiveMarker CcaInteractiveGoals::resetArrowControlPose(const cc_affordance_planner::PlanningType& planning_type)
+{
   visualization_msgs::msg::InteractiveMarker int_marker;
   int_marker.header.frame_id = "arm0_base_link";
   int_marker.name = "arrow_marker";
@@ -882,7 +969,8 @@ void CcaInteractiveGoals::createArrowInteractiveMarker()
   arrow_control.markers.push_back(arrow);
   int_marker.controls.push_back(arrow_control);
 
-  // Create controls for movement and rotation
+  if (planning_type!=cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY){
+  // // Create controls for movement and rotation
   visualization_msgs::msg::InteractiveMarkerControl control;
 
   control.orientation.w = 1;
@@ -917,8 +1005,8 @@ void CcaInteractiveGoals::createArrowInteractiveMarker()
   control.name = "move_y";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
   int_marker.controls.push_back(control);
-
-  server_->insert(int_marker, std::bind(&CcaInteractiveGoals::processArrowFeedback, this, std::placeholders::_1));
+  }
+  return int_marker;
 }
 
 void CcaInteractiveGoals::processArrowFeedback(
