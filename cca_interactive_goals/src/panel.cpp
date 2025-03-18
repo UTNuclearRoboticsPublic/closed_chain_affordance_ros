@@ -43,7 +43,7 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   QHBoxLayout* axis_layout = new QHBoxLayout;
   axis_label_ = new QLabel("Axis:");
   axis_combo_box_ = new QComboBox;
-  axis_combo_box_->addItems({ "", "Manual Input", "x", "y", "z", "-x", "-y", "-z" });
+  axis_combo_box_->addItems({ "", "Interactive Axis", "x", "y", "z", "-x", "-y", "-z" });
   axis_layout->addWidget(axis_label_);
   axis_layout->addWidget(axis_combo_box_);
   dynamicContentLayout->addLayout(axis_layout);
@@ -438,7 +438,7 @@ affordance_util::ScrewInfo CcaInteractiveGoals::getAffordancePose_() {
     affordance_util::ScrewInfo screw_info;
 
     // Check if asked to look at the moved interactive marker
-    if ((mode_combo_box_->currentText() == "In-Place End Effector Orientation Control") && (axis_combo_box_->currentText() != "Manual Input")){
+    if ((mode_combo_box_->currentText() == "In-Place End Effector Orientation Control") && (axis_combo_box_->currentText() != "Interactive Axis")){
 
     RCLCPP_INFO(this->get_logger(), "Getting affordance info");
     // Create an InteractiveMarker to retrieve data
