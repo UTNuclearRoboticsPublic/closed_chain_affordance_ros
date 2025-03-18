@@ -153,6 +153,7 @@ private:
   void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult & result);
   void send_cca_action_goal_();
   affordance_util::ScrewInfo getAffordancePose_();
+  double getAffordanceGoal_();
 
 };
 

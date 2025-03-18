@@ -367,31 +367,7 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
   // Determine goal value for all but CGP
   if (mode_combo_box_->currentIndex() != 1)
   {
-    if (goal_combo_box_->currentIndex() != 1)
-    {
-	if (motion_type_combo_box_->currentIndex() == 1)// Translation
-      {
-	req_.task_description.goal.affordance= std::stof(goal_combo_box_->currentText().toStdString());
-
-        RCLCPP_INFO_STREAM(this->get_logger(), "PLAN GOAL IS"<<req_.task_description.goal.affordance);
-      }
-      else // Rotation or Screw
-      {
-        req_.task_description.goal.affordance= M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
-      }
-    }
-    else 
-    {
-      try
-      {
-	req_.task_description.goal.affordance= std::stof(value_input_->text().toStdString());
-
-      }
-      catch (int)
-      {
-        RCLCPP_ERROR(this->get_logger(), "Goal could not be converted to type float. Please check entry and try again");
-      }
-    }
+	req_.task_description.goal.affordance= getAffordanceGoal_();
   }
 
   if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
@@ -416,13 +392,33 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
 
 }
 
-// void CcaInteractiveGoals::buildInPlaceEeOrientationControlPlanningRequest(){
-
-//    req_.task_description =
-//     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
-
-// }
-
+double CcaInteractiveGoals::getAffordanceGoal_(){
+	double goal;
+	if ((motion_type_combo_box_->currentText() == "Rotation" || motion_type_combo_box_->currentText() == "Screw Motion") && (goal_combo_box_->currentText() != "Manual Input")){
+		goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
+	}
+	else if (motion_type_combo_box_->currentText() == "Translation"  && goal_combo_box_->currentText() != "Manual Input")
+	{
+		goal = std::stof(goal_combo_box_->currentText().toStdString());
+	}
+	else { // Manual Input
+	      try
+	      {
+		goal = std::stof(value_input_->text().toStdString());
+	      }
+	      catch (const std::exception& e)
+	      {
+	          RCLCPP_ERROR(this->get_logger(), "Unexpected error occurred during conversion: %s", e.what());
+		  goal = 0.0;
+	      }
+	      catch (...)
+	      {
+	          RCLCPP_ERROR(this->get_logger(), "An unknown error occurred during conversion.");
+		  goal = 0.0;
+	      }
+	}
+	return goal;
+}
 
 affordance_util::ScrewInfo CcaInteractiveGoals::getAffordancePose_() {
     affordance_util::ScrewInfo screw_info;
