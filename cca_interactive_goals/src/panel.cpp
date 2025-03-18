@@ -800,8 +800,12 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 //           RCLCPP_INFO(this->get_logger(), "Not Manual Mode");
 
 // } // If not manual mode, reset the arrow control pose
-  if (static_cast<AxisOption>(index)!=AxisOption::Manual){
-	  int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
+  // if (static_cast<AxisOption>(index)!=AxisOption::Manual){
+	  // int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
+  if (static_cast<AxisOption>(index)==AxisOption::Manual){
+	  int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::APPROACH);} 
+	  else
+{int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
 
   // visualization_msgs::msg::InteractiveMarkerControl arrow;
   for (auto& control : int_marker.controls)
@@ -976,9 +980,10 @@ visualization_msgs::msg::InteractiveMarker CcaInteractiveGoals::resetArrowContro
   control.name = "rotate_x";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
   int_marker.controls.push_back(control);
+  if (planning_type!=cc_affordance_planner::PlanningType::APPROACH){
   control.name = "move_x";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-  int_marker.controls.push_back(control);
+  int_marker.controls.push_back(control);}
 
   control.orientation.w = 1;
   control.orientation.x = 0;
@@ -987,9 +992,10 @@ visualization_msgs::msg::InteractiveMarker CcaInteractiveGoals::resetArrowContro
   control.name = "rotate_z";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
   int_marker.controls.push_back(control);
+  if (planning_type!=cc_affordance_planner::PlanningType::APPROACH){
   control.name = "move_z";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-  int_marker.controls.push_back(control);
+  int_marker.controls.push_back(control);}
 
   control.orientation.w = 1;
   control.orientation.x = 0;
@@ -998,9 +1004,10 @@ visualization_msgs::msg::InteractiveMarker CcaInteractiveGoals::resetArrowContro
   control.name = "rotate_y";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
   int_marker.controls.push_back(control);
+  if (planning_type!=cc_affordance_planner::PlanningType::APPROACH){
   control.name = "move_y";
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-  int_marker.controls.push_back(control);
+  int_marker.controls.push_back(control);}
   }
   return int_marker;
 }
