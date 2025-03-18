@@ -1203,6 +1203,15 @@ void CcaInteractiveGoals::processInvisibleMarkerFeedback(
 void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name)
 {
   visualization_msgs::msg::InteractiveMarker int_marker;
+	if (marker_name=="arrow_marker"){
+    RCLCPP_INFO(this->get_logger(),
+                "Resetting arrow to affordance mode");
+	server_->get(marker_name, int_marker);
+	int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+    server_->insert(int_marker);
+    server_->applyChanges();
+	}
+	else{
   if (server_->get(marker_name, int_marker))
   {
     for (auto& control : int_marker.controls)
@@ -1222,6 +1231,7 @@ void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& mar
         control.markers[0].color.a = 1.0;  // Set alpha to 1.0 for full opacity
       }
     }
+  }
     server_->insert(int_marker);
     server_->applyChanges();
   }
