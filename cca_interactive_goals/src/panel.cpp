@@ -370,27 +370,40 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
 	req_.task_description.goal.affordance= getAffordanceGoal_();
   }
 
-  if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
-    RCLCPP_WARN(this->get_logger(),
-                 "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
+  // if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
+  //   RCLCPP_WARN(this->get_logger(),
+  //                "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
     // req_.task_description.affordance_info.axis = default_affordance_axis_;
     // req_.task_description.affordance_info.location = default_affordance_location_;
     auto screw_info = getAffordancePose_();
     req_.task_description.affordance_info.axis = screw_info.axis;
     req_.task_description.affordance_info.location = screw_info.location;
-} else {
-    req_.task_description.affordance_info.axis = affordance_axis_;
-    req_.task_description.affordance_info.location = affordance_location_;
-}
+// } else {
+//     req_.task_description.affordance_info.axis = affordance_axis_;
+//     req_.task_description.affordance_info.location = affordance_location_;
+// }
 
 // The following two parameters come from advanced settings
+    if (new_settings_applied_){
     if (trajectory_density_->text().toInt() != 0) {
         req_.task_description.trajectory_density = trajectory_density_->text().toInt();
     }
 
     req_.task_description.vir_screw_order = screw_order_map_.at(screw_order_combo_->currentText());
+    }
 
 }
+
+// CcaInteractiveGoals::buildInPlaceEEOrientationControlReq(){
+
+//     req_.task_description =
+//     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
+
+//     // If not manual input
+
+
+
+// }
 
 double CcaInteractiveGoals::getAffordanceGoal_(){
     RCLCPP_INFO(this->get_logger(), "Getting affordance goal");
@@ -423,6 +436,9 @@ double CcaInteractiveGoals::getAffordanceGoal_(){
 
 affordance_util::ScrewInfo CcaInteractiveGoals::getAffordancePose_() {
     affordance_util::ScrewInfo screw_info;
+
+    // Check if asked to look at the moved interactive marker
+    if ((mode_combo_box_->currentText() == "In-Place End Effector Orientation Control") && (axis_combo_box_->currentText() != "Manual Input")){
 
     RCLCPP_INFO(this->get_logger(), "Getting affordance info");
     // Create an InteractiveMarker to retrieve data
@@ -463,6 +479,21 @@ affordance_util::ScrewInfo CcaInteractiveGoals::getAffordancePose_() {
                 return screw_info;
             }
         }
+    }
+    }
+    else {
+  if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
+    RCLCPP_WARN(this->get_logger(),
+                 "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
+    screw_info.axis = default_affordance_axis_;
+    screw_info.location = default_affordance_location_;
+} else {
+    RCLCPP_WARN(this->get_logger(),
+                 "Interactive marker has moved");
+    screw_info.axis = affordance_axis_;
+    screw_info.location = affordance_location_;
+}
+    
     }
 
 }
@@ -901,6 +932,7 @@ void CcaInteractiveGoals::applySettingsClicked()
     }
 
 
+    new_settings_applied_ = true;
     RCLCPP_INFO(this->get_logger(), "Advanced Settings Modified");
 }
 

@@ -154,6 +154,7 @@ private:
   void send_cca_action_goal_();
   affordance_util::ScrewInfo getAffordancePose_();
   double getAffordanceGoal_();
+  bool new_settings_applied_ = false;
 
 };
 
