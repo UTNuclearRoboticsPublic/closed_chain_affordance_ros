@@ -393,8 +393,9 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
 }
 
 double CcaInteractiveGoals::getAffordanceGoal_(){
+    RCLCPP_INFO(this->get_logger(), "Getting affordance goal");
 	double goal;
-	if ((motion_type_combo_box_->currentText() == "Rotation" || motion_type_combo_box_->currentText() == "Screw Motion") && (goal_combo_box_->currentText() != "Manual Input")){
+	if ((motion_type_combo_box_->currentText() == "Rotation" || motion_type_combo_box_->currentText() == "Screw Motion" || mode_combo_box_->currentText() == "In-Place End Effector Orientation Control") && (goal_combo_box_->currentText() != "Manual Input")){
 		goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
 	}
 	else if (motion_type_combo_box_->currentText() == "Translation"  && goal_combo_box_->currentText() != "Manual Input")
@@ -423,6 +424,7 @@ double CcaInteractiveGoals::getAffordanceGoal_(){
 affordance_util::ScrewInfo CcaInteractiveGoals::getAffordancePose_() {
     affordance_util::ScrewInfo screw_info;
 
+    RCLCPP_INFO(this->get_logger(), "Getting affordance info");
     // Create an InteractiveMarker to retrieve data
     visualization_msgs::msg::InteractiveMarker int_marker;
 
@@ -827,16 +829,16 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 		break;
 
 	    case AxisOption::Y:
-		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.w = 0.707107;
 		marker.pose.orientation.x = 0.0;
 		marker.pose.orientation.y = 0.0;
-		marker.pose.orientation.z = 0.707;
+		marker.pose.orientation.z = 0.707107;
 		break;
 
 	    case AxisOption::Z:
-		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.w = 0.707107;
 		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = -0.707;
+		marker.pose.orientation.y = -0.707107;
 		marker.pose.orientation.z = 0.0;
 		break;
 
@@ -848,16 +850,16 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 		break;
 
 	    case AxisOption::YMinus:
-		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.w = 0.707107;
 		marker.pose.orientation.x = 0.0;
 		marker.pose.orientation.y = 0.0;
-		marker.pose.orientation.z = -0.707;
+		marker.pose.orientation.z = -0.707107;
 		break;
 
 	    case AxisOption::ZMinus:
-		marker.pose.orientation.w = 0.707;
+		marker.pose.orientation.w = 0.707107;
 		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = 0.707;
+		marker.pose.orientation.y = 0.707107;
 		marker.pose.orientation.z = 0.0;
 		break;
 
