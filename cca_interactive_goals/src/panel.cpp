@@ -881,6 +881,10 @@ visualization_msgs::msg::InteractiveMarker CcaInteractiveGoals::resetArrowContro
   control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
   int_marker.controls.push_back(control);}
   }
+
+  // Also reset affordance poses
+  affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+  affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
   return int_marker;
 }
 
