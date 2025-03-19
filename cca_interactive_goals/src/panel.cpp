@@ -208,8 +208,9 @@ void CcaInteractiveGoals::onInitialize()
   req_.start_state.robot = READY_CONFIG;
 
   // Create and hide interactive markers
-  createArrowInteractiveMarker();
-  server_->applyChanges();
+  // createArrowInteractiveMarker();
+  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::AFFORDANCE, true);
+  // server_->applyChanges();
 
   disableInteractiveMarkerControls("arrow_marker");
 
@@ -567,7 +568,8 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
   {
     conf_place_button_->setEnabled(true);
     conf_place_button_->setVisible(true);
-    enableInteractiveMarkerControls("arrow_marker");
+    // enableInteractiveMarkerControls("arrow_marker");
+  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::AFFORDANCE);
   }
   else
   {
@@ -657,7 +659,20 @@ void CcaInteractiveGoals::pitchSelected(int index)
 
 void CcaInteractiveGoals::axisOptionSelected(int index)
 {
-          RCLCPP_INFO(this->get_logger(), "Arrow index is: %i", index);
+  enum class AxisOption {
+    Manual = 1,
+    X = 2,
+    Y = 3,
+    Z = 4,
+    XMinus = 5,
+    YMinus = 6,
+    ZMinus = 7
+};
+  // Enable interactive marker for manual mode and return
+  if (static_cast<AxisOption>(index)==AxisOption::Manual){
+  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::APPROACH); 
+  return;}
+
   if (index != 0)
   {
     goal_label_->setVisible(true);
@@ -672,22 +687,12 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     }
   }
 
+  // Enable the arrow
+  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
+
+  // Reset arrow below
   visualization_msgs::msg::InteractiveMarker int_marker;
   server_->get("arrow_marker", int_marker);
-
-  enum class AxisOption {
-    Manual = 1,
-    X = 2,
-    Y = 3,
-    Z = 4,
-    XMinus = 5,
-    YMinus = 6,
-    ZMinus = 7
-};
-  if (static_cast<AxisOption>(index)==AxisOption::Manual){
-	  int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::APPROACH);} 
-	  else
-{int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
 
   for (auto& control : int_marker.controls)
 {
@@ -806,12 +811,13 @@ void CcaInteractiveGoals::updateUIState()
   conf_place_button_->setVisible(true);
 }
 
-void CcaInteractiveGoals::createArrowInteractiveMarker()
-{
-  auto int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+// void CcaInteractiveGoals::createArrowInteractiveMarker()
+// {
+//   // auto int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+//   enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::AFFORDANCE);
 
-  server_->insert(int_marker, std::bind(&CcaInteractiveGoals::processArrowFeedback, this, std::placeholders::_1));
-}
+//   server_->insert(int_marker, std::bind(&CcaInteractiveGoals::processArrowFeedback, this, std::placeholders::_1));
+// }
 
 visualization_msgs::msg::InteractiveMarker CcaInteractiveGoals::resetArrowControlPose(const cc_affordance_planner::PlanningType& planning_type)
 {
@@ -911,14 +917,84 @@ void CcaInteractiveGoals::processArrowFeedback(
   }
 }
 
-void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name)
-{
-    visualization_msgs::msg::InteractiveMarker int_marker;
-    server_->get(marker_name, int_marker); // assuming marker is always "arrow_marker"
-    int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+// void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name)
+// {
+//     visualization_msgs::msg::InteractiveMarker int_marker;
+//     server_->get(marker_name, int_marker); // assuming marker is always "arrow_marker"
+//     int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+//     server_->insert(int_marker);
+//     server_->applyChanges();
+// }
+void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name, const cc_affordance_planner::PlanningType& planning_type, bool create) {
+  visualization_msgs::msg::InteractiveMarker int_marker;
+
+  if (!create){server_->get(marker_name, int_marker);}
+  int_marker = visualization_msgs::msg::InteractiveMarker(); //Clear the marker
+  // Lambda to add control
+  auto addControl = [&](const std::string& name, double x, double y, double z, bool isRotation) {
+    visualization_msgs::msg::InteractiveMarkerControl control;
+    control.orientation.w = 1.0;
+    control.orientation.x = x;
+    control.orientation.y = y;
+    control.orientation.z = z;
+    control.name = name;
+    control.interaction_mode = isRotation ? visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS : visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+    int_marker.controls.push_back(control);
+  };
+
+  // Initialize marker
+  int_marker.header.frame_id = "arm0_base_link";
+  int_marker.name = marker_name;
+  int_marker.description = "";
+  int_marker.scale = 0.5;
+
+  // Create arrow marker
+  visualization_msgs::msg::Marker arrow;
+  arrow.ns = "interactive_goals";
+  arrow.type = visualization_msgs::msg::Marker::ARROW;
+  arrow.scale.x = 0.5;
+  arrow.scale.y = 0.05;
+  arrow.scale.z = 0.05;
+  arrow.color.r = 0.251;
+  arrow.color.g = 0.878;
+  arrow.color.b = 0.816;
+  arrow.color.a = 1.0;
+  arrow.id = 8;
+
+  visualization_msgs::msg::InteractiveMarkerControl arrow_control;
+  arrow_control.always_visible = true;
+  arrow_control.markers.push_back(arrow);
+  int_marker.controls.push_back(arrow_control);
+
+  // Add movement and rotation controls
+  if (planning_type != cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY) {
+    addControl("rotate_x", 1.0, 0.0, 0.0, true);
+    addControl("rotate_y", 0.0, 0.0, 1.0, true);
+    addControl("rotate_z", 0.0, 1.0, 0.0, true);
+      RCLCPP_INFO(this->get_logger(), "Added rotation control");
+
+    if (planning_type != cc_affordance_planner::PlanningType::APPROACH) {
+      addControl("move_x", 1.0, 0.0, 0.0, false);
+      addControl("move_y", 0.0, 0.0, 1.0, false);
+      addControl("move_z", 0.0, 1.0, 0.0, false);
+      RCLCPP_INFO(this->get_logger(), "Added translation control");
+    }
+  }
+
+  affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+  affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+
+  // Insert and apply changes
+  if (create) { //Insert with callback if it does not exist
+      RCLCPP_INFO(this->get_logger(), "Arrow does not exist. Creating one");
+    server_->insert(int_marker, std::bind(&CcaInteractiveGoals::processArrowFeedback, this, std::placeholders::_1));
+  } else {
+      RCLCPP_INFO(this->get_logger(), "Using existing arrow");
     server_->insert(int_marker);
-    server_->applyChanges();
+  }
+  server_->applyChanges();
 }
+
 
 void CcaInteractiveGoals::disableInteractiveMarkerControls(const std::string& marker_name)
 {

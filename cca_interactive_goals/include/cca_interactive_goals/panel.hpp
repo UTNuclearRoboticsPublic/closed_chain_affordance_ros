@@ -75,12 +75,13 @@ protected Q_SLOTS:
   void pitchSelected(int index);
   void axisOptionSelected(int index);
   void intMarkerController(visualization_msgs::msg::InteractiveMarker int_marker, bool rotate, bool translate);
-  void createArrowInteractiveMarker();
+  // void createArrowInteractiveMarker();
   void processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
-  void createInvisibleInteractiveMarker();
-  void
-  processInvisibleMarkerFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
-  void enableInteractiveMarkerControls(const std::string& marker_name);
+  // void createInvisibleInteractiveMarker();
+  // void
+  // processInvisibleMarkerFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
+  // void enableInteractiveMarkerControls(const std::string& marker_name);
+  void enableInteractiveMarkerControls(const std::string& marker_name, const cc_affordance_planner::PlanningType& planning_type, bool create=false);
   void disableInteractiveMarkerControls(const std::string& marker_name);
   void applySettingsClicked();
   void spin();
