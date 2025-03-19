@@ -63,12 +63,11 @@ public:
   virtual void save(rviz_common::Config config) const override;
 
 protected Q_SLOTS:
-  void framePlaceButtonClicked();
   void planVizClicked();
   void planVizExeClicked();
   void planExeClicked();
   void stopClicked();
-  void screwInfoBuilder();
+  void buildPlanningRequest();
   void confirmPlaceClicked();
   void modeSelected(int index);
   void motionTypeSelected(int index);
@@ -108,7 +107,6 @@ private:
   QLineEdit* value_input_;
   QLineEdit* pitch_value_input_;
   QPushButton* plan_viz_button_;
-  QPushButton* frame_place_button_;
   QPushButton* plan_viz_exe_button_;
   QPushButton* plan_exe_button_;
   QPushButton* stop_button_;
@@ -125,7 +123,7 @@ private:
   QComboBox* cca_type_combo_;
   QPushButton* apply_button_;
 
-  const std::map<QString, affordance_util::VirtualScrewOrder> screw_order_map_ = {
+  const std::map<QString, affordance_util::VirtualScrewOrder> virtual_screw_order_map_ = {
     { QString("NONE"), affordance_util::VirtualScrewOrder::NONE },
     { QString("YZX"), affordance_util::VirtualScrewOrder::YZX },
     { QString("ZXY"), affordance_util::VirtualScrewOrder::ZXY },

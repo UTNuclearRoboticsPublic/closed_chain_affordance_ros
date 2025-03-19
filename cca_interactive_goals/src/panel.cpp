@@ -13,23 +13,19 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   QVBoxLayout* mainLayout = new QVBoxLayout;
 
   // Mode selection dropdown
-
   QHBoxLayout* mode_layout = new QHBoxLayout;
   QLabel* mode_label = new QLabel("Select Mode:");
   mode_combo_box_ = new QComboBox;
-  mode_combo_box_->addItems({ "Affordance Planning", "Cartesian Goal Planning",
-                              "In-Place End Effector Orientation Control", "Approach Motion Task" });
+  mode_combo_box_->addItems({ "Affordance Planning", "In-Place End Effector Orientation Control"});
   mode_layout->addWidget(mode_label);
   mode_layout->addWidget(mode_combo_box_);
   mainLayout->addLayout(mode_layout);
 
   // Dynamic content layout
-
   QVBoxLayout* dynamicContentLayout = new QVBoxLayout;
   dynamicContentLayout->setSpacing(10);  // Set spacing between dynamic boxes
 
   // Motion type dropdown
-
   QHBoxLayout* motion_type_layout = new QHBoxLayout;
   motion_type_label_ = new QLabel("Motion Type:");
   motion_type_combo_box_ = new QComboBox;
@@ -39,7 +35,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   dynamicContentLayout->addLayout(motion_type_layout);
 
   // Axis Selection Dropdown
-
   QHBoxLayout* axis_layout = new QHBoxLayout;
   axis_label_ = new QLabel("Axis:");
   axis_combo_box_ = new QComboBox;
@@ -49,19 +44,11 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   dynamicContentLayout->addLayout(axis_layout);
 
   // Screw placement button
-
   conf_place_button_ = new QPushButton("Confirm Screw Placement");
   dynamicContentLayout->addWidget(conf_place_button_);
   conf_place_button_->setEnabled(false);
 
-  // Frame placement button
-
-  frame_place_button_ = new QPushButton("Confirm Frame Placement");
-  dynamicContentLayout->addWidget(frame_place_button_);
-  frame_place_button_->setEnabled(false);
-
   // Pitch Selection Dropdown
-
   QHBoxLayout* pitch_layout = new QHBoxLayout;
   pitch_label_ = new QLabel("Pitch(meters/radian):");
   pitch_combo_box_ = new QComboBox;
@@ -71,7 +58,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   dynamicContentLayout->addLayout(pitch_layout);
 
   // Pitch input
-
   QHBoxLayout* pitch_value_layout = new QHBoxLayout;
   pitch_value_label_ = new QLabel("Pitch Value(meters/radian):");
   pitch_value_label_->setObjectName("Pitch Value Label");
@@ -81,7 +67,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   dynamicContentLayout->addLayout(pitch_value_layout);
 
   // Goal Selection Dropdown
-
   QHBoxLayout* goal_layout = new QHBoxLayout;
   goal_label_ = new QLabel("Goal:");
   goal_combo_box_ = new QComboBox;
@@ -92,7 +77,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   dynamicContentLayout->addLayout(goal_layout);
 
   // Goal input
-
   QHBoxLayout* value_layout = new QHBoxLayout;
   value_label_ = new QLabel("Value:");
   value_label_->setObjectName("Value Label");
@@ -104,22 +88,20 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   mainLayout->addLayout(dynamicContentLayout);
 
   // Spacer to push buttons to the bottom
-
   mainLayout->addStretch();
 
   // Plan, Viz, Execute Buttons
-
   QVBoxLayout* buttonLayout = new QVBoxLayout;
-  plan_viz_button_ = new QPushButton("Plan + Visualize");
+  plan_viz_button_ = new QPushButton("Plan");
   buttonLayout->addWidget(plan_viz_button_);
   plan_viz_button_->setEnabled(false);
-  plan_viz_exe_button_ = new QPushButton("Plan, Visualize + Execute");
+  plan_viz_exe_button_ = new QPushButton("Plan and Execute");
   buttonLayout->addWidget(plan_viz_exe_button_);
   plan_viz_exe_button_->setEnabled(false);
-  plan_exe_button_ = new QPushButton("Plan + Execute");
+  plan_exe_button_ = new QPushButton("Execute");
   buttonLayout->addWidget(plan_exe_button_);
   plan_exe_button_->setEnabled(false);
-  stop_button_ = new QPushButton("STOP");
+  stop_button_ = new QPushButton("Cancel Execution");
   buttonLayout->addWidget(stop_button_);
   stop_button_->setEnabled(false);
 
@@ -142,9 +124,9 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   // Dropdown menus
   screw_order_combo_ = new QComboBox();
 
-  // Create a QStringList from screw_order_map_
+  // Create a QStringList from virtual_screw_order_map_
   QStringList screw_options;
-  for (const auto& pair : screw_order_map_) {
+  for (const auto& pair : virtual_screw_order_map_) {
       screw_options.append(pair.first); 
   }
 
@@ -232,7 +214,6 @@ void CcaInteractiveGoals::onInitialize()
   server_->applyChanges();
 
   disableInteractiveMarkerControls("arrow_marker");
-  disableInteractiveMarkerControls("approach_frame");
 
   // Set up timer for spinning the node
   spin_timer_ = new QTimer(this);
@@ -253,7 +234,7 @@ void CcaInteractiveGoals::save(rviz_common::Config config) const
 void CcaInteractiveGoals::planVizClicked()
 {
   // Handle plan viz button click
-  screwInfoBuilder();
+  buildPlanningRequest();
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planViz button pressed");
@@ -265,7 +246,7 @@ void CcaInteractiveGoals::planVizClicked()
 void CcaInteractiveGoals::planVizExeClicked()
 {
   // Handle plan viz execute button click
-  screwInfoBuilder();
+  buildPlanningRequest();
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planVizExe button pressed");
@@ -277,7 +258,7 @@ void CcaInteractiveGoals::planVizExeClicked()
 void CcaInteractiveGoals::planExeClicked()
 {
   // Handle plan execute button click
-  screwInfoBuilder();
+  buildPlanningRequest();
   stop_button_->setEnabled(true);
 
   RCLCPP_INFO(this->get_logger(), "planExe button pressed");
@@ -305,47 +286,29 @@ else{
 
 }
 
-void CcaInteractiveGoals::screwInfoBuilder()
+void CcaInteractiveGoals::buildPlanningRequest()
 {
 
-  if (mode_combo_box_->currentIndex() == 0) // Affordance Planning
+  if (mode_combo_box_->currentText() == "Affordance Planning") // Affordance Planning
   {
     req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
 
-  }
-  else if (mode_combo_box_->currentIndex() == 1)
-  {
-    req_.task_description =
-    cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
-  }
-  else if (mode_combo_box_->currentIndex() == 2)
-  {
-   req_.task_description =
-    cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
-  }
-  else if (mode_combo_box_->currentIndex() == 3)
-  {
-  req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::APPROACH);
-  }
-
-  // Determine motion type for affordance and approach motion
-  if (mode_combo_box_->currentIndex() == 0 || mode_combo_box_->currentIndex() == 3)
-  {
-    if (motion_type_combo_box_->currentIndex() == 1)
+    // Determine motion type for affordance planning
+    if (motion_type_combo_box_->currentText() == "Translation")
     {
       req_.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
 
     }
-    else if (motion_type_combo_box_->currentIndex() == 2)
+    else if (motion_type_combo_box_->currentText() == "Rotation")
     {
       req_.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
     }
-    else if (motion_type_combo_box_->currentIndex() == 3)
+    else if (motion_type_combo_box_->currentText() == "Screw Motion")
     {
       req_.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
 
       // Determine pitch value
-      if (pitch_combo_box_->currentIndex() != 1)
+      if (pitch_combo_box_->currentText() != "Manual Input")
       {
       req_.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
 
@@ -363,47 +326,32 @@ req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text
         }
       }
     }
+
   }
-  // Determine goal value for all but CGP
-  if (mode_combo_box_->currentIndex() != 1)
+  else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
   {
-	req_.task_description.goal.affordance= getAffordanceGoal_();
+   req_.task_description =
+    cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
   }
 
-  // if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
-  //   RCLCPP_WARN(this->get_logger(),
-  //                "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
-    // req_.task_description.affordance_info.axis = default_affordance_axis_;
-    // req_.task_description.affordance_info.location = default_affordance_location_;
+  // Get affordance goal
+  req_.task_description.goal.affordance= getAffordanceGoal_();
+
+  // Get affordance pose
     auto screw_info = getAffordancePose_();
     req_.task_description.affordance_info.axis = screw_info.axis;
     req_.task_description.affordance_info.location = screw_info.location;
-// } else {
-//     req_.task_description.affordance_info.axis = affordance_axis_;
-//     req_.task_description.affordance_info.location = affordance_location_;
-// }
 
-// The following two parameters come from advanced settings
+  // Extract task-specific settingsa from advanced settings 
     if (new_settings_applied_){
     if (trajectory_density_->text().toInt() != 0) {
         req_.task_description.trajectory_density = trajectory_density_->text().toInt();
     }
 
-    req_.task_description.vir_screw_order = screw_order_map_.at(screw_order_combo_->currentText());
+    req_.task_description.vir_screw_order = virtual_screw_order_map_.at(screw_order_combo_->currentText());
     }
 
 }
-
-// CcaInteractiveGoals::buildInPlaceEEOrientationControlReq(){
-
-//     req_.task_description =
-//     cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::CARTESIAN_GOAL);
-
-//     // If not manual input
-
-
-
-// }
 
 double CcaInteractiveGoals::getAffordanceGoal_(){
     RCLCPP_INFO(this->get_logger(), "Getting affordance goal");
@@ -504,8 +452,6 @@ void CcaInteractiveGoals::confirmPlaceClicked()
   value_input_->setEnabled(false);
   value_label_->setVisible(false);
 
-  if (mode_combo_box_->currentText() == "Affordance Planning")
-  {
     // Handle confirm screw placement button click
     goal_label_->setVisible(true);
     goal_combo_box_->setEnabled(true);
@@ -533,55 +479,6 @@ void CcaInteractiveGoals::confirmPlaceClicked()
         goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
       }
     }
-  }
-  else
-  {
-    frame_place_button_->setVisible(true);
-    frame_place_button_->setEnabled(true);
-    enableInteractiveMarkerControls("approach_frame");
-  }
-}
-
-void CcaInteractiveGoals::framePlaceButtonClicked()
-{
-  if (mode_combo_box_->currentText() == "Approach Motion Task")
-  {
-    // Handle confirm frame place button click
-
-    // Handle confirm screw placement button click
-    goal_label_->setVisible(true);
-    goal_combo_box_->setEnabled(true);
-    goal_combo_box_->setVisible(true);
-    goal_combo_box_->setCurrentIndex(0);
-    if (motion_type_combo_box_->currentText() == "Translation")
-    {
-      goal_label_->setText("Goal Distance(meters)");
-      for (int i = 2; i <= 11; i++)
-      {
-        double value = (i - 1) * 0.1;
-        QString text = QString::number(value, 'f', 1);
-        goal_combo_box_->setItemText(i, text);
-      }
-    }
-    else if (motion_type_combo_box_->currentText() == "Rotation" ||
-             motion_type_combo_box_->currentText() == "Screw Motion")
-    {
-      goal_label_->setText("Goal Angle(radians)");
-      std::vector<std::string> pi_fractions = {
-        "π/4", "π/2", "3π/4", "π", "5π/4", "3π/2", "7π/4", "2π", "9π/4", "5π/2"
-      };
-      for (int i = 2; i <= 11; i++)
-      {
-        goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
-      }
-    }
-  }
-  else
-  {
-    plan_exe_button_->setEnabled(true);
-    plan_viz_button_->setEnabled(true);
-    plan_viz_exe_button_->setEnabled(true);
-  }
 }
 
 void CcaInteractiveGoals::modeSelected(int index)
@@ -597,12 +494,10 @@ void CcaInteractiveGoals::modeSelected(int index)
   bool mode_selected = mode_combo_box_->currentIndex() != -1;
 
   disableInteractiveMarkerControls("arrow_marker");
-  disableInteractiveMarkerControls("approach_frame");
 
   if (mode_selected)
   {
-    if (mode_combo_box_->currentText() == "Affordance Planning" ||
-        mode_combo_box_->currentText() == "Approach Motion Task")
+    if (mode_combo_box_->currentText() == "Affordance Planning") 
     {
       // TODO: set all others to not visible
 
@@ -630,34 +525,6 @@ void CcaInteractiveGoals::modeSelected(int index)
       motion_type_combo_box_->setCurrentText("");
       conf_place_button_->setEnabled(false);
       conf_place_button_->setVisible(true);
-    }
-    else if (mode_combo_box_->currentText() == "Cartesian Goal Planning")
-    {
-      axis_combo_box_->setEnabled(false);
-      axis_combo_box_->setVisible(false);
-      axis_label_->setVisible(false);
-      motion_type_label_->setVisible(false);
-      motion_type_combo_box_->setEnabled(false);
-      motion_type_combo_box_->setVisible(false);
-      conf_place_button_->setEnabled(false);
-      conf_place_button_->setVisible(false);
-      goal_label_->setVisible(false);
-      goal_combo_box_->setEnabled(false);
-      goal_combo_box_->setVisible(false);
-      value_input_->setVisible(false);
-      value_input_->setEnabled(false);
-      value_label_->setVisible(false);
-      frame_place_button_->setVisible(false);
-      pitch_label_->setVisible(false);
-      pitch_combo_box_->setVisible(false);
-      pitch_value_input_->setVisible(false);
-      pitch_value_label_->setVisible(false);
-
-      // Set necessary widgets to visible
-
-      frame_place_button_->setVisible(true);
-      frame_place_button_->setEnabled(true);
-      enableInteractiveMarkerControls("approach_frame");
     }
     else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
     {
@@ -717,7 +584,6 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
     conf_place_button_->setEnabled(false);
     conf_place_button_->setVisible(true);
     disableInteractiveMarkerControls("arrow_marker");
-    disableInteractiveMarkerControls("approach_frame");
   }
   if (motion_type_combo_box_->currentText() == "Screw Motion")
   {
@@ -814,7 +680,6 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     {
       goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
     }
-    // enableInteractiveMarkerControls("arrow_marker");
   }
 
   visualization_msgs::msg::InteractiveMarker int_marker;
@@ -829,18 +694,11 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     YMinus = 6,
     ZMinus = 7
 };
-// if (static_cast<AxisOption>(index)!=AxisOption::Manual){int_marker = resetArrowControlPose();
-//           RCLCPP_INFO(this->get_logger(), "Not Manual Mode");
-
-// } // If not manual mode, reset the arrow control pose
-  // if (static_cast<AxisOption>(index)!=AxisOption::Manual){
-	  // int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
   if (static_cast<AxisOption>(index)==AxisOption::Manual){
 	  int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::APPROACH);} 
 	  else
 {int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);}
 
-  // visualization_msgs::msg::InteractiveMarkerControl arrow;
   for (auto& control : int_marker.controls)
 {
   if (!control.markers.empty())
@@ -894,12 +752,6 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 		marker.pose.orientation.z = 0.0;
 		break;
 
-	    // default: // Manual Mode
-		// marker.pose.orientation.w = 1.0;
-		// marker.pose.orientation.x = 0.0;
-		// marker.pose.orientation.y = 0.0;
-		// marker.pose.orientation.z = 0.0;
-		// break;
 	}
       }
     }
@@ -910,7 +762,6 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
 server_->insert(int_marker);
 server_->applyChanges();
 
-  // enableInteractiveMarkerControls("arrow_marker");
 }
 
 void CcaInteractiveGoals::applySettingsClicked()
@@ -951,13 +802,10 @@ void CcaInteractiveGoals::updateUIState()
   value_input_->setVisible(false);
   value_input_->setEnabled(false);
   value_label_->setVisible(false);
-  frame_place_button_->setVisible(false);
   pitch_label_->setVisible(false);
   pitch_combo_box_->setVisible(false);
   pitch_value_input_->setVisible(false);
   pitch_value_label_->setVisible(false);
-  frame_place_button_->setVisible(false);
-  frame_place_button_->setEnabled(false);
 
   // Set necessary widgets to visible
   motion_type_label_->setVisible(true);
@@ -1069,172 +917,13 @@ void CcaInteractiveGoals::processArrowFeedback(
   }
 }
 
-void CcaInteractiveGoals::createInvisibleInteractiveMarker()
-{
-  visualization_msgs::msg::InteractiveMarker int_marker;
-  int_marker.header.frame_id = "arm0_base_link";
-  int_marker.name = "approach_frame";
-  int_marker.description = "";
-  int_marker.scale = 1.0;
-
-  visualization_msgs::msg::InteractiveMarkerControl frame_control;
-  frame_control.always_visible = true;
-
-  // X axis (red)
-  visualization_msgs::msg::Marker marker;
-  marker.type = visualization_msgs::msg::Marker::CYLINDER;
-
-  marker.scale.x = 0.05;
-  marker.scale.y = 0.05;
-  marker.scale.z = 0.5;
-  marker.color.a = 1.0;
-
-  marker.color.r = 1.0;
-  marker.color.g = 0.0;
-  marker.color.b = 0.0;
-  marker.pose.position.x = 0.25;
-  marker.pose.orientation.w = 0.7071;
-  marker.pose.orientation.x = 0;
-  marker.pose.orientation.y = 0.7071;
-  marker.pose.orientation.z = 0;
-  frame_control.markers.clear();
-  frame_control.markers.push_back(marker);
-  frame_control.orientation.w = 1;
-  frame_control.orientation.x = 0;
-  frame_control.orientation.y = 0;
-  frame_control.orientation.z = 0;
-  int_marker.controls.push_back(frame_control);
-
-  // Y axis (green)
-  marker.color.r = 0.0;
-  marker.color.g = 1.0;
-  marker.color.b = 0.0;
-  marker.pose.position.x = 0;
-  marker.pose.position.y = 0.25;
-  marker.pose.orientation.w = 0.7071;
-  marker.pose.orientation.x = -0.7071;
-  marker.pose.orientation.y = 0;
-  marker.pose.orientation.z = 0;
-  frame_control.markers.clear();
-  frame_control.markers.push_back(marker);
-  frame_control.orientation.w = 0.7071;
-  frame_control.orientation.x = 0;
-  frame_control.orientation.y = 0;
-  frame_control.orientation.z = 0.7071;
-  frame_control.name = "y_axis";
-  int_marker.controls.push_back(frame_control);
-
-  // Z axis (blue)
-  marker.color.r = 0.0;
-  marker.color.g = 0.0;
-  marker.color.b = 1.0;
-  marker.pose.position.y = 0;
-  marker.pose.position.z = 0.25;
-  marker.pose.orientation.w = 1;
-  marker.pose.orientation.x = 0;
-  marker.pose.orientation.y = 0;
-  marker.pose.orientation.z = 0;
-  frame_control.markers.clear();
-  frame_control.markers.push_back(marker);
-  frame_control.orientation.w = 0.7071;
-  frame_control.orientation.x = -0.7071;
-  frame_control.orientation.y = 0;
-  frame_control.orientation.z = 0;
-  frame_control.name = "z_axis";
-  int_marker.controls.push_back(frame_control);
-
-  // Create controls for movement and rotation
-  visualization_msgs::msg::InteractiveMarkerControl control;
-
-  control.orientation.w = 1;
-  control.orientation.x = 1;
-  control.orientation.y = 0;
-  control.orientation.z = 0;
-  control.name = "rotate_x";
-  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
-  int_marker.controls.push_back(control);
-  control.name = "move_x";
-  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-  int_marker.controls.push_back(control);
-
-  control.orientation.w = 1;
-  control.orientation.x = 0;
-  control.orientation.y = 1;
-  control.orientation.z = 0;
-  control.name = "rotate_z";
-  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
-  int_marker.controls.push_back(control);
-  control.name = "move_z";
-  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-  int_marker.controls.push_back(control);
-
-  control.orientation.w = 1;
-  control.orientation.x = 0;
-  control.orientation.y = 0;
-  control.orientation.z = 1;
-  control.name = "rotate_y";
-  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
-  int_marker.controls.push_back(control);
-  control.name = "move_y";
-  control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-  int_marker.controls.push_back(control);
-
-  server_->insert(int_marker,
-                  std::bind(&CcaInteractiveGoals::processInvisibleMarkerFeedback, this, std::placeholders::_1));
-}
-
-void CcaInteractiveGoals::processInvisibleMarkerFeedback(
-    const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback)
-{
-  if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE)
-  {
-    RCLCPP_INFO(this->get_logger(),
-                "Invisible marker moved to position (%.2f, %.2f, %.2f) and orientation(% .2f, % .2f, % .2f, % .2f) ",
-                feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z,
-                feedback->pose.orientation.x, feedback->pose.orientation.y, feedback->pose.orientation.z,
-                feedback->pose.orientation.w);
-
-    // Update the marker's pose
-    server_->setPose(feedback->marker_name, feedback->pose);
-    server_->applyChanges();
-  }
-}
-
 void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name)
 {
-  visualization_msgs::msg::InteractiveMarker int_marker;
-	if (marker_name=="arrow_marker"){
-    RCLCPP_INFO(this->get_logger(),
-                "Resetting arrow to affordance mode");
-	server_->get(marker_name, int_marker);
-	int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
+    visualization_msgs::msg::InteractiveMarker int_marker;
+    server_->get(marker_name, int_marker); // assuming marker is always "arrow_marker"
+    int_marker = resetArrowControlPose(cc_affordance_planner::PlanningType::AFFORDANCE);
     server_->insert(int_marker);
     server_->applyChanges();
-	}
-	else{
-  if (server_->get(marker_name, int_marker))
-  {
-    for (auto& control : int_marker.controls)
-    {
-      if (control.name.find("rotate") != std::string::npos)
-      {
-        control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS;
-      }
-      else if (control.name.find("move") != std::string::npos)
-      {
-        control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
-      }
-
-      // Make the arrow visible
-      if (!control.markers.empty())
-      {
-        control.markers[0].color.a = 1.0;  // Set alpha to 1.0 for full opacity
-      }
-    }
-  }
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
 }
 
 void CcaInteractiveGoals::disableInteractiveMarkerControls(const std::string& marker_name)
