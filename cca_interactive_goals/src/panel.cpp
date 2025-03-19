@@ -833,8 +833,18 @@ void CcaInteractiveGoals::processArrowFeedback(
 void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create) {
   visualization_msgs::msg::InteractiveMarker int_marker;
 
-  if (!create){server_->get(marker_name, int_marker);}
-  int_marker = visualization_msgs::msg::InteractiveMarker(); //Clear the marker
+  // Retrieve marker if not creating a new one
+  if (!create) {
+    server_->get(marker_name, int_marker);
+  }
+
+  // Clear and initialize marker
+  int_marker = visualization_msgs::msg::InteractiveMarker();
+  int_marker.header.frame_id = "arm0_base_link";
+  int_marker.name = marker_name;
+  int_marker.description = "";
+  int_marker.scale = 0.5;
+
   // Lambda to add control
   auto addControl = [&](const std::string& name, double x, double y, double z, bool isRotation) {
     visualization_msgs::msg::InteractiveMarkerControl control;
@@ -843,17 +853,13 @@ void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& mar
     control.orientation.y = y;
     control.orientation.z = z;
     control.name = name;
-    control.interaction_mode = isRotation ? visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS : visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
+    control.interaction_mode = isRotation ? 
+      visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS : 
+      visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
     int_marker.controls.push_back(control);
   };
 
-  // Initialize marker
-  int_marker.header.frame_id = "arm0_base_link";
-  int_marker.name = marker_name;
-  int_marker.description = "";
-  int_marker.scale = 0.5;
-
-  // Create arrow marker
+  // Create and add arrow marker
   visualization_msgs::msg::Marker arrow;
   arrow.ns = "interactive_goals";
   arrow.type = visualization_msgs::msg::Marker::ARROW;
@@ -871,35 +877,35 @@ void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& mar
   arrow_control.markers.push_back(arrow);
   int_marker.controls.push_back(arrow_control);
 
-  // Add movement and rotation controls
+  // Helper to add rotation and translation controls
+  auto addRotationControls = [&]() {
+    addControl("rotate_x", 1.0, 0.0, 0.0, true);
+    addControl("rotate_y", 0.0, 1.0, 0.0, true);
+    addControl("rotate_z", 0.0, 0.0, 1.0, true);
+  };
+
+  auto addTranslationControls = [&]() {
+    addControl("move_x", 1.0, 0.0, 0.0, false);
+    addControl("move_y", 0.0, 1.0, 0.0, false);
+    addControl("move_z", 0.0, 0.0, 1.0, false);
+  };
+
+  // Configure controls based on enable type
   switch (enable) {
-  case ImControlEnable::ROTATION:
-    addControl("rotate_x", 1.0, 0.0, 0.0, true);
-    addControl("rotate_y", 0.0, 1.0, 0.0, true);
-    addControl("rotate_z", 0.0, 0.0, 1.0, true);
-    break;
-
-  case ImControlEnable::TRANSLATION:
-    addControl("move_x", 1.0, 0.0, 0.0, false);
-    addControl("move_y", 0.0, 1.0, 0.0, false);
-    addControl("move_z", 0.0, 0.0, 1.0, false);
-    break;
-
-  case ImControlEnable::ALL:
-    addControl("rotate_x", 1.0, 0.0, 0.0, true);
-    addControl("rotate_y", 0.0, 1.0, 0.0, true);
-    addControl("rotate_z", 0.0, 0.0, 1.0, true);
-    addControl("move_x", 1.0, 0.0, 0.0, false);
-    addControl("move_y", 0.0, 1.0, 0.0, false);
-    addControl("move_z", 0.0, 0.0, 1.0, false);
-    break;
-
-  case ImControlEnable::NONE:
-    break;
-}
-
-  affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-  affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+    case ImControlEnable::ROTATION:
+      addRotationControls();
+      break;
+    case ImControlEnable::TRANSLATION:
+      addTranslationControls();
+      break;
+    case ImControlEnable::ALL:
+      addRotationControls();
+      addTranslationControls();
+      break;
+    case ImControlEnable::NONE:
+    default:
+      break;
+  }
 
   // Insert and apply changes
   if (create) { //Insert with callback if it does not exist
@@ -908,8 +914,11 @@ void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& mar
     server_->insert(int_marker);
   }
   server_->applyChanges();
-}
 
+  // Reset affordance pose
+  affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+  affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+}
 
 void CcaInteractiveGoals::disableInteractiveMarkerControls(const std::string& marker_name)
 {
