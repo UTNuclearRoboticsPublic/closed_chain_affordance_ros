@@ -55,6 +55,8 @@ public:
   using CcaRosAction = cca_ros_viz_msgs::action::CcaRosAction;
   using GoalHandleCcaRosAction = rclcpp_action::ClientGoalHandle<CcaRosAction>;
 
+  enum class ImControlEnable{ROTATION, TRANSLATION, NONE, ALL};
+
   explicit CcaInteractiveGoals(QWidget* parent = nullptr);
 
   virtual void onInitialize() override;
@@ -76,7 +78,7 @@ protected Q_SLOTS:
   void axisOptionSelected(int index);
   void intMarkerController(visualization_msgs::msg::InteractiveMarker int_marker, bool rotate, bool translate);
   void processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
-  void enableInteractiveMarkerControls(const std::string& marker_name, const cc_affordance_planner::PlanningType& planning_type, bool create=false);
+  void enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create = false);
   void disableInteractiveMarkerControls(const std::string& marker_name);
   void applySettingsClicked();
   void spin();

@@ -208,7 +208,7 @@ void CcaInteractiveGoals::onInitialize()
   req_.start_state.robot = READY_CONFIG;
 
   // Create and hide the interactive marker
-  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::AFFORDANCE, true);
+  enableInteractiveMarkerControls("arrow_marker", ImControlEnable::ALL, true);
   disableInteractiveMarkerControls("arrow_marker");
 
   // Set up timer for spinning the node
@@ -309,7 +309,7 @@ void CcaInteractiveGoals::buildPlanningRequest()
       req_.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
 
       }
-      else
+      else // Manual input
       {
         try
         {
@@ -565,8 +565,7 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
   {
     conf_place_button_->setEnabled(true);
     conf_place_button_->setVisible(true);
-    // enableInteractiveMarkerControls("arrow_marker");
-  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::AFFORDANCE);
+    enableInteractiveMarkerControls("arrow_marker", ImControlEnable::ALL);
   }
   else
   {
@@ -665,9 +664,9 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     YMinus = 6,
     ZMinus = 7
 };
-  // Enable interactive marker for manual mode and return
+  // Enable interactive marker for manual mode (with rotation control) and return
   if (static_cast<AxisOption>(index)==AxisOption::Manual){
-  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::APPROACH); 
+  enableInteractiveMarkerControls("arrow_marker", ImControlEnable::ROTATION); 
   return;}
 
   if (index != 0)
@@ -684,8 +683,8 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     }
   }
 
-  // Enable the arrow
-  enableInteractiveMarkerControls("arrow_marker", cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
+  // Enable the arrow with no interactive control
+  enableInteractiveMarkerControls("arrow_marker", ImControlEnable::NONE);
 
   // Reset arrow below
   visualization_msgs::msg::InteractiveMarker int_marker;
@@ -831,7 +830,7 @@ void CcaInteractiveGoals::processArrowFeedback(
   }
 }
 
-void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name, const cc_affordance_planner::PlanningType& planning_type, bool create) {
+void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create) {
   visualization_msgs::msg::InteractiveMarker int_marker;
 
   if (!create){server_->get(marker_name, int_marker);}
@@ -873,17 +872,31 @@ void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& mar
   int_marker.controls.push_back(arrow_control);
 
   // Add movement and rotation controls
-  if (planning_type != cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY) {
+  switch (enable) {
+  case ImControlEnable::ROTATION:
     addControl("rotate_x", 1.0, 0.0, 0.0, true);
-    addControl("rotate_y", 0.0, 0.0, 1.0, true);
-    addControl("rotate_z", 0.0, 1.0, 0.0, true);
+    addControl("rotate_y", 0.0, 1.0, 0.0, true);
+    addControl("rotate_z", 0.0, 0.0, 1.0, true);
+    break;
 
-    if (planning_type != cc_affordance_planner::PlanningType::APPROACH) {
-      addControl("move_x", 1.0, 0.0, 0.0, false);
-      addControl("move_y", 0.0, 0.0, 1.0, false);
-      addControl("move_z", 0.0, 1.0, 0.0, false);
-    }
-  }
+  case ImControlEnable::TRANSLATION:
+    addControl("move_x", 1.0, 0.0, 0.0, false);
+    addControl("move_y", 0.0, 1.0, 0.0, false);
+    addControl("move_z", 0.0, 0.0, 1.0, false);
+    break;
+
+  case ImControlEnable::ALL:
+    addControl("rotate_x", 1.0, 0.0, 0.0, true);
+    addControl("rotate_y", 0.0, 1.0, 0.0, true);
+    addControl("rotate_z", 0.0, 0.0, 1.0, true);
+    addControl("move_x", 1.0, 0.0, 0.0, false);
+    addControl("move_y", 0.0, 1.0, 0.0, false);
+    addControl("move_z", 0.0, 0.0, 1.0, false);
+    break;
+
+  case ImControlEnable::NONE:
+    break;
+}
 
   affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
   affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
