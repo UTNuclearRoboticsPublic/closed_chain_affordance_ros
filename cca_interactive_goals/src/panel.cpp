@@ -176,7 +176,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   connect(goal_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(goalSelected(int)));
   connect(axis_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(axisOptionSelected(int)));
   connect(pitch_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(pitchSelected(int)));
-  connect(frame_place_button_, SIGNAL(clicked()), this, SLOT(framePlaceButtonClicked()));
   connect(plan_viz_button_, SIGNAL(clicked()), this, SLOT(planVizClicked()));
   connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(planVizExeClicked()));
   connect(plan_exe_button_, SIGNAL(clicked()), this, SLOT(planExeClicked()));
@@ -210,7 +209,6 @@ void CcaInteractiveGoals::onInitialize()
 
   // Create and hide interactive markers
   createArrowInteractiveMarker();
-  createInvisibleInteractiveMarker();
   server_->applyChanges();
 
   disableInteractiveMarkerControls("arrow_marker");
@@ -510,13 +508,10 @@ void CcaInteractiveGoals::modeSelected(int index)
       value_input_->setVisible(false);
       value_input_->setEnabled(false);
       value_label_->setVisible(false);
-      frame_place_button_->setVisible(false);
       pitch_label_->setVisible(false);
       pitch_combo_box_->setVisible(false);
       pitch_value_input_->setVisible(false);
       pitch_value_label_->setVisible(false);
-      frame_place_button_->setVisible(false);
-      frame_place_button_->setEnabled(false);
 
       // Set necessary widgets to visible
       motion_type_label_->setVisible(true);
@@ -539,13 +534,10 @@ void CcaInteractiveGoals::modeSelected(int index)
       value_input_->setVisible(false);
       value_input_->setEnabled(false);
       value_label_->setVisible(false);
-      frame_place_button_->setVisible(false);
       pitch_label_->setVisible(false);
       pitch_combo_box_->setVisible(false);
       pitch_value_input_->setVisible(false);
       pitch_value_label_->setVisible(false);
-      frame_place_button_->setVisible(false);
-      frame_place_button_->setEnabled(false);
 
       // Set necessary widgets to visible
 
@@ -570,8 +562,6 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
   pitch_value_input_->setVisible(false);
   pitch_value_label_->setVisible(false);
   pitch_combo_box_->setCurrentIndex(0);
-  frame_place_button_->setVisible(false);
-  frame_place_button_->setEnabled(false);
   if (motion_type_combo_box_->currentText() == "Translation" || motion_type_combo_box_->currentText() == "Rotation" ||
       motion_type_combo_box_->currentText() == "Screw Motion")
   {
