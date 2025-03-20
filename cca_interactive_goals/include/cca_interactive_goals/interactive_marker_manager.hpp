@@ -56,6 +56,12 @@ class InteractiveMarkerManager : public rclcpp::Node
     static const std::map<std::string, Eigen::Quaterniond>
         AXIS_ORIENTATION_MAP; ///<--map containing orientation transform to align x-axis with various axes
 
+    // ARROW AESTHETICS -- Color is Cyan
+    static const double ARROW_SCALE = 0.5;
+    static const double ARROW_COLOR_R = 0.251;
+    static const double ARROW_COLOR_G = 0.878;
+    static const double ARROW_COLOR_B = 0.816;
+
     // Methods
     void process_arrow_feedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
 };

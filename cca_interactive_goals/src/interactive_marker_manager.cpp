@@ -70,15 +70,15 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     int_marker.header.frame_id = "arm0_base_link";
     int_marker.name = marker_name;
     int_marker.description = "";
-    int_marker.scale = 0.5;
+    int_marker.scale = ARROW_SCALE;
 
-    // Lambda to add control
-    auto addControl = [&](const std::string &name, double x, double y, double z, bool isRotation) {
+    // Lambda to add control using static axis vectors
+    auto addControl = [&](const std::string &name, const Eigen::Vector3d &axis, bool isRotation) {
         visualization_msgs::msg::InteractiveMarkerControl control;
         control.orientation.w = 1.0;
-        control.orientation.x = x;
-        control.orientation.y = y;
-        control.orientation.z = z;
+        control.orientation.x = axis.x();
+        control.orientation.y = axis.y();
+        control.orientation.z = axis.z();
         control.name = name;
         control.interaction_mode = isRotation ? visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS
                                               : visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS;
@@ -89,12 +89,12 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     visualization_msgs::msg::Marker arrow;
     arrow.ns = "interactive_goals";
     arrow.type = visualization_msgs::msg::Marker::ARROW;
-    arrow.scale.x = 0.5;
-    arrow.scale.y = 0.05;
-    arrow.scale.z = 0.05;
-    arrow.color.r = 0.251;
-    arrow.color.g = 0.878;
-    arrow.color.b = 0.816;
+    arrow.scale.x = ARROW_SCALE;
+    arrow.scale.y = ARROW_SCALE / 10.0;
+    arrow.scale.z = ARROW_SCALE / 10.0;
+    arrow.color.r = ARROW_COLOR_R;
+    arrow.color.g = ARROW_COLOR_G;
+    arrow.color.b = ARROW_COLOR_B;
     arrow.color.a = 1.0;
 
     visualization_msgs::msg::InteractiveMarkerControl arrow_control;
@@ -104,15 +104,15 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
 
     // Helper to add rotation and translation controls
     auto addRotationControls = [&]() {
-        addControl("rotate_x", 1.0, 0.0, 0.0, true);
-        addControl("rotate_y", 0.0, 1.0, 0.0, true);
-        addControl("rotate_z", 0.0, 0.0, 1.0, true);
+        addControl("rotate_x", X_AXIS_, true);
+        addControl("rotate_y", Y_AXIS_, true);
+        addControl("rotate_z", Z_AXIS_, true);
     };
 
     auto addTranslationControls = [&]() {
-        addControl("move_x", 1.0, 0.0, 0.0, false);
-        addControl("move_y", 0.0, 1.0, 0.0, false);
-        addControl("move_z", 0.0, 0.0, 1.0, false);
+        addControl("move_x", X_AXIS_, false);
+        addControl("move_y", Y_AXIS_, false);
+        addControl("move_z", Z_AXIS_, false);
     };
 
     // Configure controls based on enable type
@@ -210,24 +210,18 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
     if ((planning_mode == "In-Place End Effector Orientation Control") && (axis_mode != "Interactive Axis"))
     {
 
-        // Create an InteractiveMarker to retrieve data
-        visualization_msgs::msg::InteractiveMarker int_marker;
-
         // Retrieve the marker
+        visualization_msgs::msg::InteractiveMarker int_marker;
         server_->get(arrow_marker_name_, int_marker);
-
         auto &marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
 
-        // Extract the marker pose (position and orientation)
+        // Extract the marker pose
         const geometry_msgs::msg::Pose &marker_pose = marker.pose;
-
-        // Extract position and orientation from the marker pose
         Eigen::Vector3d arrow_location(marker_pose.position.x, marker_pose.position.y, marker_pose.position.z);
-
         Eigen::Quaterniond arrow_quaternion(marker_pose.orientation.w, marker_pose.orientation.x,
                                             marker_pose.orientation.y, marker_pose.orientation.z);
 
-        // Rotate the default axis using the quaternion from the marker's orientation
+        // Determine how the quaternion has transformed the arrow
         Eigen::Vector3d arrow_axis = arrow_quaternion * DEFAULT_ARROW_AXIS_;
 
         // Populate the screw_info struct
