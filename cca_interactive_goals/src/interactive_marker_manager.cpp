@@ -205,7 +205,7 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
 {
     affordance_util::ScrewInfo screw_info;
 
-    // Check if asked to look at the moved interactive marker
+    // Check if asked to look at the interactive marker
     if ((planning_mode == "In-Place End Effector Orientation Control") && (axis_mode != "Interactive Axis"))
     {
 
@@ -226,10 +226,8 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
         // Populate the screw_info struct
         screw_info.axis = arrow_axis;
         screw_info.location = arrow_location;
-
-        return screw_info;
     }
-    else
+    else // from interactive marker
     {
         // Go with default location if the arrow hasn't moved
         if (arrow_axis_.hasNaN() && arrow_location_.hasNaN())
@@ -243,5 +241,6 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
             screw_info.location = arrow_location_;
         }
     }
+    return screw_info;
 }
 } // namespace interactive_marker_manager

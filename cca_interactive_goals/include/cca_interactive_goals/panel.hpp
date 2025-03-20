@@ -129,12 +129,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 
     // CCA parameters
     cca_ros::PlanningRequest req_;
-    Eigen::Vector3d affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-    Eigen::Vector3d affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-    const Eigen::Vector3d default_affordance_axis_ =
-        (Eigen::Vector3d() << 1.0, 0.0, 0.0).finished(); // Default interactive marker
-    const Eigen::Vector3d default_affordance_location_ =
-        (Eigen::Vector3d() << 0.0, 0.0, 0.0).finished(); // Interactive marker's default location
 
     // ROS clients
     rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
