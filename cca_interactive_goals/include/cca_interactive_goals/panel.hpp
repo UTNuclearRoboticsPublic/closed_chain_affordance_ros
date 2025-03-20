@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <Eigen/Dense>
+#include <algorithm>
 
 //CCA headers
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
@@ -79,7 +80,7 @@ protected Q_SLOTS:
   void intMarkerController(visualization_msgs::msg::InteractiveMarker int_marker, bool rotate, bool translate);
   void processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
   void enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create = false);
-  void disableInteractiveMarkerControls(const std::string& marker_name);
+  void hideInteractiveMarker(const std::string& marker_name);
   void applySettingsClicked();
   void spin();
 

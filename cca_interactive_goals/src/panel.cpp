@@ -209,7 +209,7 @@ void CcaInteractiveGoals::onInitialize()
 
   // Create and hide the interactive marker
   enableInteractiveMarkerControls("arrow_marker", ImControlEnable::ALL, true);
-  disableInteractiveMarkerControls("arrow_marker");
+  hideInteractiveMarker("arrow_marker");
 
   // Set up timer for spinning the node
   spin_timer_ = new QTimer(this);
@@ -489,7 +489,7 @@ void CcaInteractiveGoals::modeSelected(int index)
 
   bool mode_selected = mode_combo_box_->currentIndex() != -1;
 
-  disableInteractiveMarkerControls("arrow_marker");
+  hideInteractiveMarker("arrow_marker");
 
   if (mode_selected)
   {
@@ -571,7 +571,7 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
   {
     conf_place_button_->setEnabled(false);
     conf_place_button_->setVisible(true);
-    disableInteractiveMarkerControls("arrow_marker");
+    hideInteractiveMarker("arrow_marker");
   }
   if (motion_type_combo_box_->currentText() == "Screw Motion")
   {
@@ -920,24 +920,24 @@ void CcaInteractiveGoals::enableInteractiveMarkerControls(const std::string& mar
   affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
 }
 
-void CcaInteractiveGoals::disableInteractiveMarkerControls(const std::string& marker_name)
-{
-  visualization_msgs::msg::InteractiveMarker int_marker;
-  if (server_->get(marker_name, int_marker))
-  {
-    for (auto& control : int_marker.controls)
-    {
-      control.interaction_mode = visualization_msgs::msg::InteractiveMarkerControl::NONE;
+void CcaInteractiveGoals::hideInteractiveMarker(const std::string& marker_name)
+{    
+  // Disable interactive marker controls 
+  enableInteractiveMarkerControls(marker_name, ImControlEnable::NONE);
 
-      // Make the arrow invisible
-      if (!control.markers.empty())
-      {
-        control.markers[0].color.a = 0.0;  // Set alpha to 0.0 for full transparency
-      }
-    }
-    server_->insert(int_marker);
-    server_->applyChanges();
-  }
+  // Get the interactive marker object
+  visualization_msgs::msg::InteractiveMarker int_marker;
+  server_->get(marker_name, int_marker);
+
+  // Hide all non-interactive makers by making them fully transparent
+  std::for_each(int_marker.controls.begin(), int_marker.controls.end(), [](auto& control) {
+    std::for_each(control.markers.begin(), control.markers.end(), [](auto& marker) {
+      marker.color.a = 0.0;  
+    });
+  });
+
+  server_->insert(int_marker);
+  server_->applyChanges();
 }
 
 void CcaInteractiveGoals::spin()
