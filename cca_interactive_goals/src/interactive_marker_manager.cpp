@@ -84,7 +84,6 @@ void InteractiveMarkerManager::enable_im_controls(const std::string& marker_name
   arrow.color.g = 0.878;
   arrow.color.b = 0.816;
   arrow.color.a = 1.0;
-  arrow.id = 8;
 
   visualization_msgs::msg::InteractiveMarkerControl arrow_control;
   arrow_control.always_visible = true;
@@ -178,14 +177,7 @@ void InteractiveMarkerManager::draw_ee_or_control_im(int index)
   visualization_msgs::msg::InteractiveMarker int_marker;
   server_->get("arrow_marker", int_marker);
 
-  for (auto& control : int_marker.controls)
-{
-  if (!control.markers.empty())
-  {
-    for (auto& marker : control.markers)
-    {
-      if (marker.id == 8) // Found the arrow marker
-      {
+    auto& marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
 
 	switch (static_cast<AxisOption>(index)) {
 	    case AxisOption::X:
@@ -230,10 +222,6 @@ void InteractiveMarkerManager::draw_ee_or_control_im(int index)
 		marker.pose.orientation.z = 0.0;
 		break;
 
-	}
-      }
-    }
-  }
 }
 
 // Update the interactive marker with the new arrow orientation
@@ -254,39 +242,34 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
     // Retrieve the marker 
     server_->get("arrow_marker", int_marker);
 
-    // Search through all controls and markers to find the one with the correct ID
-    for (auto& control : int_marker.controls) {
-        for (auto& marker : control.markers) {
-            if (marker.id == marker_id_) { 
+    auto& marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
+    
+    // Extract the marker pose (position and orientation)
+    const geometry_msgs::msg::Pose& marker_pose = marker.pose;
 
-                // Extract the marker pose (position and orientation)
-                const geometry_msgs::msg::Pose& marker_pose = marker.pose;
+    // Extract position and orientation from the marker pose
+    Eigen::Vector3d arrow_location(
+        marker_pose.position.x,
+        marker_pose.position.y,
+        marker_pose.position.z
+    );
 
-                // Extract position and orientation from the marker pose
-                Eigen::Vector3d arrow_location(
-                    marker_pose.position.x,
-                    marker_pose.position.y,
-                    marker_pose.position.z
-                );
+    Eigen::Quaterniond arrow_quaternion(
+        marker_pose.orientation.w,
+        marker_pose.orientation.x,
+        marker_pose.orientation.y,
+        marker_pose.orientation.z
+    );
 
-                Eigen::Quaterniond arrow_quaternion(
-                    marker_pose.orientation.w,
-                    marker_pose.orientation.x,
-                    marker_pose.orientation.y,
-                    marker_pose.orientation.z
-                );
+    // Rotate the default axis using the quaternion from the marker's orientation
+    Eigen::Vector3d arrow_axis = arrow_quaternion * DEFAULT_ARROW_AXIS_;
 
-                // Rotate the default axis using the quaternion from the marker's orientation
-                Eigen::Vector3d arrow_axis = arrow_quaternion * DEFAULT_ARROW_AXIS_;
+    // Populate the screw_info struct
+    screw_info.axis = arrow_axis;
+    screw_info.location = arrow_location;
 
-                // Populate the screw_info struct
-                screw_info.axis = arrow_axis;
-                screw_info.location = arrow_location;
+    return screw_info;
 
-                return screw_info;
-            }
-        }
-    }
     }
     else {
 	    // Go with default location if the arrow hasn't moved

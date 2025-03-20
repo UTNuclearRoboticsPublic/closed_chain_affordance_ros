@@ -32,7 +32,6 @@ public:
   void draw_ee_or_control_im(int index);
 
 private:
-  const int marker_id_=8;
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
 
   // Some variables and consts to capture arrow pose
@@ -47,7 +46,6 @@ private:
   // Methods
   void process_arrow_feedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
 };
-
 
 }  // namespace interactive_marker_manager
 
