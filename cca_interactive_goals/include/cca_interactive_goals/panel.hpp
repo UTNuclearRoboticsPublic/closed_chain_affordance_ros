@@ -55,8 +55,8 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 {
     Q_OBJECT
   public:
-    using CcaRosAction = cca_ros_viz_msgs::action::CcaRosAction;
-    using GoalHandleCcaRosAction = rclcpp_action::ClientGoalHandle<CcaRosAction>;
+    // using CcaRosAction = cca_ros_viz_msgs::action::CcaRosAction;
+    // using GoalHandleCcaRosAction = rclcpp_action::ClientGoalHandle<CcaRosAction>;
 
     explicit CcaInteractiveGoals(QWidget *parent = nullptr);
 
@@ -84,7 +84,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     const int marker_id_ = 8;
     void updateUIState();
 
-    std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
+    // std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
     interactive_markers::MenuHandler menu_handler_;
 
     QComboBox *mode_combo_box_;
@@ -131,17 +131,18 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     cca_ros::PlanningRequest req_;
 
     // ROS clients
-    rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
-        cca_action_client_; ///< Client for planning and executing with CCA
-    std::shared_future<GoalHandleCcaRosAction::SharedPtr>
-        cca_action_goal_future_; ///< Goal handle future for the CCA action
-    const std::string cca_as_name_ = "/cca_ros_action";
+    // rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
+    // cca_action_client_; ///< Client for planning and executing with CCA
+    // std::shared_future<GoalHandleCcaRosAction::SharedPtr>
+    // cca_action_goal_future_; ///< Goal handle future for the CCA action
+    // const std::string cca_as_name_ = "/cca_ros_action";
 
-    void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr &goal_handle);
-    void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult &result);
-    void send_cca_action_goal_();
+    // void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr &goal_handle);
+    // void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult &result);
+    // void send_cca_action_goal_();
     double getAffordanceGoal_();
     bool new_settings_applied_ = false;
+    std::shared_ptr<cca_ros_action::CcaRosActionClient> ccaRosActionClient;
 };
 
 } // namespace cca_interactive_goals

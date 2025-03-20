@@ -195,7 +195,8 @@ void CcaInteractiveGoals::onInitialize()
     // Do ROS client initializations here
 
     // Initialize CCA action client
-    cca_action_client_ = rclcpp_action::create_client<CcaRosAction>(this, cca_as_name_);
+    // cca_action_client_ = rclcpp_action::create_client<CcaRosAction>(this, cca_as_name_);
+    ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
     // Set planning request start state for testing purposes
     const Eigen::VectorXd READY_CONFIG =
@@ -226,7 +227,8 @@ void CcaInteractiveGoals::planVizClicked()
     RCLCPP_INFO(this->get_logger(), "planViz button pressed");
     req_.visualize_trajectory = true;
     req_.execute_trajectory = false;
-    this->send_cca_action_goal_();
+    // this->send_cca_action_goal_();
+    ccaRosActionClient->send_goal(req_);
 }
 
 void CcaInteractiveGoals::planVizExeClicked()
@@ -238,7 +240,8 @@ void CcaInteractiveGoals::planVizExeClicked()
     RCLCPP_INFO(this->get_logger(), "planVizExe button pressed");
     req_.visualize_trajectory = true;
     req_.execute_trajectory = true;
-    this->send_cca_action_goal_();
+    // this->send_cca_action_goal_();
+    ccaRosActionClient->send_goal(req_);
 }
 
 void CcaInteractiveGoals::planExeClicked()
@@ -250,30 +253,11 @@ void CcaInteractiveGoals::planExeClicked()
     RCLCPP_INFO(this->get_logger(), "planExe button pressed");
     req_.visualize_trajectory = false;
     req_.execute_trajectory = true;
-    this->send_cca_action_goal_();
+    // this->send_cca_action_goal_();
+    ccaRosActionClient->send_goal(req_);
 }
 
-void CcaInteractiveGoals::stopClicked()
-{
-    if (cca_action_goal_future_.valid())
-    {
-        auto goal_handle = cca_action_goal_future_.get(); // Extracts the goal handle
-        if (goal_handle)
-        {
-            cca_action_client_->async_cancel_goal(goal_handle); // Cancel the goal
-        }
-        else
-        {
-            RCLCPP_WARN(this->get_logger(), "Cannot cancel goal because it was not accepted by the server: %s",
-                        cca_as_name_.c_str());
-        }
-    }
-    else
-    {
-        RCLCPP_WARN(this->get_logger(), "Unable to cancel %s server goal due to the goal future being invalid ",
-                    cca_as_name_.c_str());
-    }
-}
+void CcaInteractiveGoals::stopClicked() { ccaRosActionClient->cancel_goal(); }
 
 void CcaInteractiveGoals::buildPlanningRequest()
 {
@@ -664,61 +648,61 @@ void CcaInteractiveGoals::updateUIState()
 
 void CcaInteractiveGoals::spin() { rclcpp::spin_some(this->get_node_base_interface()); }
 
-void CcaInteractiveGoals::send_cca_action_goal_()
-{
-    // Create goal
-    auto goal_msg = cca_ros_viz_msgs::action::CcaRosAction::Goal();
-    goal_msg.req = cca_ros_util::convert_req_to_cca_ros_action(req_);
-    RCLCPP_INFO_STREAM(this->get_logger(), "Axis is: " << req_.task_description.affordance_info.axis.transpose());
-    RCLCPP_INFO_STREAM(this->get_logger(),
-                       "Location is: " << req_.task_description.affordance_info.location.transpose());
-    RCLCPP_INFO_STREAM(this->get_logger(),
-                       "EE orientation is: " << req_.task_description.goal.ee_orientation.transpose());
+// void CcaInteractiveGoals::send_cca_action_goal_()
+// {
+//     // Create goal
+//     auto goal_msg = cca_ros_viz_msgs::action::CcaRosAction::Goal();
+//     goal_msg.req = cca_ros_util::convert_req_to_cca_ros_action(req_);
+//     RCLCPP_INFO_STREAM(this->get_logger(), "Axis is: " << req_.task_description.affordance_info.axis.transpose());
+//     RCLCPP_INFO_STREAM(this->get_logger(),
+//                        "Location is: " << req_.task_description.affordance_info.location.transpose());
+//     RCLCPP_INFO_STREAM(this->get_logger(),
+//                        "EE orientation is: " << req_.task_description.goal.ee_orientation.transpose());
 
-    if (!this->cca_action_client_->wait_for_action_server())
-    {
-        RCLCPP_ERROR(this->get_logger(), "%s action server not available after waiting", cca_as_name_.c_str());
-        rclcpp::shutdown();
-    }
+//     if (!this->cca_action_client_->wait_for_action_server())
+//     {
+//         RCLCPP_ERROR(this->get_logger(), "%s action server not available after waiting", cca_as_name_.c_str());
+//         rclcpp::shutdown();
+//     }
 
-    RCLCPP_INFO(this->get_logger(), "Sending goal to %s action server.", cca_as_name_.c_str());
+//     RCLCPP_INFO(this->get_logger(), "Sending goal to %s action server.", cca_as_name_.c_str());
 
-    using namespace std::placeholders;
-    auto send_goal_options = rclcpp_action::Client<CcaRosAction>::SendGoalOptions();
-    send_goal_options.goal_response_callback =
-        std::bind(&CcaInteractiveGoals::cca_action_client_goal_response_cb_, this, _1);
-    send_goal_options.result_callback = std::bind(&CcaInteractiveGoals::cca_action_client_result_cb_, this, _1);
-    cca_action_goal_future_ = this->cca_action_client_->async_send_goal(goal_msg, send_goal_options);
-}
-void CcaInteractiveGoals::cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr &goal_handle)
-{
-    if (!goal_handle)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Goal was rejected by action server, %s", cca_as_name_.c_str());
-    }
-    else
-    {
-        RCLCPP_INFO(this->get_logger(), "Goal accepted by %s server, waiting for result", cca_as_name_.c_str());
-    }
-}
+//     using namespace std::placeholders;
+//     auto send_goal_options = rclcpp_action::Client<CcaRosAction>::SendGoalOptions();
+//     send_goal_options.goal_response_callback =
+//         std::bind(&CcaInteractiveGoals::cca_action_client_goal_response_cb_, this, _1);
+//     send_goal_options.result_callback = std::bind(&CcaInteractiveGoals::cca_action_client_result_cb_, this, _1);
+//     cca_action_goal_future_ = this->cca_action_client_->async_send_goal(goal_msg, send_goal_options);
+// }
+// void CcaInteractiveGoals::cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr &goal_handle)
+// {
+//     if (!goal_handle)
+//     {
+//         RCLCPP_ERROR(this->get_logger(), "Goal was rejected by action server, %s", cca_as_name_.c_str());
+//     }
+//     else
+//     {
+//         RCLCPP_INFO(this->get_logger(), "Goal accepted by %s server, waiting for result", cca_as_name_.c_str());
+//     }
+// }
 
-void CcaInteractiveGoals::cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult &result)
-{
-    switch (result.code)
-    {
-    case rclcpp_action::ResultCode::SUCCEEDED:
-        break;
-    case rclcpp_action::ResultCode::ABORTED:
-        RCLCPP_ERROR(this->get_logger(), "Goal was aborted by %s server", cca_as_name_.c_str());
-        return;
-    case rclcpp_action::ResultCode::CANCELED:
-        RCLCPP_ERROR(this->get_logger(), "Goal was canceled by %s server", cca_as_name_.c_str());
-        return;
-    default:
-        RCLCPP_ERROR(this->get_logger(), "Unknown result code from %s server", cca_as_name_.c_str());
-        return;
-    }
-}
+// void CcaInteractiveGoals::cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult &result)
+// {
+//     switch (result.code)
+//     {
+//     case rclcpp_action::ResultCode::SUCCEEDED:
+//         break;
+//     case rclcpp_action::ResultCode::ABORTED:
+//         RCLCPP_ERROR(this->get_logger(), "Goal was aborted by %s server", cca_as_name_.c_str());
+//         return;
+//     case rclcpp_action::ResultCode::CANCELED:
+//         RCLCPP_ERROR(this->get_logger(), "Goal was canceled by %s server", cca_as_name_.c_str());
+//         return;
+//     default:
+//         RCLCPP_ERROR(this->get_logger(), "Unknown result code from %s server", cca_as_name_.c_str());
+//         return;
+//     }
+// }
 
 } // namespace cca_interactive_goals
 // TODO: get marker frame id from outside to make this robot-agnostic
