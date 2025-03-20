@@ -8,14 +8,14 @@ namespace interactive_marker_manager
   const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_AXIS_ = InteractiveMarkerManager::X_AXIS_;
   const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_LOCATION_(0.0, 0.0, 0.0);
 
-InteractiveMarkerManager::InteractiveMarkerManager(const std::string& node_name): rclcpp::Node(node_name)
+InteractiveMarkerManager::InteractiveMarkerManager(const std::string& node_name): rclcpp::Node(node_name), arrow_marker_name_("arrow_marker")
 {
 
   server_ = std::make_shared<interactive_markers::InteractiveMarkerServer>(
       "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
       this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-  enable_im_controls("arrow_marker", ImControlEnable::ALL, true);
+  enable_im_controls(arrow_marker_name_, ImControlEnable::ALL, true);
 
 
   RCLCPP_INFO(this->get_logger(),"Interactive marker manager initialized.");
@@ -166,16 +166,16 @@ void InteractiveMarkerManager::draw_ee_or_control_im(int index)
 };
   // Enable interactive marker for manual mode (with rotation control) and return
   if (static_cast<AxisOption>(index)==AxisOption::Manual){
-  enable_im_controls("arrow_marker", ImControlEnable::ROTATION); 
+  enable_im_controls(arrow_marker_name_, ImControlEnable::ROTATION); 
   return;}
 
 
   // Enable the arrow with no interactive control
-  enable_im_controls("arrow_marker", ImControlEnable::NONE);
+  enable_im_controls(arrow_marker_name_, ImControlEnable::NONE);
 
   // Reset arrow below
   visualization_msgs::msg::InteractiveMarker int_marker;
-  server_->get("arrow_marker", int_marker);
+  server_->get(arrow_marker_name_, int_marker);
 
     auto& marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
 
@@ -240,7 +240,7 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
     visualization_msgs::msg::InteractiveMarker int_marker;
 
     // Retrieve the marker 
-    server_->get("arrow_marker", int_marker);
+    server_->get(arrow_marker_name_, int_marker);
 
     auto& marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
     

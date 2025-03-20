@@ -34,6 +34,7 @@ public:
 private:
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
 
+  std::string arrow_marker_name_;
   // Some variables and consts to capture arrow pose
   Eigen::Vector3d arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
   Eigen::Vector3d arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
