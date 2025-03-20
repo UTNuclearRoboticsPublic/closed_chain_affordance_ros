@@ -21,8 +21,7 @@ const std::map<std::string, Eigen::Quaterniond> InteractiveMarkerManager::AXIS_O
     {"-z", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, NEG_Z_AXIS_)}  // Rotate X to -Z
 };
 
-InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
-    : rclcpp::Node(node_name), arrow_marker_name_("arrow_marker")
+InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name) : rclcpp::Node(node_name)
 {
 
     server_ = std::make_shared<interactive_markers::InteractiveMarkerServer>(

@@ -71,7 +71,8 @@ class InteractiveMarkerManager : public rclcpp::Node
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
-    std::string arrow_marker_name_; ///< Name of the interactive marker for the screw arrow
+    static constexpr const char *arrow_marker_name_ =
+        "arrow_marker"; ///< Name of the interactive marker for the screw arrow
 
     // Variables for capturing the arrow pose
     Eigen::Vector3d arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
