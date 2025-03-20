@@ -40,6 +40,8 @@
 #include <QTimer>
 #include <QFormLayout>
 
+#include "cca_interactive_goals/interactive_marker_manager.hpp"
+
 class QLabel;
 class QComboBox;
 class QPushButton;
@@ -49,7 +51,7 @@ class QTimer;
 namespace cca_interactive_goals
 {
 
-class CcaInteractiveGoals : public rviz_common::Panel, public rclcpp::Node
+class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker_manager::InteractiveMarkerManager
 {
   Q_OBJECT
 public:
@@ -77,10 +79,10 @@ protected Q_SLOTS:
   void goalSelected(int index);
   void pitchSelected(int index);
   void axisOptionSelected(int index);
-  void intMarkerController(visualization_msgs::msg::InteractiveMarker int_marker, bool rotate, bool translate);
-  void processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
-  void enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create = false);
-  void hideInteractiveMarker(const std::string& marker_name);
+  // void intMarkerController(visualization_msgs::msg::InteractiveMarker int_marker, bool rotate, bool translate);
+  // void processArrowFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
+  // void enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create = false);
+  // void hideInteractiveMarker(const std::string& marker_name);
   void applySettingsClicked();
   void spin();
 
@@ -148,9 +150,11 @@ private:
   void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr & goal_handle);
   void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult & result);
   void send_cca_action_goal_();
-  affordance_util::ScrewInfo getAffordancePose_();
+  // affordance_util::ScrewInfo getAffordancePose_();
   double getAffordanceGoal_();
   bool new_settings_applied_ = false;
+
+  std::shared_ptr<interactive_marker_manager::InteractiveMarkerManager> imm_;
 
 };
 

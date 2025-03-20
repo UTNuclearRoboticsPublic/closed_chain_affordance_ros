@@ -32,10 +32,12 @@ include_directories(include)
 
 set(HEADERS
   include/${PROJECT_NAME}/panel.hpp
+  include/${PROJECT_NAME}/interactive_marker_manager.hpp
 )
 
 set(SOURCES
   src/panel.cpp
+  src/interactive_marker_manager.cpp
 )
 
 qt5_wrap_ui(UIC_FILES
