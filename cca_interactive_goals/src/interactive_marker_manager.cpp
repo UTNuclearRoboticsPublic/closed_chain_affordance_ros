@@ -5,8 +5,21 @@ namespace interactive_marker_manager
 
 // Initialize Eigen static consts
 const Eigen::Vector3d InteractiveMarkerManager::X_AXIS_(1.0, 0.0, 0.0);
+const Eigen::Vector3d InteractiveMarkerManager::Y_AXIS_(0.0, 1.0, 0.0);
+const Eigen::Vector3d InteractiveMarkerManager::Z_AXIS_(0.0, 0.0, 1.0);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_X_AXIS_(-1.0, 0.0, 0.0);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_Y_AXIS_(0.0, -1.0, 0.0);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_Z_AXIS_(0.0, 0.0, -1.0);
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_AXIS_ = InteractiveMarkerManager::X_AXIS_;
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_LOCATION_(0.0, 0.0, 0.0);
+const std::map<std::string, Eigen::Quaterniond> InteractiveMarkerManager::AXIS_ORIENTATION_MAP = {
+    {"x", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, X_AXIS_)},      // No rotation needed
+    {"y", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, Y_AXIS_)},      // Rotate X to Y
+    {"z", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, Z_AXIS_)},      // Rotate X to Z
+    {"-x", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, NEG_X_AXIS_)}, // Rotate X to -X
+    {"-y", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, NEG_Y_AXIS_)}, // Rotate X to -Y
+    {"-z", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, NEG_Z_AXIS_)}  // Rotate X to -Z
+};
 
 InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
     : rclcpp::Node(node_name), arrow_marker_name_("arrow_marker")
@@ -167,53 +180,20 @@ void InteractiveMarkerManager::draw_ee_or_control_im(const std::string &axis)
     // Enable the arrow with no interactive control
     enable_im_controls(arrow_marker_name_, ImControlEnable::NONE);
 
-    // Reset arrow below
+    // Get the interactive marker
     visualization_msgs::msg::InteractiveMarker int_marker;
     server_->get(arrow_marker_name_, int_marker);
 
     auto &marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
 
-    if (axis == "x")
+    // Orient the arrow to align with the specified axis
+    if (AXIS_ORIENTATION_MAP.find(axis) != AXIS_ORIENTATION_MAP.end())
     {
-        marker.pose.orientation.w = 1.0;
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 0.0;
-    }
-    else if (axis == "y")
-    {
-        marker.pose.orientation.w = 0.707107;
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 0.707107;
-    }
-    else if (axis == "z")
-    {
-        marker.pose.orientation.w = 0.707107;
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = -0.707107;
-        marker.pose.orientation.z = 0.0;
-    }
-    else if (axis == "-x")
-    {
-        marker.pose.orientation.w = 0.0;
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 1.0;
-    }
-    else if (axis == "-y")
-    {
-        marker.pose.orientation.w = 0.707107;
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = -0.707107;
-    }
-    else if (axis == "-z")
-    {
-        marker.pose.orientation.w = 0.707107;
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.707107;
-        marker.pose.orientation.z = 0.0;
+        Eigen::Quaterniond q = InteractiveMarkerManager::AXIS_ORIENTATION_MAP.at(axis);
+        marker.pose.orientation.w = q.w();
+        marker.pose.orientation.x = q.x();
+        marker.pose.orientation.y = q.y();
+        marker.pose.orientation.z = q.z();
     }
 
     // Update the interactive marker with the new arrow orientation

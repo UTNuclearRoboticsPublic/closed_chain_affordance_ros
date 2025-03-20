@@ -48,6 +48,13 @@ class InteractiveMarkerManager : public rclcpp::Node
 
     // Helper consts
     static const Eigen::Vector3d X_AXIS_;
+    static const Eigen::Vector3d Y_AXIS_;
+    static const Eigen::Vector3d Z_AXIS_;
+    static const Eigen::Vector3d NEG_X_AXIS_;
+    static const Eigen::Vector3d NEG_Y_AXIS_;
+    static const Eigen::Vector3d NEG_Z_AXIS_;
+    static const std::map<std::string, Eigen::Quaterniond>
+        AXIS_ORIENTATION_MAP; ///<--map containing orientation transform to align x-axis with various axes
 
     // Methods
     void process_arrow_feedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
