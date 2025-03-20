@@ -11,11 +11,11 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string& node_name)
       "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
       this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-  enableInteractiveMarkerControls("arrow_marker", ImControlEnable::ALL, true);
+  enable_im_controls("arrow_marker", ImControlEnable::ALL, true);
 
 }
 
-void InteractiveMarkerManager::processArrowFeedback(
+void InteractiveMarkerManager::process_arrow_feedback(
     const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback)
 {
   switch (feedback->event_type)
@@ -28,8 +28,8 @@ void InteractiveMarkerManager::processArrowFeedback(
           		feedback->pose.orientation.y,
           		feedback->pose.orientation.z);
       Eigen::Vector3d X_AXIS(1.0, 0.0, 0.0);//Starts as oriented along x
-      affordance_axis_ = q * X_AXIS;
-      affordance_location_= Eigen::Vector3d(
+      arrow_axis_ = q * X_AXIS;
+      arrow_location_= Eigen::Vector3d(
             feedback->pose.position.x, feedback->pose.position.y, feedback->pose.position.z);
 
       server_->setPose(feedback->marker_name, feedback->pose);
@@ -38,7 +38,7 @@ void InteractiveMarkerManager::processArrowFeedback(
   }
 }
 
-void InteractiveMarkerManager::enableInteractiveMarkerControls(const std::string& marker_name, const ImControlEnable& enable, bool create) {
+void InteractiveMarkerManager::enable_im_controls(const std::string& marker_name, const ImControlEnable& enable, bool create) {
   visualization_msgs::msg::InteractiveMarker int_marker;
 
   // Retrieve marker if not creating a new one
@@ -117,21 +117,21 @@ void InteractiveMarkerManager::enableInteractiveMarkerControls(const std::string
 
   // Insert and apply changes
   if (create) { //Insert with callback if it does not exist
-    server_->insert(int_marker, std::bind(&InteractiveMarkerManager::processArrowFeedback, this, std::placeholders::_1));
+    server_->insert(int_marker, std::bind(&InteractiveMarkerManager::process_arrow_feedback, this, std::placeholders::_1));
   } else {
     server_->insert(int_marker);
   }
   server_->applyChanges();
 
   // Reset affordance pose
-  affordance_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-  affordance_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+  arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+  arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
 }
 
-void InteractiveMarkerManager::hideInteractiveMarker(const std::string& marker_name)
+void InteractiveMarkerManager::hide_im(const std::string& marker_name)
 {    
   // Disable interactive marker controls 
-  enableInteractiveMarkerControls(marker_name, ImControlEnable::NONE);
+  enable_im_controls(marker_name, ImControlEnable::NONE);
 
   // Get the interactive marker object
   visualization_msgs::msg::InteractiveMarker int_marker;
@@ -148,7 +148,7 @@ void InteractiveMarkerManager::hideInteractiveMarker(const std::string& marker_n
   server_->applyChanges();
 }
 
-void InteractiveMarkerManager::drawEeOrControlIm(int index)
+void InteractiveMarkerManager::draw_ee_or_control_im(int index)
 {
     RCLCPP_INFO(this->get_logger(), "About to draw EE Or mode marker");
   enum class AxisOption {
@@ -162,12 +162,12 @@ void InteractiveMarkerManager::drawEeOrControlIm(int index)
 };
   // Enable interactive marker for manual mode (with rotation control) and return
   if (static_cast<AxisOption>(index)==AxisOption::Manual){
-  enableInteractiveMarkerControls("arrow_marker", ImControlEnable::ROTATION); 
+  enable_im_controls("arrow_marker", ImControlEnable::ROTATION); 
   return;}
 
 
   // Enable the arrow with no interactive control
-  enableInteractiveMarkerControls("arrow_marker", ImControlEnable::NONE);
+  enable_im_controls("arrow_marker", ImControlEnable::NONE);
 
   // Reset arrow below
   visualization_msgs::msg::InteractiveMarker int_marker;
@@ -239,7 +239,7 @@ server_->applyChanges();
 
 }
 
-affordance_util::ScrewInfo InteractiveMarkerManager::getAffordancePose_(const std::string planning_mode, const std::string axis_mode) {
+affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::string planning_mode, const std::string axis_mode) {
     affordance_util::ScrewInfo screw_info;
 
     // Check if asked to look at the moved interactive marker
@@ -261,7 +261,7 @@ affordance_util::ScrewInfo InteractiveMarkerManager::getAffordancePose_(const st
                 const geometry_msgs::msg::Pose& marker_pose = marker.pose;
 
                 // Extract position and orientation from the marker pose
-                Eigen::Vector3d affordance_location(
+                Eigen::Vector3d arrow_location(
                     marker_pose.position.x,
                     marker_pose.position.y,
                     marker_pose.position.z
@@ -275,11 +275,11 @@ affordance_util::ScrewInfo InteractiveMarkerManager::getAffordancePose_(const st
                 );
 
                 // Rotate the default axis using the quaternion from the marker's orientation
-                Eigen::Vector3d affordance_axis = arrow_quaternion * default_affordance_axis_;
+                Eigen::Vector3d arrow_axis = arrow_quaternion * default_arrow_axis_;
 
                 // Populate the screw_info struct
-                screw_info.axis = affordance_axis;
-                screw_info.location = affordance_location;
+                screw_info.axis = arrow_axis;
+                screw_info.location = arrow_location;
 
                 return screw_info;
             }
@@ -287,16 +287,16 @@ affordance_util::ScrewInfo InteractiveMarkerManager::getAffordancePose_(const st
     }
     }
     else {
-  if (affordance_axis_.hasNaN() && affordance_location_.hasNaN()) {
+  if (arrow_axis_.hasNaN() && arrow_location_.hasNaN()) {
     RCLCPP_WARN(this->get_logger(),
                  "Requested planning without having moved the affordance screw axis arrow. Going with its default location and orientation");
-    screw_info.axis = default_affordance_axis_;
-    screw_info.location = default_affordance_location_;
+    screw_info.axis = default_arrow_axis_;
+    screw_info.location = default_arrow_location_;
 } else {
     RCLCPP_WARN(this->get_logger(),
                  "Interactive marker has moved");
-    screw_info.axis = affordance_axis_;
-    screw_info.location = affordance_location_;
+    screw_info.axis = arrow_axis_;
+    screw_info.location = arrow_location_;
 }
     
     }
