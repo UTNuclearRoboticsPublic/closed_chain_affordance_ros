@@ -35,15 +35,19 @@ private:
   const int marker_id_=8;
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
 
-  // Capturing affordance from interactive marker arrow
+  // Some variables and consts to capture arrow pose
   Eigen::Vector3d arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
   Eigen::Vector3d arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-  const Eigen::Vector3d default_arrow_axis_ = (Eigen::Vector3d()<<1.0, 0.0, 0.0).finished(); // Default interactive marker
-  const Eigen::Vector3d default_arrow_location_= (Eigen::Vector3d()<<0.0, 0.0, 0.0).finished(); // Interactive marker's default location
+  static const Eigen::Vector3d DEFAULT_ARROW_AXIS_;
+  static const Eigen::Vector3d DEFAULT_ARROW_LOCATION_;
+
+  // Helper consts
+  static const Eigen::Vector3d X_AXIS_;
 
   // Methods
   void process_arrow_feedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
 };
+
 
 }  // namespace interactive_marker_manager
 
