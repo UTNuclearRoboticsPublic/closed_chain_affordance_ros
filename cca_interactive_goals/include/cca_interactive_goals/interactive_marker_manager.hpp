@@ -28,8 +28,8 @@ public:
   explicit InteractiveMarkerManager(const std::string& node_name);
   void enable_im_controls(const std::string& marker_name, const ImControlEnable& enable, bool create = false);
   void hide_im(const std::string& marker_name);
-  affordance_util::ScrewInfo get_arrow_pose(const std::string planning_mode, const std::string axis_mode);
-  void draw_ee_or_control_im(int index);
+  affordance_util::ScrewInfo get_arrow_pose(const std::string& planning_mode, const std::string& axis_mode);
+  void draw_ee_or_control_im(const std::string& axis);
 
 private:
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;

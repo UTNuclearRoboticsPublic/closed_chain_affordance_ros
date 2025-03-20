@@ -153,19 +153,10 @@ void InteractiveMarkerManager::hide_im(const std::string& marker_name)
   server_->applyChanges();
 }
 
-void InteractiveMarkerManager::draw_ee_or_control_im(int index)
+void InteractiveMarkerManager::draw_ee_or_control_im(const std::string& axis)
 {
-  enum class AxisOption {
-    Manual = 1,
-    X = 2,
-    Y = 3,
-    Z = 4,
-    XMinus = 5,
-    YMinus = 6,
-    ZMinus = 7
-};
   // Enable interactive marker for manual mode (with rotation control) and return
-  if (static_cast<AxisOption>(index)==AxisOption::Manual){
+  if (axis=="Interactive Axis"){
   enable_im_controls(arrow_marker_name_, ImControlEnable::ROTATION); 
   return;}
 
@@ -177,52 +168,39 @@ void InteractiveMarkerManager::draw_ee_or_control_im(int index)
   visualization_msgs::msg::InteractiveMarker int_marker;
   server_->get(arrow_marker_name_, int_marker);
 
-    auto& marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
+  auto& marker = int_marker.controls.front().markers.front(); // First control contains the arrow marker
 
-	switch (static_cast<AxisOption>(index)) {
-	    case AxisOption::X:
-		marker.pose.orientation.w = 1.0;
-		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = 0.0;
-		marker.pose.orientation.z = 0.0;
-		break;
-
-	    case AxisOption::Y:
-		marker.pose.orientation.w = 0.707107;
-		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = 0.0;
-		marker.pose.orientation.z = 0.707107;
-		break;
-
-	    case AxisOption::Z:
-		marker.pose.orientation.w = 0.707107;
-		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = -0.707107;
-		marker.pose.orientation.z = 0.0;
-		break;
-
-	    case AxisOption::XMinus:
-		marker.pose.orientation.w = 0.0;
-		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = 0.0;
-		marker.pose.orientation.z = 1.0;
-		break;
-
-	    case AxisOption::YMinus:
-		marker.pose.orientation.w = 0.707107;
-		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = 0.0;
-		marker.pose.orientation.z = -0.707107;
-		break;
-
-	    case AxisOption::ZMinus:
-		marker.pose.orientation.w = 0.707107;
-		marker.pose.orientation.x = 0.0;
-		marker.pose.orientation.y = 0.707107;
-		marker.pose.orientation.z = 0.0;
-		break;
-
-}
+  if (axis == "x") {
+	  marker.pose.orientation.w = 1.0;
+	  marker.pose.orientation.x = 0.0;
+	  marker.pose.orientation.y = 0.0;
+	  marker.pose.orientation.z = 0.0;
+  } else if (axis == "y") {
+	  marker.pose.orientation.w = 0.707107;
+	  marker.pose.orientation.x = 0.0;
+	  marker.pose.orientation.y = 0.0;
+	  marker.pose.orientation.z = 0.707107;
+  } else if (axis == "z") {
+	  marker.pose.orientation.w = 0.707107;
+	  marker.pose.orientation.x = 0.0;
+	  marker.pose.orientation.y = -0.707107;
+	  marker.pose.orientation.z = 0.0;
+  } else if (axis == "-x") {
+	  marker.pose.orientation.w = 0.0;
+	  marker.pose.orientation.x = 0.0;
+	  marker.pose.orientation.y = 0.0;
+	  marker.pose.orientation.z = 1.0;
+  } else if (axis == "-y") {
+	  marker.pose.orientation.w = 0.707107;
+	  marker.pose.orientation.x = 0.0;
+	  marker.pose.orientation.y = 0.0;
+	  marker.pose.orientation.z = -0.707107;
+  } else if (axis == "-z") {
+	  marker.pose.orientation.w = 0.707107;
+	  marker.pose.orientation.x = 0.0;
+	  marker.pose.orientation.y = 0.707107;
+	  marker.pose.orientation.z = 0.0;
+  }
 
 // Update the interactive marker with the new arrow orientation
 server_->insert(int_marker);
@@ -230,7 +208,7 @@ server_->applyChanges();
 
 }
 
-affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::string planning_mode, const std::string axis_mode) {
+affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::string& planning_mode, const std::string& axis_mode) {
     affordance_util::ScrewInfo screw_info;
 
     // Check if asked to look at the moved interactive marker

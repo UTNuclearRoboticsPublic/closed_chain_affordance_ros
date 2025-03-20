@@ -76,7 +76,7 @@ protected Q_SLOTS:
   void motionTypeSelected(int index);
   void goalSelected(int index);
   void pitchSelected(int index);
-  void axisOptionSelected(int index);
+  void axisOptionSelected(QString axis);
   void applySettingsClicked();
   void spin();
 

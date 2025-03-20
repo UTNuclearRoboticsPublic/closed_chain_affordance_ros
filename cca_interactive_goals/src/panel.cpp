@@ -174,7 +174,7 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget* parent)
   connect(mode_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(modeSelected(int)));
   connect(motion_type_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(motionTypeSelected(int)));
   connect(goal_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(goalSelected(int)));
-  connect(axis_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(axisOptionSelected(int)));
+  connect(axis_combo_box_, SIGNAL(currentTextChanged(QString)), this, SLOT(axisOptionSelected(QString)));
   connect(pitch_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(pitchSelected(int)));
   connect(plan_viz_button_, SIGNAL(clicked()), this, SLOT(planVizClicked()));
   connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(planVizExeClicked()));
@@ -477,7 +477,7 @@ void CcaInteractiveGoals::modeSelected(int index)
       axis_combo_box_->setEnabled(true);
       axis_combo_box_->setVisible(true);
       axis_label_->setVisible(true);
-      axis_combo_box_->setCurrentIndex(0);
+      axis_combo_box_->setCurrentText("");
     }
   }
 }
@@ -588,9 +588,9 @@ void CcaInteractiveGoals::pitchSelected(int index)
   }
 }
 
-void CcaInteractiveGoals::axisOptionSelected(int index)
+void CcaInteractiveGoals::axisOptionSelected(QString axis)
 {
-  if (index != 0)
+  if (axis != "")
   {
     goal_label_->setVisible(true);
     goal_combo_box_->setEnabled(true);
@@ -604,7 +604,7 @@ void CcaInteractiveGoals::axisOptionSelected(int index)
     }
   }
 
-  this->draw_ee_or_control_im(index);
+  this->draw_ee_or_control_im(axis.toStdString());
 
 }
 
