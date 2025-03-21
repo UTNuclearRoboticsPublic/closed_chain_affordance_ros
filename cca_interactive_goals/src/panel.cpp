@@ -173,10 +173,10 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     connect(goal_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(goalSelected(int)));
     connect(axis_combo_box_, SIGNAL(currentTextChanged(QString)), this, SLOT(axisOptionSelected(QString)));
     connect(pitch_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(pitchSelected(int)));
-    connect(plan_viz_button_, SIGNAL(clicked()), this, SLOT(planVizClicked()));
-    connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(planVizExeClicked()));
-    connect(plan_exe_button_, SIGNAL(clicked()), this, SLOT(planExeClicked()));
-    connect(stop_button_, SIGNAL(clicked()), this, SLOT(stopClicked()));
+    connect(plan_viz_button_, SIGNAL(clicked()), this, SLOT(planButtonClicked()));
+    connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(planExeButtonClicked()));
+    connect(plan_exe_button_, SIGNAL(clicked()), this, SLOT(ExeButtonClicked()));
+    connect(stop_button_, SIGNAL(clicked()), this, SLOT(cancelExeButtonClicked()));
 
     connect(apply_button_, SIGNAL(clicked()), this, SLOT(applySettingsClicked()));
 
@@ -203,7 +203,7 @@ void CcaInteractiveGoals::load(const rviz_common::Config &config) { rviz_common:
 
 void CcaInteractiveGoals::save(rviz_common::Config config) const { rviz_common::Panel::save(config); }
 
-void CcaInteractiveGoals::planVizClicked()
+void CcaInteractiveGoals::planButtonClicked()
 {
     // Handle plan viz button click
     auto req = buildPlanningRequest();
@@ -215,7 +215,7 @@ void CcaInteractiveGoals::planVizClicked()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::planVizExeClicked()
+void CcaInteractiveGoals::planExeButtonClicked()
 {
     // Handle plan viz execute button click
     auto req = buildPlanningRequest();
@@ -227,7 +227,7 @@ void CcaInteractiveGoals::planVizExeClicked()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::planExeClicked()
+void CcaInteractiveGoals::ExeButtonClicked()
 {
     // Handle plan execute button click
     auto req = buildPlanningRequest();
@@ -239,7 +239,7 @@ void CcaInteractiveGoals::planExeClicked()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::stopClicked() { ccaRosActionClient->cancel_goal(); }
+void CcaInteractiveGoals::cancelExeButtonClicked() { ccaRosActionClient->cancel_goal(); }
 
 cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
 {

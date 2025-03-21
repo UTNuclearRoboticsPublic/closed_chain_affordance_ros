@@ -65,10 +65,10 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     virtual void save(rviz_common::Config config) const override;
 
   protected Q_SLOTS:
-    void planVizClicked();
-    void planVizExeClicked();
-    void planExeClicked();
-    void stopClicked();
+    void planButtonClicked();
+    void planExeButtonClicked();
+    void ExeButtonClicked();
+    void cancelExeButtonClicked();
     cca_ros::PlanningRequest buildPlanningRequest();
     void modeSelected(int index);
     void motionTypeSelected(int index);
@@ -99,7 +99,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     QPushButton *plan_viz_exe_button_;
     QPushButton *plan_exe_button_;
     QPushButton *stop_button_;
-    QPushButton *conf_place_button_;
     QTimer *spin_timer_;
 
     // Advanced Settings Widgets
