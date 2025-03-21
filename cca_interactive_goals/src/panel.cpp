@@ -43,11 +43,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     axis_layout->addWidget(axis_combo_box_);
     dynamicContentLayout->addLayout(axis_layout);
 
-    // Screw placement button
-    conf_place_button_ = new QPushButton("Confirm Screw Placement");
-    dynamicContentLayout->addWidget(conf_place_button_);
-    conf_place_button_->setEnabled(false);
-
     // Pitch Selection Dropdown
     QHBoxLayout *pitch_layout = new QHBoxLayout;
     pitch_label_ = new QLabel("Pitch(meters/radian):");
@@ -182,7 +177,6 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(planVizExeClicked()));
     connect(plan_exe_button_, SIGNAL(clicked()), this, SLOT(planExeClicked()));
     connect(stop_button_, SIGNAL(clicked()), this, SLOT(stopClicked()));
-    connect(conf_place_button_, SIGNAL(clicked()), this, SLOT(confirmPlaceClicked()));
 
     connect(apply_button_, SIGNAL(clicked()), this, SLOT(applySettingsClicked()));
 
@@ -360,40 +354,6 @@ double CcaInteractiveGoals::getAffordanceGoal_()
     return goal;
 }
 
-void CcaInteractiveGoals::confirmPlaceClicked()
-{
-    value_input_->setVisible(false);
-    value_input_->setEnabled(false);
-    value_label_->setVisible(false);
-
-    // Handle confirm screw placement button click
-    goal_label_->setVisible(true);
-    goal_combo_box_->setEnabled(true);
-    goal_combo_box_->setVisible(true);
-    goal_combo_box_->setCurrentIndex(0);
-    if (motion_type_combo_box_->currentText() == "Translation")
-    {
-        goal_label_->setText("Goal Distance(meters)");
-        for (int i = 2; i <= 11; i++)
-        {
-            double value = (i - 1) * 0.1;
-            QString text = QString::number(value, 'f', 1);
-            goal_combo_box_->setItemText(i, text);
-        }
-    }
-    else if (motion_type_combo_box_->currentText() == "Rotation" ||
-             motion_type_combo_box_->currentText() == "Screw Motion")
-    {
-        goal_label_->setText("Goal Angle(radians)");
-        std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
-                                                 "3π/2", "7π/4", "2π",   "9π/4", "5π/2"};
-        for (int i = 2; i <= 11; i++)
-        {
-            goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
-        }
-    }
-}
-
 void CcaInteractiveGoals::modeSelected(int index)
 {
     // Grey out execute buttons
@@ -432,16 +392,12 @@ void CcaInteractiveGoals::modeSelected(int index)
             motion_type_combo_box_->setEnabled(true);
             motion_type_combo_box_->setVisible(true);
             motion_type_combo_box_->setCurrentText("");
-            conf_place_button_->setEnabled(false);
-            conf_place_button_->setVisible(true);
         }
         else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
         {
             motion_type_label_->setVisible(false);
             motion_type_combo_box_->setEnabled(false);
             motion_type_combo_box_->setVisible(false);
-            conf_place_button_->setEnabled(false);
-            conf_place_button_->setVisible(false);
             goal_label_->setVisible(false);
             goal_combo_box_->setEnabled(false);
             goal_combo_box_->setVisible(false);
@@ -479,14 +435,10 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
     if (motion_type_combo_box_->currentText() == "Translation" || motion_type_combo_box_->currentText() == "Rotation" ||
         motion_type_combo_box_->currentText() == "Screw Motion")
     {
-        conf_place_button_->setEnabled(true);
-        conf_place_button_->setVisible(true);
         this->enable_im_controls("arrow_marker", interactive_marker_manager::ImControlEnable::ALL);
     }
     else
     {
-        conf_place_button_->setEnabled(false);
-        conf_place_button_->setVisible(true);
         this->hide_im("arrow_marker");
     }
     if (motion_type_combo_box_->currentText() == "Screw Motion")
@@ -496,11 +448,31 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
         pitch_value_input_->setVisible(false);
         pitch_value_label_->setVisible(false);
     }
-    goal_label_->setVisible(false);
-    goal_combo_box_->setEnabled(false);
-    goal_combo_box_->setVisible(false);
-    if (index != 0)
+    // Enable goal boxes
+    goal_label_->setVisible(true);
+    goal_combo_box_->setEnabled(true);
+    goal_combo_box_->setVisible(true);
+    goal_combo_box_->setCurrentIndex(0);
+    if (motion_type_combo_box_->currentText() == "Translation")
     {
+        goal_label_->setText("Goal Distance(meters)");
+        for (int i = 2; i <= 11; i++)
+        {
+            double value = (i - 1) * 0.1;
+            QString text = QString::number(value, 'f', 1);
+            goal_combo_box_->setItemText(i, text);
+        }
+    }
+    else if (motion_type_combo_box_->currentText() == "Rotation" ||
+             motion_type_combo_box_->currentText() == "Screw Motion")
+    {
+        goal_label_->setText("Goal Angle(radians)");
+        std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
+                                                 "3π/2", "7π/4", "2π",   "9π/4", "5π/2"};
+        for (int i = 2; i <= 11; i++)
+        {
+            goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
+        }
     }
 }
 
@@ -626,7 +598,7 @@ void CcaInteractiveGoals::applySettingsClicked()
 
     advanced_settings_ = advanced_settings;
     new_settings_applied_ = true;
-    RCLCPP_INFO(this->get_logger(), "Advanced Settings Modified");
+    RCLCPP_INFO(this->get_logger(), "New Advanced Settings Applied");
 }
 
 void CcaInteractiveGoals::updateUIState()
@@ -654,8 +626,6 @@ void CcaInteractiveGoals::updateUIState()
     motion_type_combo_box_->setEnabled(true);
     motion_type_combo_box_->setVisible(true);
     motion_type_combo_box_->setCurrentText("");
-    conf_place_button_->setEnabled(false);
-    conf_place_button_->setVisible(true);
 }
 
 void CcaInteractiveGoals::spin() { rclcpp::spin_some(this->get_node_base_interface()); }

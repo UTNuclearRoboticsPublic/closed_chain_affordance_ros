@@ -70,7 +70,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     void planExeClicked();
     void stopClicked();
     cca_ros::PlanningRequest buildPlanningRequest();
-    void confirmPlaceClicked();
     void modeSelected(int index);
     void motionTypeSelected(int index);
     void goalSelected(int index);
