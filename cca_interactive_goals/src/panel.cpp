@@ -132,10 +132,11 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     }
 
     // Add the screw options to the QComboBox
+    screw_order_combo_->addItem(QString(""));
     screw_order_combo_->addItems(screw_options);
 
     // Set XYZ as default option for screw order
-    screw_order_combo_->setCurrentText(QString("XYZ"));
+    screw_order_combo_->setCurrentText(QString(""));
 
     cca_type_combo_ = new QComboBox();
     cca_type_combo_->addItems({"Affordance Control", "Affordance and EE Control"});
@@ -195,13 +196,6 @@ void CcaInteractiveGoals::onInitialize()
     // Do ROS client initializations here
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
-    // Set planning request start state for testing purposes
-    const Eigen::VectorXd READY_CONFIG =
-        (Eigen::VectorXd(6) << -0.00015592575073242188, -0.8980185389518738, 1.8094338178634644, 0.000377655029296875,
-         -0.8991076946258545, 0.0015475749969482422)
-            .finished();
-    req_.start_state.robot = READY_CONFIG;
-
     // Hide the markers to start
     this->hide_im("arrow_marker");
 
@@ -218,71 +212,79 @@ void CcaInteractiveGoals::save(rviz_common::Config config) const { rviz_common::
 void CcaInteractiveGoals::planVizClicked()
 {
     // Handle plan viz button click
-    buildPlanningRequest();
+    auto req = buildPlanningRequest();
     stop_button_->setEnabled(true);
 
     RCLCPP_INFO(this->get_logger(), "planViz button pressed");
-    req_.visualize_trajectory = true;
-    req_.execute_trajectory = false;
-    ccaRosActionClient->send_goal(req_);
+    req.visualize_trajectory = true;
+    req.execute_trajectory = false;
+    ccaRosActionClient->send_goal(req);
 }
 
 void CcaInteractiveGoals::planVizExeClicked()
 {
     // Handle plan viz execute button click
-    buildPlanningRequest();
+    auto req = buildPlanningRequest();
     stop_button_->setEnabled(true);
 
     RCLCPP_INFO(this->get_logger(), "planVizExe button pressed");
-    req_.visualize_trajectory = true;
-    req_.execute_trajectory = true;
-    ccaRosActionClient->send_goal(req_);
+    req.visualize_trajectory = true;
+    req.execute_trajectory = true;
+    ccaRosActionClient->send_goal(req);
 }
 
 void CcaInteractiveGoals::planExeClicked()
 {
     // Handle plan execute button click
-    buildPlanningRequest();
+    auto req = buildPlanningRequest();
     stop_button_->setEnabled(true);
 
     RCLCPP_INFO(this->get_logger(), "planExe button pressed");
-    req_.visualize_trajectory = false;
-    req_.execute_trajectory = true;
-    ccaRosActionClient->send_goal(req_);
+    req.visualize_trajectory = false;
+    req.execute_trajectory = true;
+    ccaRosActionClient->send_goal(req);
 }
 
 void CcaInteractiveGoals::stopClicked() { ccaRosActionClient->cancel_goal(); }
 
-void CcaInteractiveGoals::buildPlanningRequest()
+cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
 {
 
+    cca_ros::PlanningRequest req;
+
+    // Set planning request start state for testing purposes
+    const Eigen::VectorXd READY_CONFIG =
+        (Eigen::VectorXd(6) << -0.00015592575073242188, -0.8980185389518738, 1.8094338178634644, 0.000377655029296875,
+         -0.8991076946258545, 0.0015475749969482422)
+            .finished();
+    req.start_state.robot = READY_CONFIG;
     if (mode_combo_box_->currentText() == "Affordance Planning") // Affordance Planning
     {
-        req_.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
+        req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
 
         // Determine motion type for affordance planning
         if (motion_type_combo_box_->currentText() == "Translation")
         {
-            req_.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
+            req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
         }
         else if (motion_type_combo_box_->currentText() == "Rotation")
         {
-            req_.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
+            req.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
         }
         else if (motion_type_combo_box_->currentText() == "Screw Motion")
         {
-            req_.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
+            req.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
 
             // Determine pitch value
             if (pitch_combo_box_->currentText() != "Manual Input")
             {
-                req_.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
+                req.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
             }
             else // Manual input
             {
                 try
                 {
-                    req_.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
+                    req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
                 }
                 catch (int)
                 {
@@ -294,29 +296,33 @@ void CcaInteractiveGoals::buildPlanningRequest()
     }
     else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
     {
-        req_.task_description =
+        req.task_description =
             cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
     }
 
     // Get affordance goal
-    req_.task_description.goal.affordance = getAffordanceGoal_();
+    req.task_description.goal.affordance = getAffordanceGoal_();
 
     // Get affordance pose
     auto screw_info = this->get_arrow_pose(mode_combo_box_->currentText().toStdString(),
                                            axis_combo_box_->currentText().toStdString());
-    req_.task_description.affordance_info.axis = screw_info.axis;
-    req_.task_description.affordance_info.location = screw_info.location;
+    req.task_description.affordance_info.axis = screw_info.axis;
+    req.task_description.affordance_info.location = screw_info.location;
 
     // Extract task-specific settingsa from advanced settings
     if (new_settings_applied_)
     {
-        if (trajectory_density_->text().toInt() != 0)
+        req.planner_config = advanced_settings_.planner_config;
+        req.task_description.trajectory_density = advanced_settings_.task_description.trajectory_density;
+        if (advanced_settings_.task_description.vir_screw_order
+                .has_value()) // Since the default for this is different for different planning types, we
+                              // check if the user has specified a value before applying it. For all other settings, the
+                              // default is the same across all planning types
         {
-            req_.task_description.trajectory_density = trajectory_density_->text().toInt();
+            req.task_description.vir_screw_order = advanced_settings_.task_description.vir_screw_order.value();
         }
-
-        req_.task_description.vir_screw_order = virtual_screw_order_map_.at(screw_order_combo_->currentText());
     }
+    return req;
 }
 
 double CcaInteractiveGoals::getAffordanceGoal_()
@@ -588,22 +594,32 @@ void CcaInteractiveGoals::applySettingsClicked()
 {
     if (accuracy_->text().toFloat() != 0)
     {
-        req_.planner_config.accuracy = accuracy_->text().toFloat();
+        advanced_settings_.planner_config.accuracy = accuracy_->text().toFloat();
     }
 
     if (closure_angle_->text().toFloat() != 0)
     {
-        req_.planner_config.closure_err_threshold_ang = closure_angle_->text().toFloat();
+        advanced_settings_.planner_config.closure_err_threshold_ang = closure_angle_->text().toFloat();
     }
 
     if (closure_linear_->text().toFloat() != 0)
     {
-        req_.planner_config.closure_err_threshold_lin = closure_linear_->text().toFloat();
+        advanced_settings_.planner_config.closure_err_threshold_lin = closure_linear_->text().toFloat();
     }
 
     if (ik_iterations_->text().toInt() != 0)
     {
-        req_.planner_config.ik_max_itr = ik_iterations_->text().toInt();
+        advanced_settings_.planner_config.ik_max_itr = ik_iterations_->text().toInt();
+    }
+    if (trajectory_density_->text().toInt() != 0)
+    {
+        advanced_settings_.task_description.trajectory_density = trajectory_density_->text().toInt();
+    }
+
+    if (screw_order_combo_->currentIndex() != 0)
+    {
+        advanced_settings_.task_description.vir_screw_order =
+            virtual_screw_order_map_.at(screw_order_combo_->currentText());
     }
 
     new_settings_applied_ = true;

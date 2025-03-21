@@ -46,6 +46,17 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 {
     Q_OBJECT
   public:
+    struct AdvancedSettings
+    {
+        struct TaskDescription
+        {
+            int trajectory_density;
+            std::optional<affordance_util::VirtualScrewOrder> vir_screw_order;
+        };
+        cc_affordance_planner::PlannerConfig planner_config;
+        TaskDescription task_description;
+    };
+
     explicit CcaInteractiveGoals(QWidget *parent = nullptr);
 
     virtual void onInitialize() override;
@@ -58,7 +69,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     void planVizExeClicked();
     void planExeClicked();
     void stopClicked();
-    void buildPlanningRequest();
+    cca_ros::PlanningRequest buildPlanningRequest();
     void confirmPlaceClicked();
     void modeSelected(int index);
     void motionTypeSelected(int index);
@@ -113,7 +124,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
                                                                     // advanced settings menu
 
     // CCA parameters
-    cca_ros::PlanningRequest req_;
+    AdvancedSettings advanced_settings_;
 
     double getAffordanceGoal_();
     bool new_settings_applied_ = false;
