@@ -592,36 +592,39 @@ void CcaInteractiveGoals::axisOptionSelected(QString axis)
 
 void CcaInteractiveGoals::applySettingsClicked()
 {
+    AdvancedSettings advanced_settings;
+
     if (accuracy_->text().toFloat() != 0)
     {
-        advanced_settings_.planner_config.accuracy = accuracy_->text().toFloat();
+        advanced_settings.planner_config.accuracy = accuracy_->text().toFloat();
     }
 
     if (closure_angle_->text().toFloat() != 0)
     {
-        advanced_settings_.planner_config.closure_err_threshold_ang = closure_angle_->text().toFloat();
+        advanced_settings.planner_config.closure_err_threshold_ang = closure_angle_->text().toFloat();
     }
 
     if (closure_linear_->text().toFloat() != 0)
     {
-        advanced_settings_.planner_config.closure_err_threshold_lin = closure_linear_->text().toFloat();
+        advanced_settings.planner_config.closure_err_threshold_lin = closure_linear_->text().toFloat();
     }
 
     if (ik_iterations_->text().toInt() != 0)
     {
-        advanced_settings_.planner_config.ik_max_itr = ik_iterations_->text().toInt();
+        advanced_settings.planner_config.ik_max_itr = ik_iterations_->text().toInt();
     }
     if (trajectory_density_->text().toInt() != 0)
     {
-        advanced_settings_.task_description.trajectory_density = trajectory_density_->text().toInt();
+        advanced_settings.task_description.trajectory_density = trajectory_density_->text().toInt();
     }
 
     if (screw_order_combo_->currentIndex() != 0)
     {
-        advanced_settings_.task_description.vir_screw_order =
+        advanced_settings.task_description.vir_screw_order =
             virtual_screw_order_map_.at(screw_order_combo_->currentText());
     }
 
+    advanced_settings_ = advanced_settings;
     new_settings_applied_ = true;
     RCLCPP_INFO(this->get_logger(), "Advanced Settings Modified");
 }

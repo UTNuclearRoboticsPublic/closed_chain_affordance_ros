@@ -50,7 +50,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     {
         struct TaskDescription
         {
-            int trajectory_density;
+            int trajectory_density = 10;
             std::optional<affordance_util::VirtualScrewOrder> vir_screw_order;
         };
         cc_affordance_planner::PlannerConfig planner_config;
