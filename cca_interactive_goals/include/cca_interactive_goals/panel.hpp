@@ -3,7 +3,6 @@
 
 // CPP headers
 #include <Eigen/Dense>
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,8 +11,6 @@
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cca_ros/cca_ros.hpp>
 #include <cca_ros_action/cca_ros_action.hpp>
-#include <cca_ros_util/cca_ros_util.hpp>
-#include <cca_ros_viz_msgs/action/cca_ros_action.hpp>
 
 // ROS headers
 #include "tf2/LinearMath/Quaternion.h"
@@ -30,15 +27,9 @@
 #include <QString>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <interactive_markers/interactive_marker_server.hpp>
-#include <interactive_markers/menu_handler.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
 #include <rviz_common/panel.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
-#include <visualization_msgs/msg/interactive_marker.hpp>
-#include <visualization_msgs/msg/interactive_marker_control.hpp>
-#include <visualization_msgs/msg/marker.hpp>
 
 #include "cca_interactive_goals/interactive_marker_manager.hpp"
 
@@ -55,9 +46,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 {
     Q_OBJECT
   public:
-    // using CcaRosAction = cca_ros_viz_msgs::action::CcaRosAction;
-    // using GoalHandleCcaRosAction = rclcpp_action::ClientGoalHandle<CcaRosAction>;
-
     explicit CcaInteractiveGoals(QWidget *parent = nullptr);
 
     virtual void onInitialize() override;
@@ -83,9 +71,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
   private:
     const int marker_id_ = 8;
     void updateUIState();
-
-    // std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-    interactive_markers::MenuHandler menu_handler_;
 
     QComboBox *mode_combo_box_;
     QComboBox *motion_type_combo_box_;
@@ -130,16 +115,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     // CCA parameters
     cca_ros::PlanningRequest req_;
 
-    // ROS clients
-    // rclcpp_action::Client<cca_ros_viz_msgs::action::CcaRosAction>::SharedPtr
-    // cca_action_client_; ///< Client for planning and executing with CCA
-    // std::shared_future<GoalHandleCcaRosAction::SharedPtr>
-    // cca_action_goal_future_; ///< Goal handle future for the CCA action
-    // const std::string cca_as_name_ = "/cca_ros_action";
-
-    // void cca_action_client_goal_response_cb_(const GoalHandleCcaRosAction::SharedPtr &goal_handle);
-    // void cca_action_client_result_cb_(const GoalHandleCcaRosAction::WrappedResult &result);
-    // void send_cca_action_goal_();
     double getAffordanceGoal_();
     bool new_settings_applied_ = false;
     std::shared_ptr<cca_ros_action::CcaRosActionClient> ccaRosActionClient;
