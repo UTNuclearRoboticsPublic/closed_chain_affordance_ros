@@ -2,7 +2,7 @@
 namespace cca_ros_action
 {
 CcaRosActionServer::CcaRosActionServer(const std::string &node_name, const rclcpp::NodeOptions &node_options)
-    : cca_ros::CcaRos(node_name, node_options), timeout_secs_(60)
+    : cca_ros::CcaRos(node_name, node_options)
 {
     // Initialize the action server
     action_server_ = rclcpp_action::create_server<CcaRosAction>(
@@ -62,12 +62,12 @@ void CcaRosActionServer::execute_action(const std::shared_ptr<GoalHandleCcaRosAc
         return;
     }
 
-    start_time_ = std::chrono::steady_clock::now();
+    auto start_time = std::chrono::steady_clock::now();
 
     while (rclcpp::ok())
     {
         auto current_time = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time_).count() > timeout_secs_)
+        if (std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count() > TIMEOUT_SECS_)
         {
             RCLCPP_ERROR(this->get_logger(), "Timed out waiting for action request to complete on server '%s'.",
                          CCA_ROS_AS_NAME);
