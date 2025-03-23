@@ -20,6 +20,18 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     this->update_ui_state_();
 }
 
+void CcaInteractiveGoals::onInitialize()
+{
+    // Do ROS client initializations in this function
+    // Initialize the CCA Ros action client to be able to send planning requests
+    ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
+
+    // Set up timer for spinning the node
+    spin_timer_ = new QTimer(this);
+    connect(spin_timer_, &QTimer::timeout, this, &CcaInteractiveGoals::spin);
+    spin_timer_->start(10); // Spin every 10ms
+}
+
 QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
 {
     auto *cca_ig_tab_widget = new QWidget();
@@ -32,10 +44,10 @@ QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
 
     dynamic_content_layout->addLayout(
         this->create_combo_box_layout_("Motion Type:", motion_type_bl_, this->get_map_keys_(motion_type_map_, true)));
-    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Axis:", axis_bl_, AXES_));
-    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Pitch(meters/radian):", pitch_bl_, PITCHES_));
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Axis:", axis_bl_, axes_));
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Pitch(meters/radian):", pitch_bl_, pitches_));
     dynamic_content_layout->addLayout(this->create_line_edit_layout_("Pitch Value(meters/radian):", pitch_value_ll_));
-    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Goal:", goal_bl_, TRANSLATION_GOALS_));
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Goal:", goal_bl_, translation_goals_));
     dynamic_content_layout->addLayout(this->create_line_edit_layout_("Value:", value_ll_));
 
     main_layout->addLayout(dynamic_content_layout);
@@ -60,14 +72,14 @@ QWidget *CcaInteractiveGoals::create_advanced_settings_tab_()
 
     // Here we connect the QLineEdits to the widgets struct
     advanced_settings_widgets_.accuracy = new QLineEdit();
-    advanced_settings_widgets_.closure_angle = new QLineEdit();
-    advanced_settings_widgets_.closure_linear = new QLineEdit();
+    advanced_settings_widgets_.closure_angular_threshold = new QLineEdit();
+    advanced_settings_widgets_.closure_linear_threshold = new QLineEdit();
     advanced_settings_widgets_.ik_iterations = new QLineEdit();
     advanced_settings_widgets_.trajectory_density = new QLineEdit();
 
     form_layout->addRow("Accuracy:", advanced_settings_widgets_.accuracy);
-    form_layout->addRow("Closure Error Threshold Angle:", advanced_settings_widgets_.closure_angle);
-    form_layout->addRow("Closure Error Threshold Linear:", advanced_settings_widgets_.closure_linear);
+    form_layout->addRow("Closure Error Angular Threshold:", advanced_settings_widgets_.closure_angular_threshold);
+    form_layout->addRow("Closure Error Linear Threshold:", advanced_settings_widgets_.closure_linear_threshold);
     form_layout->addRow("IK Max Iterations:", advanced_settings_widgets_.ik_iterations);
     form_layout->addRow("Trajectory Density:", advanced_settings_widgets_.trajectory_density);
 
@@ -103,51 +115,6 @@ void CcaInteractiveGoals::update_ui_state_()
     this->hide_im(this->arrow_marker_name_);
 }
 
-void CcaInteractiveGoals::create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout)
-{
-    button = new QPushButton(text);
-    button->setEnabled(false);
-    layout->addWidget(button);
-}
-
-QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
-                                                           const QStringList &items)
-{
-    combo_box = new QComboBox;
-    combo_box->addItems(items);
-
-    // Add to layout
-    auto *layout = new QHBoxLayout;
-    layout->addWidget(new QLabel(label));
-    layout->addWidget(combo_box);
-    return layout;
-}
-QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl,
-                                                           const QStringList &items)
-{
-    bl.label = new QLabel(label);
-    bl.combo_box = new QComboBox;
-    bl.combo_box->addItems(items);
-
-    // Add to layout
-    auto *layout = new QHBoxLayout;
-    layout->addWidget(bl.label);
-    layout->addWidget(bl.combo_box);
-    return layout;
-}
-
-QHBoxLayout *CcaInteractiveGoals::create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll)
-{
-    ll.label = new QLabel(label);
-    ll.line_edit = new QLineEdit;
-
-    // Add to layout
-    auto *layout = new QHBoxLayout;
-    layout->addWidget(ll.label);
-    layout->addWidget(ll.line_edit);
-    return layout;
-}
-
 void CcaInteractiveGoals::connect_signals_()
 {
     connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_()));
@@ -162,34 +129,7 @@ void CcaInteractiveGoals::connect_signals_()
     connect(apply_button_, SIGNAL(clicked()), this, SLOT(apply_settings_clicked_()));
 }
 
-template <typename ValueType>
-QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType> &map, bool prepend_empty)
-{
-    QStringList keys;
-    // If asked, add an empty string in the beginning
-    if (prepend_empty)
-    {
-        keys.append("");
-    }
-
-    for (const auto &pair : map)
-    {
-        keys.append(pair.first); // Append the key to the list
-    }
-    return keys;
-}
-
-void CcaInteractiveGoals::onInitialize()
-{
-    // Do ROS client initializations in this function
-    // Initialize the CCA Ros action client to be able to send planning requests
-    ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
-
-    // Set up timer for spinning the node
-    spin_timer_ = new QTimer(this);
-    connect(spin_timer_, &QTimer::timeout, this, &CcaInteractiveGoals::spin);
-    spin_timer_->start(10); // Spin every 10ms
-}
+// Slot function implementations follow
 void CcaInteractiveGoals::mode_selected_()
 {
     // Disable all execution buttons
@@ -300,116 +240,18 @@ void CcaInteractiveGoals::axis_option_selected_(QString axis)
     goal_bl_.combo_box->setCurrentIndex(0);
     goal_bl_.label->setText("Goal Angle(radians)");
     goal_bl_.combo_box->clear();
-    goal_bl_.combo_box->addItems(ROTATION_GOALS_);
+    goal_bl_.combo_box->addItems(rotation_goals_);
 
     // Draw the appropriate interactive marker
     this->draw_ee_or_control_im(axis.toStdString());
 }
-
-void CcaInteractiveGoals::set_execute_buttons_enabled_(bool enabled)
-{
-    plan_viz_button_->setEnabled(enabled);
-    plan_viz_exe_button_->setEnabled(enabled);
-    plan_exe_button_->setEnabled(enabled);
-    stop_button_->setEnabled(enabled);
-}
-
-void CcaInteractiveGoals::hide_all_controls_()
-{
-    // Hide all UI control groups
-    set_combo_box_controls_(axis_bl_, false);
-    set_combo_box_controls_(motion_type_bl_, false);
-    set_combo_box_controls_(goal_bl_, false);
-    set_line_edit_controls_(value_ll_, false);
-    set_combo_box_controls_(pitch_bl_, false);
-    set_line_edit_controls_(pitch_value_ll_, false);
-}
-
-void CcaInteractiveGoals::set_combo_box_controls_(const QComboBoxAndLabel &controls, bool visible)
-{
-    if (controls.label)
-    {
-        controls.label->setVisible(visible);
-    }
-    if (controls.combo_box)
-    {
-        controls.combo_box->setEnabled(visible);
-        controls.combo_box->setVisible(visible);
-    }
-}
-
-void CcaInteractiveGoals::set_line_edit_controls_(const QLineEditAndLabel &controls, bool visible)
-{
-    if (controls.label)
-    {
-        controls.label->setVisible(visible);
-    }
-    if (controls.line_edit)
-    {
-        controls.line_edit->setEnabled(visible);
-        controls.line_edit->setVisible(visible);
-    }
-}
-
-void CcaInteractiveGoals::setup_goal_controls_for_motion_type_(const QString &motion_type)
-{
-    // Enable goal boxes
-    set_combo_box_controls_(goal_bl_, true);
-    goal_bl_.combo_box->setCurrentIndex(0);
-
-    if (motion_type == "Translation")
-    {
-        goal_bl_.label->setText("Goal Distance(meters)");
-        goal_bl_.combo_box->clear();
-        goal_bl_.combo_box->addItems(TRANSLATION_GOALS_);
-    }
-    else if (motion_type == "Rotation" || motion_type == "Screw")
-    {
-        goal_bl_.label->setText("Goal Angle(radians)");
-        goal_bl_.combo_box->clear();
-        goal_bl_.combo_box->addItems(ROTATION_GOALS_);
-    }
-}
-
-void CcaInteractiveGoals::setup_value_label_text_()
-{
-    QString motion_type = motion_type_bl_.combo_box->currentText();
-    QString mode = mode_bl_.combo_box->currentText();
-
-    if (motion_type == "Translation" && mode != "EE Orientation Only")
-    {
-        value_ll_.label->setText("Meters");
-    }
-    else if (motion_type == "Rotation" || motion_type == "Screw" || mode == "EE Orientation Only")
-    {
-        value_ll_.label->setText("Radians");
-    }
-}
-
-void CcaInteractiveGoals::update_execution_buttons_state_(int goal_index)
-{
-    bool enable_buttons = false;
-
-    if (goal_index != 0)
-    {
-        QString motion_type = motion_type_bl_.combo_box->currentText();
-
-        if (motion_type != "Screw" || pitch_bl_.combo_box->currentIndex() != 0)
-        {
-            enable_buttons = true;
-        }
-    }
-
-    set_execute_buttons_enabled_(enable_buttons);
-}
-
 void CcaInteractiveGoals::plan_button_clicked_()
 {
     // Enable stop button
     stop_button_->setEnabled(true);
 
     // Fill out planning request and send it to the server
-    auto req = buildPlanningRequest();
+    auto req = build_planning_request_();
     req.visualize_trajectory = true;
     req.execute_trajectory = false;
     ccaRosActionClient->send_goal(req);
@@ -421,7 +263,7 @@ void CcaInteractiveGoals::plan_exe_button_clicked_()
     stop_button_->setEnabled(true);
 
     // Fill out planning request and send it to the server
-    auto req = buildPlanningRequest();
+    auto req = build_planning_request_();
     req.visualize_trajectory = true;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
@@ -433,7 +275,7 @@ void CcaInteractiveGoals::exe_button_clicked_()
     stop_button_->setEnabled(true);
 
     // Fill out planning request and send it to the server
-    auto req = buildPlanningRequest();
+    auto req = build_planning_request_();
     req.visualize_trajectory = false;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
@@ -451,16 +293,16 @@ void CcaInteractiveGoals::apply_settings_clicked_()
         advanced_settings.planner_config.accuracy = advanced_settings_widgets_.accuracy->text().toFloat();
     }
 
-    if (advanced_settings_widgets_.closure_angle->text().toFloat() != 0)
+    if (advanced_settings_widgets_.closure_angular_threshold->text().toFloat() != 0)
     {
         advanced_settings.planner_config.closure_err_threshold_ang =
-            advanced_settings_widgets_.closure_angle->text().toFloat();
+            advanced_settings_widgets_.closure_angular_threshold->text().toFloat();
     }
 
-    if (advanced_settings_widgets_.closure_linear->text().toFloat() != 0)
+    if (advanced_settings_widgets_.closure_linear_threshold->text().toFloat() != 0)
     {
         advanced_settings.planner_config.closure_err_threshold_lin =
-            advanced_settings_widgets_.closure_linear->text().toFloat();
+            advanced_settings_widgets_.closure_linear_threshold->text().toFloat();
     }
 
     if (advanced_settings_widgets_.ik_iterations->text().toInt() != 0)
@@ -493,7 +335,8 @@ void CcaInteractiveGoals::apply_settings_clicked_()
     RCLCPP_INFO(this->get_logger(), "New Advanced Settings Applied");
 }
 
-cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
+// Planning request building function
+cca_ros::PlanningRequest CcaInteractiveGoals::build_planning_request_()
 {
 
     cca_ros::PlanningRequest req;
@@ -564,6 +407,167 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
     return req;
 }
 
+// UI Creation helper functions follow
+void CcaInteractiveGoals::create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout)
+{
+    button = new QPushButton(text);
+    button->setEnabled(false);
+    layout->addWidget(button);
+}
+
+QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
+                                                           const QStringList &items)
+{
+    combo_box = new QComboBox;
+    combo_box->addItems(items);
+
+    // Add to layout
+    auto *layout = new QHBoxLayout;
+    layout->addWidget(new QLabel(label));
+    layout->addWidget(combo_box);
+    return layout;
+}
+QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl,
+                                                           const QStringList &items)
+{
+    bl.label = new QLabel(label);
+    bl.combo_box = new QComboBox;
+    bl.combo_box->addItems(items);
+
+    // Add to layout
+    auto *layout = new QHBoxLayout;
+    layout->addWidget(bl.label);
+    layout->addWidget(bl.combo_box);
+    return layout;
+}
+
+QHBoxLayout *CcaInteractiveGoals::create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll)
+{
+    ll.label = new QLabel(label);
+    ll.line_edit = new QLineEdit;
+
+    // Add to layout
+    auto *layout = new QHBoxLayout;
+    layout->addWidget(ll.label);
+    layout->addWidget(ll.line_edit);
+    return layout;
+}
+template <typename ValueType>
+QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType> &map, bool prepend_empty)
+{
+    QStringList keys;
+    // If asked, add an empty string in the beginning
+    if (prepend_empty)
+    {
+        keys.append("");
+    }
+
+    for (const auto &pair : map)
+    {
+        keys.append(pair.first); // Append the key to the list
+    }
+    return keys;
+}
+
+// UI State Management helper functions follow
+void CcaInteractiveGoals::set_execute_buttons_enabled_(bool enabled)
+{
+    plan_viz_button_->setEnabled(enabled);
+    plan_viz_exe_button_->setEnabled(enabled);
+    plan_exe_button_->setEnabled(enabled);
+    stop_button_->setEnabled(enabled);
+}
+
+void CcaInteractiveGoals::hide_all_controls_()
+{
+    // Hide all UI control groups
+    set_combo_box_controls_(axis_bl_, false);
+    set_combo_box_controls_(motion_type_bl_, false);
+    set_combo_box_controls_(goal_bl_, false);
+    set_line_edit_controls_(value_ll_, false);
+    set_combo_box_controls_(pitch_bl_, false);
+    set_line_edit_controls_(pitch_value_ll_, false);
+}
+
+void CcaInteractiveGoals::set_combo_box_controls_(const QComboBoxAndLabel &controls, bool visible)
+{
+    if (controls.label)
+    {
+        controls.label->setVisible(visible);
+    }
+    if (controls.combo_box)
+    {
+        controls.combo_box->setEnabled(visible);
+        controls.combo_box->setVisible(visible);
+    }
+}
+
+void CcaInteractiveGoals::set_line_edit_controls_(const QLineEditAndLabel &controls, bool visible)
+{
+    if (controls.label)
+    {
+        controls.label->setVisible(visible);
+    }
+    if (controls.line_edit)
+    {
+        controls.line_edit->setEnabled(visible);
+        controls.line_edit->setVisible(visible);
+    }
+}
+
+void CcaInteractiveGoals::setup_goal_controls_for_motion_type_(const QString &motion_type)
+{
+    // Enable goal boxes
+    set_combo_box_controls_(goal_bl_, true);
+    goal_bl_.combo_box->setCurrentIndex(0);
+
+    if (motion_type == "Translation")
+    {
+        goal_bl_.label->setText("Goal Distance(meters)");
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(translation_goals_);
+    }
+    else if (motion_type == "Rotation" || motion_type == "Screw")
+    {
+        goal_bl_.label->setText("Goal Angle(radians)");
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(rotation_goals_);
+    }
+}
+
+void CcaInteractiveGoals::setup_value_label_text_()
+{
+    QString motion_type = motion_type_bl_.combo_box->currentText();
+    QString mode = mode_bl_.combo_box->currentText();
+
+    if (motion_type == "Translation" && mode != "EE Orientation Only")
+    {
+        value_ll_.label->setText("Meters");
+    }
+    else if (motion_type == "Rotation" || motion_type == "Screw" || mode == "EE Orientation Only")
+    {
+        value_ll_.label->setText("Radians");
+    }
+}
+
+void CcaInteractiveGoals::update_execution_buttons_state_(int goal_index)
+{
+    bool enable_buttons = false;
+
+    if (goal_index != 0)
+    {
+        QString motion_type = motion_type_bl_.combo_box->currentText();
+
+        if (motion_type != "Screw" || pitch_bl_.combo_box->currentIndex() != 0)
+        {
+            enable_buttons = true;
+        }
+    }
+
+    set_execute_buttons_enabled_(enable_buttons);
+}
+
+// Planning request building helper functions follow
 double CcaInteractiveGoals::get_affordance_goal_()
 {
     double goal;
@@ -599,8 +603,6 @@ double CcaInteractiveGoals::get_affordance_goal_()
     }
     return goal;
 }
-
-void CcaInteractiveGoals::spin() { rclcpp::spin_some(this->get_node_base_interface()); }
 
 } // namespace cca_interactive_goals
 
