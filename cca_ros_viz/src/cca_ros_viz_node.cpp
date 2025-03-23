@@ -58,7 +58,6 @@ class CcaRosVizServer : public rclcpp::Node
         planning_group_ = this->get_parameter("planning_group").as_string();
         rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
         joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
-        ee_link_ = this->get_parameter("ee_link").as_string();
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<cca_ros_viz_msgs::srv::CcaRosViz>(
@@ -129,7 +128,6 @@ class CcaRosVizServer : public rclcpp::Node
     std::string planning_group_;
     std::string rviz_fixed_frame_;
     std::string joint_states_topic_;
-    std::string ee_link_;
 
     // Note, T_w_r is HTM from world frame, usually the root frame of the urdf to the service request reference frame
     Eigen::Isometry3d transform_pose_to_world_frame(const Eigen::Isometry3d &T_w_r,
