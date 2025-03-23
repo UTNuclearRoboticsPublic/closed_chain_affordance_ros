@@ -206,7 +206,7 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
     affordance_util::ScrewInfo screw_info;
 
     // Check if asked to look at the interactive marker
-    if ((planning_mode == "In-Place End Effector Orientation Control") && (axis_mode != "Interactive Axis"))
+    if ((planning_mode == "EE Orientation Only") && (axis_mode != "Interactive Axis"))
     {
 
         // Retrieve the marker
