@@ -1,188 +1,162 @@
 #include "cca_interactive_goals/panel.hpp"
+// TODO: USE UNORDERED MAP FOR PLANNING TYPES SCREW TYPES ETC. WHERE APPROPRIATE FOR EFFICIENT LOOKUP, LIKE WITH VIRTUAL
+// SCREW ORDER
 
 namespace cca_interactive_goals
 {
-
 CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     : rviz_common::Panel(parent), interactive_marker_manager::InteractiveMarkerManager("cca_interactive_goals")
 {
-    QTabWidget *tabWidget = new QTabWidget(this);
+    auto *tab_widget = new QTabWidget(this);
 
-    // CCA_IG Tab
-    QWidget *ccaIgTabWidget = new QWidget();
-    QVBoxLayout *mainLayout = new QVBoxLayout;
+    tab_widget->addTab(this->create_cca_ig_tab_(), "CCA_IG");
+    tab_widget->addTab(this->create_advanced_settings_tab_(), "Advanced Settings");
 
-    // Mode selection dropdown
-    QHBoxLayout *mode_layout = new QHBoxLayout;
-    QLabel *mode_label = new QLabel("Select Mode:");
-    mode_combo_box_ = new QComboBox;
-    mode_combo_box_->addItems({"Affordance Planning", "In-Place End Effector Orientation Control"});
-    mode_layout->addWidget(mode_label);
-    mode_layout->addWidget(mode_combo_box_);
-    mainLayout->addLayout(mode_layout);
+    auto *panel_layout = new QVBoxLayout;
+    panel_layout->addWidget(tab_widget);
+    setLayout(panel_layout);
 
-    // Dynamic content layout
-    QVBoxLayout *dynamicContentLayout = new QVBoxLayout;
-    dynamicContentLayout->setSpacing(10); // Set spacing between dynamic boxes
+    setFixedSize(PANEL_WIDTH_, PANEL_HEIGHT_);
 
-    // Motion type dropdown
-    QHBoxLayout *motion_type_layout = new QHBoxLayout;
-    motion_type_label_ = new QLabel("Motion Type:");
-    motion_type_combo_box_ = new QComboBox;
-    motion_type_combo_box_->addItems({"", "Translation", "Rotation", "Screw Motion"});
-    motion_type_layout->addWidget(motion_type_label_);
-    motion_type_layout->addWidget(motion_type_combo_box_);
-    dynamicContentLayout->addLayout(motion_type_layout);
+    this->connect_signals_();
+    this->update_ui_state_();
+}
 
-    // Axis Selection Dropdown
-    QHBoxLayout *axis_layout = new QHBoxLayout;
-    axis_label_ = new QLabel("Axis:");
-    axis_combo_box_ = new QComboBox;
-    axis_combo_box_->addItems({"", "Interactive Axis", "x", "y", "z", "-x", "-y", "-z"});
-    axis_layout->addWidget(axis_label_);
-    axis_layout->addWidget(axis_combo_box_);
-    dynamicContentLayout->addLayout(axis_layout);
+QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
+{
+    auto *cca_ig_tab_widget = new QWidget();
+    auto *main_layout = new QVBoxLayout(cca_ig_tab_widget);
 
-    // Pitch Selection Dropdown
-    QHBoxLayout *pitch_layout = new QHBoxLayout;
-    pitch_label_ = new QLabel("Pitch(meters/radian):");
-    pitch_combo_box_ = new QComboBox;
-    pitch_combo_box_->addItems({"", "Manual Input", "0.1", "0.2", "0.3", "0.4", "0.5"});
-    pitch_layout->addWidget(pitch_label_);
-    pitch_layout->addWidget(pitch_combo_box_);
-    dynamicContentLayout->addLayout(pitch_layout);
+    main_layout->addLayout(this->create_combo_box_layout_("Select Mode:", mode_bl_,
+                                                          {AFFORDANCE_PLANNING_, IN_PLACE_ORIENTATION_CONTROL_}));
+    auto *dynamic_content_layout = new QVBoxLayout;
+    dynamic_content_layout->setSpacing(10);
 
-    // Pitch input
-    QHBoxLayout *pitch_value_layout = new QHBoxLayout;
-    pitch_value_label_ = new QLabel("Pitch Value(meters/radian):");
-    pitch_value_label_->setObjectName("Pitch Value Label");
-    pitch_value_input_ = new QLineEdit;
-    pitch_value_layout->addWidget(pitch_value_label_);
-    pitch_value_layout->addWidget(pitch_value_input_);
-    dynamicContentLayout->addLayout(pitch_value_layout);
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Motion Type:", motion_type_bl_,
+                                                                     {"", "Translation", "Rotation", "Screw Motion"}));
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Axis:", axis_bl_, AXES_));
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Pitch(meters/radian):", pitch_bl_, PITCHES_));
+    dynamic_content_layout->addLayout(this->create_line_edit_layout_("Pitch Value(meters/radian):", pitch_value_ll_));
+    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Goal:", goal_bl_, TRANSLATION_GOALS_));
+    dynamic_content_layout->addLayout(this->create_line_edit_layout_("Value:", value_ll_));
 
-    // Goal Selection Dropdown
-    QHBoxLayout *goal_layout = new QHBoxLayout;
-    goal_label_ = new QLabel("Goal:");
-    goal_combo_box_ = new QComboBox;
-    goal_combo_box_->addItems(
-        {"", "Manual Input", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"});
-    goal_layout->addWidget(goal_label_);
-    goal_layout->addWidget(goal_combo_box_);
-    dynamicContentLayout->addLayout(goal_layout);
+    main_layout->addLayout(dynamic_content_layout);
+    main_layout->addStretch();
 
-    // Goal input
-    QHBoxLayout *value_layout = new QHBoxLayout;
-    value_label_ = new QLabel("Value:");
-    value_label_->setObjectName("Value Label");
-    value_input_ = new QLineEdit;
-    value_layout->addWidget(value_label_);
-    value_layout->addWidget(value_input_);
-    dynamicContentLayout->addLayout(value_layout);
+    auto *button_layout = new QVBoxLayout;
+    this->create_button_(plan_viz_button_, "Plan", button_layout);
+    this->create_button_(plan_viz_exe_button_, "Plan and Execute", button_layout);
+    this->create_button_(plan_exe_button_, "Execute", button_layout);
+    this->create_button_(stop_button_, "Cancel Execution", button_layout);
 
-    mainLayout->addLayout(dynamicContentLayout);
+    main_layout->addLayout(button_layout);
+    return cca_ig_tab_widget;
+}
 
-    // Spacer to push buttons to the bottom
-    mainLayout->addStretch();
+QWidget *CcaInteractiveGoals::create_advanced_settings_tab_()
+{
+    auto *advanced_settings_tab_widget = new QWidget();
+    auto *advanced_layout = new QVBoxLayout(advanced_settings_tab_widget);
 
-    // Plan, Viz, Execute Buttons
-    QVBoxLayout *buttonLayout = new QVBoxLayout;
-    plan_viz_button_ = new QPushButton("Plan");
-    buttonLayout->addWidget(plan_viz_button_);
-    plan_viz_button_->setEnabled(false);
-    plan_viz_exe_button_ = new QPushButton("Plan and Execute");
-    buttonLayout->addWidget(plan_viz_exe_button_);
-    plan_viz_exe_button_->setEnabled(false);
-    plan_exe_button_ = new QPushButton("Execute");
-    buttonLayout->addWidget(plan_exe_button_);
-    plan_exe_button_->setEnabled(false);
-    stop_button_ = new QPushButton("Cancel Execution");
-    buttonLayout->addWidget(stop_button_);
-    stop_button_->setEnabled(false);
+    auto *form_layout = new QFormLayout;
 
-    mainLayout->addLayout(buttonLayout);
+    // Here we connect the QLineEdits to the widgets struct
+    advanced_settings_widgets_.accuracy = new QLineEdit();
+    advanced_settings_widgets_.closure_angle = new QLineEdit();
+    advanced_settings_widgets_.closure_linear = new QLineEdit();
+    advanced_settings_widgets_.ik_iterations = new QLineEdit();
+    advanced_settings_widgets_.trajectory_density = new QLineEdit();
 
-    ccaIgTabWidget->setLayout(mainLayout);
+    form_layout->addRow("Accuracy:", advanced_settings_widgets_.accuracy);
+    form_layout->addRow("Closure Error Threshold Angle:", advanced_settings_widgets_.closure_angle);
+    form_layout->addRow("Closure Error Threshold Linear:", advanced_settings_widgets_.closure_linear);
+    form_layout->addRow("IK Max Iterations:", advanced_settings_widgets_.ik_iterations);
+    form_layout->addRow("Trajectory Density:", advanced_settings_widgets_.trajectory_density);
 
-    // Advanced Settings Tab
-    QWidget *advancedSettingsTabWidget = new QWidget();
-    QVBoxLayout *advancedLayout = new QVBoxLayout;
-    QFormLayout *form_layout = new QFormLayout;
+    // Directly use the populated maps
+    form_layout->addRow(create_combo_box_layout_("Virtual Screw Order:", advanced_settings_widgets_.vir_screw_order,
+                                                 this->get_map_keys_(vir_screw_order_map_)));
+    form_layout->addRow(
+        create_combo_box_layout_("CCA Type:", advanced_settings_widgets_.cca_type, this->get_map_keys_(cca_type_map_)));
 
-    // Text input fields
-    accuracy_ = new QLineEdit();
-    closure_angle_ = new QLineEdit();
-    closure_linear_ = new QLineEdit();
-    ik_iterations_ = new QLineEdit();
-    trajectory_density_ = new QLineEdit();
-
-    // Dropdown menus
-    screw_order_combo_ = new QComboBox();
-
-    // Create a QStringList from virtual_screw_order_map_
-    QStringList screw_options;
-    for (const auto &pair : virtual_screw_order_map_)
-    {
-        screw_options.append(pair.first);
-    }
-
-    // Add the screw options to the QComboBox
-    screw_order_combo_->addItem(QString(""));
-    screw_order_combo_->addItems(screw_options);
-
-    // Set XYZ as default option for screw order
-    screw_order_combo_->setCurrentText(QString(""));
-
-    cca_type_combo_ = new QComboBox();
-    cca_type_combo_->addItems({"Affordance Control", "Affordance and EE Control"});
-
-    form_layout->addRow("Accuracy:", accuracy_);
-    form_layout->addRow("Closure Error Threshold Angle:", closure_angle_);
-    form_layout->addRow("Closure Error Threshold Linear:", closure_linear_);
-    form_layout->addRow("IK Max Iterations:", ik_iterations_);
-    form_layout->addRow("Trajectory Density:", trajectory_density_);
-    form_layout->addRow("Virtual Screw Order:", screw_order_combo_);
-    form_layout->addRow("CCA Type:", cca_type_combo_);
-
-    // Add form layout to advanced tab
-    advancedLayout->addLayout(form_layout);
-    advancedLayout->addStretch();
+    advanced_layout->addLayout(form_layout);
+    advanced_layout->addStretch();
 
     apply_button_ = new QPushButton("Apply Settings");
+    advanced_layout->addWidget(apply_button_);
 
-    QVBoxLayout *button_layout = new QVBoxLayout();
-    button_layout->addWidget(apply_button_);
+    return advanced_settings_tab_widget;
+}
 
-    advancedLayout->addLayout(button_layout); //
+void CcaInteractiveGoals::create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout)
+{
+    button = new QPushButton(text);
+    button->setEnabled(false);
+    layout->addWidget(button);
+}
 
-    advancedSettingsTabWidget->setLayout(advancedLayout);
+// QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
+//                                                            const QStringList &items)
+QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
+                                                           const QStringList &items)
+{
+    combo_box = new QComboBox;
+    combo_box->addItems(items);
 
-    tabWidget->addTab(ccaIgTabWidget, "CCA_IG");
-    tabWidget->addTab(advancedSettingsTabWidget, "Advanced Settings");
+    // Add to layout
+    auto *layout = new QHBoxLayout;
+    layout->addWidget(new QLabel(label));
+    layout->addWidget(combo_box);
+    return layout;
+}
+QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl,
+                                                           const QStringList &items)
+{
+    bl.label = new QLabel(label);
+    bl.combo_box = new QComboBox;
+    bl.combo_box->addItems(items);
 
-    QVBoxLayout *panelLayout = new QVBoxLayout;
-    panelLayout->addWidget(tabWidget);
-    setLayout(panelLayout);
+    // Add to layout
+    auto *layout = new QHBoxLayout;
+    layout->addWidget(bl.label);
+    layout->addWidget(bl.combo_box);
+    return layout;
+}
 
-    setFixedSize(400, 475); // Set fixed size for the panel
+QHBoxLayout *CcaInteractiveGoals::create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll)
+{
+    ll.label = new QLabel(label);
+    ll.line_edit = new QLineEdit;
 
-    // Linking of the callback functions
+    // Add to layout
+    auto *layout = new QHBoxLayout;
+    layout->addWidget(ll.label);
+    layout->addWidget(ll.line_edit);
+    return layout;
+}
 
-    connect(mode_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(modeSelected(int)));
-    connect(motion_type_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(motionTypeSelected(int)));
-    connect(goal_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(goalSelected(int)));
-    connect(axis_combo_box_, SIGNAL(currentTextChanged(QString)), this, SLOT(axisOptionSelected(QString)));
-    connect(pitch_combo_box_, SIGNAL(currentIndexChanged(int)), this, SLOT(pitchSelected(int)));
-    connect(plan_viz_button_, SIGNAL(clicked()), this, SLOT(planButtonClicked()));
-    connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(planExeButtonClicked()));
-    connect(plan_exe_button_, SIGNAL(clicked()), this, SLOT(ExeButtonClicked()));
-    connect(stop_button_, SIGNAL(clicked()), this, SLOT(cancelExeButtonClicked()));
+void CcaInteractiveGoals::connect_signals_()
+{
+    connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_(int)));
+    connect(motion_type_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(motion_type_selected_(int)));
+    connect(goal_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(goal_selected_(int)));
+    connect(axis_bl_.combo_box, SIGNAL(currentTextChanged(QString)), this, SLOT(axis_option_selected_(QString)));
+    connect(pitch_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(pitch_selected_(int)));
+    connect(plan_viz_button_, SIGNAL(clicked()), this, SLOT(plan_button_clicked_()));
+    connect(plan_viz_exe_button_, SIGNAL(clicked()), this, SLOT(plan_exe_button_clicked_()));
+    connect(plan_exe_button_, SIGNAL(clicked()), this, SLOT(exe_button_clicked_()));
+    connect(stop_button_, SIGNAL(clicked()), this, SLOT(cancel_exe_button_clicked_()));
+    connect(apply_button_, SIGNAL(clicked()), this, SLOT(apply_settings_clicked_()));
+}
 
-    connect(apply_button_, SIGNAL(clicked()), this, SLOT(applySettingsClicked()));
-
-    updateUIState();
-
-    // Interactive marker initialization
+template <typename ValueType> QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType> &map)
+{
+    QStringList keys;
+    for (const auto &pair : map)
+    {
+        keys.append(pair.first); // Append the key to the list
+    }
+    return keys;
 }
 
 void CcaInteractiveGoals::onInitialize()
@@ -203,7 +177,7 @@ void CcaInteractiveGoals::load(const rviz_common::Config &config) { rviz_common:
 
 void CcaInteractiveGoals::save(rviz_common::Config config) const { rviz_common::Panel::save(config); }
 
-void CcaInteractiveGoals::planButtonClicked()
+void CcaInteractiveGoals::plan_button_clicked_()
 {
     // Handle plan viz button click
     auto req = buildPlanningRequest();
@@ -215,7 +189,7 @@ void CcaInteractiveGoals::planButtonClicked()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::planExeButtonClicked()
+void CcaInteractiveGoals::plan_exe_button_clicked_()
 {
     // Handle plan viz execute button click
     auto req = buildPlanningRequest();
@@ -227,7 +201,7 @@ void CcaInteractiveGoals::planExeButtonClicked()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::ExeButtonClicked()
+void CcaInteractiveGoals::exe_button_clicked_()
 {
     // Handle plan execute button click
     auto req = buildPlanningRequest();
@@ -239,7 +213,7 @@ void CcaInteractiveGoals::ExeButtonClicked()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::cancelExeButtonClicked() { ccaRosActionClient->cancel_goal(); }
+void CcaInteractiveGoals::cancel_exe_button_clicked_() { ccaRosActionClient->cancel_goal(); }
 
 cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
 {
@@ -252,33 +226,35 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
          -0.8991076946258545, 0.0015475749969482422)
             .finished();
     req.start_state.robot = READY_CONFIG;
-    if (mode_combo_box_->currentText() == "Affordance Planning") // Affordance Planning
+    if (mode_bl_.combo_box->currentText() == "Affordance Planning") // Affordance Planning
     {
         req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
 
         // Determine motion type for affordance planning
-        if (motion_type_combo_box_->currentText() == "Translation")
+        if (motion_type_bl_.combo_box->currentText() == "Translation")
         {
             req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
         }
-        else if (motion_type_combo_box_->currentText() == "Rotation")
+        else if (motion_type_bl_.combo_box->currentText() == "Rotation")
         {
             req.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
         }
-        else if (motion_type_combo_box_->currentText() == "Screw Motion")
+        else if (motion_type_bl_.combo_box->currentText() == "Screw Motion")
         {
             req.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
 
             // Determine pitch value
-            if (pitch_combo_box_->currentText() != "Manual Input")
+            if (pitch_bl_.combo_box->currentText() != "Manual Input")
             {
-                req.task_description.affordance_info.pitch = std::stof(pitch_combo_box_->currentText().toStdString());
+                req.task_description.affordance_info.pitch =
+                    std::stof(pitch_bl_.combo_box->currentText().toStdString());
             }
             else // Manual input
             {
                 try
                 {
-                    req.task_description.affordance_info.pitch = std::stof(pitch_value_input_->text().toStdString());
+                    req.task_description.affordance_info.pitch =
+                        std::stof(pitch_value_ll_.line_edit->text().toStdString());
                 }
                 catch (int)
                 {
@@ -288,7 +264,7 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
             }
         }
     }
-    else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
+    else if (mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control")
     {
         req.task_description =
             cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
@@ -298,8 +274,8 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
     req.task_description.goal.affordance = getAffordanceGoal_();
 
     // Get affordance pose
-    auto screw_info = this->get_arrow_pose(mode_combo_box_->currentText().toStdString(),
-                                           axis_combo_box_->currentText().toStdString());
+    auto screw_info = this->get_arrow_pose(mode_bl_.combo_box->currentText().toStdString(),
+                                           axis_bl_.combo_box->currentText().toStdString());
     req.task_description.affordance_info.axis = screw_info.axis;
     req.task_description.affordance_info.location = screw_info.location;
 
@@ -323,22 +299,23 @@ double CcaInteractiveGoals::getAffordanceGoal_()
 {
     RCLCPP_INFO(this->get_logger(), "Getting affordance goal");
     double goal;
-    if ((motion_type_combo_box_->currentText() == "Rotation" ||
-         motion_type_combo_box_->currentText() == "Screw Motion" ||
-         mode_combo_box_->currentText() == "In-Place End Effector Orientation Control") &&
-        (goal_combo_box_->currentText() != "Manual Input"))
+    if ((motion_type_bl_.combo_box->currentText() == "Rotation" ||
+         motion_type_bl_.combo_box->currentText() == "Screw Motion" ||
+         mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control") &&
+        (goal_bl_.combo_box->currentText() != "Manual Input"))
     {
-        goal = M_PI * (goal_combo_box_->currentIndex() - 1) / 4.0; // multiple of pi/4
+        goal = M_PI * (goal_bl_.combo_box->currentIndex() - 1) / 4.0; // multiple of pi/4
     }
-    else if (motion_type_combo_box_->currentText() == "Translation" && goal_combo_box_->currentText() != "Manual Input")
+    else if (motion_type_bl_.combo_box->currentText() == "Translation" &&
+             goal_bl_.combo_box->currentText() != "Manual Input")
     {
-        goal = std::stof(goal_combo_box_->currentText().toStdString());
+        goal = std::stof(goal_bl_.combo_box->currentText().toStdString());
     }
     else
     { // Manual Input
         try
         {
-            goal = std::stof(value_input_->text().toStdString());
+            goal = std::stof(value_ll_.line_edit->text().toStdString());
         }
         catch (const std::exception &e)
         {
@@ -354,7 +331,7 @@ double CcaInteractiveGoals::getAffordanceGoal_()
     return goal;
 }
 
-void CcaInteractiveGoals::modeSelected(int index)
+void CcaInteractiveGoals::mode_selected_(int index)
 {
     // Grey out execute buttons
     plan_viz_button_->setEnabled(false);
@@ -364,76 +341,77 @@ void CcaInteractiveGoals::modeSelected(int index)
 
     // Setup other widgets based on selection
 
-    bool mode_selected = mode_combo_box_->currentIndex() != -1;
+    bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
 
     this->hide_im("arrow_marker");
 
     if (mode_selected)
     {
-        if (mode_combo_box_->currentText() == "Affordance Planning")
+        if (mode_bl_.combo_box->currentText() == "Affordance Planning")
         {
 
-            axis_combo_box_->setEnabled(false);
-            axis_combo_box_->setVisible(false);
-            axis_label_->setVisible(false);
-            goal_label_->setVisible(false);
-            goal_combo_box_->setEnabled(false);
-            goal_combo_box_->setVisible(false);
-            value_input_->setVisible(false);
-            value_input_->setEnabled(false);
-            value_label_->setVisible(false);
-            pitch_label_->setVisible(false);
-            pitch_combo_box_->setVisible(false);
-            pitch_value_input_->setVisible(false);
-            pitch_value_label_->setVisible(false);
+            axis_bl_.combo_box->setEnabled(false);
+            axis_bl_.combo_box->setVisible(false);
+            axis_bl_.label->setVisible(false);
+            goal_bl_.label->setVisible(false);
+            goal_bl_.combo_box->setEnabled(false);
+            goal_bl_.combo_box->setVisible(false);
+            value_ll_.line_edit->setVisible(false);
+            value_ll_.line_edit->setEnabled(false);
+            value_ll_.label->setVisible(false);
+            pitch_bl_.label->setVisible(false);
+            pitch_bl_.combo_box->setVisible(false);
+            pitch_value_ll_.line_edit->setVisible(false);
+            pitch_value_ll_.label->setVisible(false);
 
             // Set necessary widgets to visible
-            motion_type_label_->setVisible(true);
-            motion_type_combo_box_->setEnabled(true);
-            motion_type_combo_box_->setVisible(true);
-            motion_type_combo_box_->setCurrentText("");
+            motion_type_bl_.label->setVisible(true);
+            motion_type_bl_.combo_box->setEnabled(true);
+            motion_type_bl_.combo_box->setVisible(true);
+            motion_type_bl_.combo_box->setCurrentText("");
         }
-        else if (mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
+        else if (mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control")
         {
-            motion_type_label_->setVisible(false);
-            motion_type_combo_box_->setEnabled(false);
-            motion_type_combo_box_->setVisible(false);
-            goal_label_->setVisible(false);
-            goal_combo_box_->setEnabled(false);
-            goal_combo_box_->setVisible(false);
-            value_input_->setVisible(false);
-            value_input_->setEnabled(false);
-            value_label_->setVisible(false);
-            pitch_label_->setVisible(false);
-            pitch_combo_box_->setVisible(false);
-            pitch_value_input_->setVisible(false);
-            pitch_value_label_->setVisible(false);
+            motion_type_bl_.label->setVisible(false);
+            motion_type_bl_.combo_box->setEnabled(false);
+            motion_type_bl_.combo_box->setVisible(false);
+            goal_bl_.label->setVisible(false);
+            goal_bl_.combo_box->setEnabled(false);
+            goal_bl_.combo_box->setVisible(false);
+            value_ll_.line_edit->setVisible(false);
+            value_ll_.line_edit->setEnabled(false);
+            value_ll_.label->setVisible(false);
+            pitch_bl_.label->setVisible(false);
+            pitch_bl_.combo_box->setVisible(false);
+            pitch_value_ll_.line_edit->setVisible(false);
+            pitch_value_ll_.label->setVisible(false);
 
             // Set necessary widgets to visible
 
-            axis_combo_box_->setEnabled(true);
-            axis_combo_box_->setVisible(true);
-            axis_label_->setVisible(true);
-            axis_combo_box_->setCurrentText("");
+            axis_bl_.combo_box->setEnabled(true);
+            axis_bl_.combo_box->setVisible(true);
+            axis_bl_.label->setVisible(true);
+            axis_bl_.combo_box->setCurrentText("");
         }
     }
 }
 
-void CcaInteractiveGoals::motionTypeSelected(int index)
+void CcaInteractiveGoals::motion_type_selected_(int index)
 {
     plan_exe_button_->setEnabled(false);
     plan_viz_button_->setEnabled(false);
     plan_viz_exe_button_->setEnabled(false);
-    value_input_->setVisible(false);
-    value_input_->setEnabled(false);
-    value_label_->setVisible(false);
-    pitch_label_->setVisible(false);
-    pitch_combo_box_->setVisible(false);
-    pitch_value_input_->setVisible(false);
-    pitch_value_label_->setVisible(false);
-    pitch_combo_box_->setCurrentIndex(0);
-    if (motion_type_combo_box_->currentText() == "Translation" || motion_type_combo_box_->currentText() == "Rotation" ||
-        motion_type_combo_box_->currentText() == "Screw Motion")
+    value_ll_.line_edit->setVisible(false);
+    value_ll_.line_edit->setEnabled(false);
+    value_ll_.label->setVisible(false);
+    pitch_bl_.label->setVisible(false);
+    pitch_bl_.combo_box->setVisible(false);
+    pitch_value_ll_.line_edit->setVisible(false);
+    pitch_value_ll_.label->setVisible(false);
+    pitch_bl_.combo_box->setCurrentIndex(0);
+    if (motion_type_bl_.combo_box->currentText() == "Translation" ||
+        motion_type_bl_.combo_box->currentText() == "Rotation" ||
+        motion_type_bl_.combo_box->currentText() == "Screw Motion")
     {
         this->enable_im_controls("arrow_marker", interactive_marker_manager::ImControlEnable::ALL);
     }
@@ -441,68 +419,68 @@ void CcaInteractiveGoals::motionTypeSelected(int index)
     {
         this->hide_im("arrow_marker");
     }
-    if (motion_type_combo_box_->currentText() == "Screw Motion")
+    if (motion_type_bl_.combo_box->currentText() == "Screw Motion")
     {
-        pitch_label_->setVisible(true);
-        pitch_combo_box_->setVisible(true);
-        pitch_value_input_->setVisible(false);
-        pitch_value_label_->setVisible(false);
+        pitch_bl_.label->setVisible(true);
+        pitch_bl_.combo_box->setVisible(true);
+        pitch_value_ll_.line_edit->setVisible(false);
+        pitch_value_ll_.label->setVisible(false);
     }
     // Enable goal boxes
-    goal_label_->setVisible(true);
-    goal_combo_box_->setEnabled(true);
-    goal_combo_box_->setVisible(true);
-    goal_combo_box_->setCurrentIndex(0);
-    if (motion_type_combo_box_->currentText() == "Translation")
+    goal_bl_.label->setVisible(true);
+    goal_bl_.combo_box->setEnabled(true);
+    goal_bl_.combo_box->setVisible(true);
+    goal_bl_.combo_box->setCurrentIndex(0);
+    if (motion_type_bl_.combo_box->currentText() == "Translation")
     {
-        goal_label_->setText("Goal Distance(meters)");
+        goal_bl_.label->setText("Goal Distance(meters)");
         for (int i = 2; i <= 11; i++)
         {
             double value = (i - 1) * 0.1;
             QString text = QString::number(value, 'f', 1);
-            goal_combo_box_->setItemText(i, text);
+            goal_bl_.combo_box->setItemText(i, text);
         }
     }
-    else if (motion_type_combo_box_->currentText() == "Rotation" ||
-             motion_type_combo_box_->currentText() == "Screw Motion")
+    else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
+             motion_type_bl_.combo_box->currentText() == "Screw Motion")
     {
-        goal_label_->setText("Goal Angle(radians)");
+        goal_bl_.label->setText("Goal Angle(radians)");
         std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
                                                  "3π/2", "7π/4", "2π",   "9π/4", "5π/2"};
         for (int i = 2; i <= 11; i++)
         {
-            goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
+            goal_bl_.combo_box->setItemText(i, pi_fractions[i - 2].c_str());
         }
     }
 }
 
-void CcaInteractiveGoals::goalSelected(int index)
+void CcaInteractiveGoals::goal_selected_(int index)
 {
     if (index == 1)
     {
-        value_label_->setVisible(true);
-        value_input_->setEnabled(true);
-        value_input_->setVisible(true);
-        if (motion_type_combo_box_->currentText() == "Translation" &&
-            mode_combo_box_->currentText() != "In-Place End Effector Orientation Control")
+        value_ll_.label->setVisible(true);
+        value_ll_.line_edit->setEnabled(true);
+        value_ll_.line_edit->setVisible(true);
+        if (motion_type_bl_.combo_box->currentText() == "Translation" &&
+            mode_bl_.combo_box->currentText() != "In-Place End Effector Orientation Control")
         {
-            value_label_->setText("Meters");
+            value_ll_.label->setText("Meters");
         }
-        else if (motion_type_combo_box_->currentText() == "Rotation" ||
-                 motion_type_combo_box_->currentText() == "Screw Motion" ||
-                 mode_combo_box_->currentText() == "In-Place End Effector Orientation Control")
+        else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
+                 motion_type_bl_.combo_box->currentText() == "Screw Motion" ||
+                 mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control")
         {
-            value_label_->setText("Radians");
+            value_ll_.label->setText("Radians");
         }
     }
     else
     {
-        value_label_->setVisible(false);
-        value_input_->setEnabled(false);
-        value_input_->setVisible(false);
+        value_ll_.label->setVisible(false);
+        value_ll_.line_edit->setEnabled(false);
+        value_ll_.line_edit->setVisible(false);
     }
     if (index != 0 &&
-        (motion_type_combo_box_->currentText() != "Screw Motion" || pitch_combo_box_->currentIndex() != 0))
+        (motion_type_bl_.combo_box->currentText() != "Screw Motion" || pitch_bl_.combo_box->currentIndex() != 0))
     {
         plan_exe_button_->setEnabled(true);
         plan_viz_button_->setEnabled(true);
@@ -516,19 +494,19 @@ void CcaInteractiveGoals::goalSelected(int index)
     }
 }
 
-void CcaInteractiveGoals::pitchSelected(int index)
+void CcaInteractiveGoals::pitch_selected_(int index)
 {
     if (index == 1)
     {
-        pitch_value_input_->setVisible(true);
-        pitch_value_label_->setVisible(true);
+        pitch_value_ll_.line_edit->setVisible(true);
+        pitch_value_ll_.label->setVisible(true);
     }
     else
     {
-        pitch_value_input_->setVisible(false);
-        pitch_value_label_->setVisible(false);
+        pitch_value_ll_.line_edit->setVisible(false);
+        pitch_value_ll_.label->setVisible(false);
     }
-    if (index != 0 && goal_combo_box_->currentIndex() != 0)
+    if (index != 0 && goal_bl_.combo_box->currentIndex() != 0)
     {
         plan_exe_button_->setEnabled(true);
         plan_viz_button_->setEnabled(true);
@@ -542,90 +520,103 @@ void CcaInteractiveGoals::pitchSelected(int index)
     }
 }
 
-void CcaInteractiveGoals::axisOptionSelected(QString axis)
+void CcaInteractiveGoals::axis_option_selected_(QString axis)
 {
     if (axis != "")
     {
-        goal_label_->setVisible(true);
-        goal_combo_box_->setEnabled(true);
-        goal_combo_box_->setVisible(true);
-        goal_combo_box_->setCurrentIndex(0);
-        goal_label_->setText("Goal Angle(radians)");
+        goal_bl_.label->setVisible(true);
+        goal_bl_.combo_box->setEnabled(true);
+        goal_bl_.combo_box->setVisible(true);
+        goal_bl_.combo_box->setCurrentIndex(0);
+        goal_bl_.label->setText("Goal Angle(radians)");
         std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
                                                  "3π/2", "7π/4", "2π",   "9π/4", "5π/2"};
         for (int i = 2; i <= 11; i++)
         {
-            goal_combo_box_->setItemText(i, pi_fractions[i - 2].c_str());
+            goal_bl_.combo_box->setItemText(i, pi_fractions[i - 2].c_str());
         }
     }
 
     this->draw_ee_or_control_im(axis.toStdString());
 }
 
-void CcaInteractiveGoals::applySettingsClicked()
+void CcaInteractiveGoals::apply_settings_clicked_()
 {
     AdvancedSettings advanced_settings;
 
-    if (accuracy_->text().toFloat() != 0)
+    // Use the advanced_settings_widgets_ struct to access the widgets
+    if (advanced_settings_widgets_.accuracy->text().toFloat() != 0)
     {
-        advanced_settings.planner_config.accuracy = accuracy_->text().toFloat();
+        advanced_settings.planner_config.accuracy = advanced_settings_widgets_.accuracy->text().toFloat();
     }
 
-    if (closure_angle_->text().toFloat() != 0)
+    if (advanced_settings_widgets_.closure_angle->text().toFloat() != 0)
     {
-        advanced_settings.planner_config.closure_err_threshold_ang = closure_angle_->text().toFloat();
+        advanced_settings.planner_config.closure_err_threshold_ang =
+            advanced_settings_widgets_.closure_angle->text().toFloat();
     }
 
-    if (closure_linear_->text().toFloat() != 0)
+    if (advanced_settings_widgets_.closure_linear->text().toFloat() != 0)
     {
-        advanced_settings.planner_config.closure_err_threshold_lin = closure_linear_->text().toFloat();
+        advanced_settings.planner_config.closure_err_threshold_lin =
+            advanced_settings_widgets_.closure_linear->text().toFloat();
     }
 
-    if (ik_iterations_->text().toInt() != 0)
+    if (advanced_settings_widgets_.ik_iterations->text().toInt() != 0)
     {
-        advanced_settings.planner_config.ik_max_itr = ik_iterations_->text().toInt();
-    }
-    if (trajectory_density_->text().toInt() != 0)
-    {
-        advanced_settings.task_description.trajectory_density = trajectory_density_->text().toInt();
+        advanced_settings.planner_config.ik_max_itr = advanced_settings_widgets_.ik_iterations->text().toInt();
     }
 
-    if (screw_order_combo_->currentIndex() != 0)
+    if (advanced_settings_widgets_.trajectory_density->text().toInt() != 0)
+    {
+        advanced_settings.task_description.trajectory_density =
+            advanced_settings_widgets_.trajectory_density->text().toInt();
+    }
+
+    // Use the screw_order_combo_ from the struct
+    if (advanced_settings_widgets_.vir_screw_order->currentIndex() != 0)
     {
         advanced_settings.task_description.vir_screw_order =
-            virtual_screw_order_map_.at(screw_order_combo_->currentText());
+            vir_screw_order_map_.at(advanced_settings_widgets_.vir_screw_order->currentText());
+    }
+
+    // Use the cca_type_combo_ from the struct if needed
+    if (advanced_settings_widgets_.cca_type->currentIndex() != 0)
+    {
+        advanced_settings.cca_type = cca_type_map_.at(advanced_settings_widgets_.cca_type->currentText());
     }
 
     advanced_settings_ = advanced_settings;
     new_settings_applied_ = true;
+
     RCLCPP_INFO(this->get_logger(), "New Advanced Settings Applied");
 }
 
-void CcaInteractiveGoals::updateUIState()
+void CcaInteractiveGoals::update_ui_state_()
 {
     plan_viz_button_->setEnabled(false);
     plan_viz_exe_button_->setEnabled(false);
     plan_exe_button_->setEnabled(false);
     stop_button_->setEnabled(false);
-    axis_combo_box_->setEnabled(false);
-    axis_combo_box_->setVisible(false);
-    axis_label_->setVisible(false);
-    goal_label_->setVisible(false);
-    goal_combo_box_->setEnabled(false);
-    goal_combo_box_->setVisible(false);
-    value_input_->setVisible(false);
-    value_input_->setEnabled(false);
-    value_label_->setVisible(false);
-    pitch_label_->setVisible(false);
-    pitch_combo_box_->setVisible(false);
-    pitch_value_input_->setVisible(false);
-    pitch_value_label_->setVisible(false);
+    axis_bl_.combo_box->setEnabled(false);
+    axis_bl_.combo_box->setVisible(false);
+    axis_bl_.label->setVisible(false);
+    goal_bl_.label->setVisible(false);
+    goal_bl_.combo_box->setEnabled(false);
+    goal_bl_.combo_box->setVisible(false);
+    value_ll_.line_edit->setVisible(false);
+    value_ll_.line_edit->setEnabled(false);
+    value_ll_.label->setVisible(false);
+    pitch_bl_.label->setVisible(false);
+    pitch_bl_.combo_box->setVisible(false);
+    pitch_value_ll_.line_edit->setVisible(false);
+    pitch_value_ll_.label->setVisible(false);
 
     // Set necessary widgets to visible
-    motion_type_label_->setVisible(true);
-    motion_type_combo_box_->setEnabled(true);
-    motion_type_combo_box_->setVisible(true);
-    motion_type_combo_box_->setCurrentText("");
+    motion_type_bl_.label->setVisible(true);
+    motion_type_bl_.combo_box->setEnabled(true);
+    motion_type_bl_.combo_box->setVisible(true);
+    motion_type_bl_.combo_box->setCurrentText("");
 }
 
 void CcaInteractiveGoals::spin() { rclcpp::spin_some(this->get_node_base_interface()); }

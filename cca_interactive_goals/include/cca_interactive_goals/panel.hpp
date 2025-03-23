@@ -46,6 +46,32 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 {
     Q_OBJECT
   public:
+    enum CcaType
+    {
+        AFFORDANCE_CONTROL,
+        AFFORDANCE_AND_EE_ORIENTATION_CONTROL
+    };
+    struct QComboBoxAndLabel
+    {
+        QComboBox *combo_box;
+        QLabel *label;
+    };
+
+    struct QLineEditAndLabel
+    {
+        QLineEdit *line_edit;
+        QLabel *label;
+    };
+    struct AdvancedSettingsWidgets
+    {
+        QLineEdit *accuracy;
+        QLineEdit *closure_angle;
+        QLineEdit *closure_linear;
+        QLineEdit *ik_iterations;
+        QLineEdit *trajectory_density;
+        QComboBox *cca_type;
+        QComboBox *vir_screw_order;
+    };
     struct AdvancedSettings
     {
         struct TaskDescription
@@ -55,6 +81,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
         };
         cc_affordance_planner::PlannerConfig planner_config;
         TaskDescription task_description;
+        CcaType cca_type;
     };
 
     explicit CcaInteractiveGoals(QWidget *parent = nullptr);
@@ -65,36 +92,36 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     virtual void save(rviz_common::Config config) const override;
 
   protected Q_SLOTS:
-    void planButtonClicked();
-    void planExeButtonClicked();
-    void ExeButtonClicked();
-    void cancelExeButtonClicked();
+    void plan_button_clicked_();
+    void plan_exe_button_clicked_();
+    void exe_button_clicked_();
+    void cancel_exe_button_clicked_();
     cca_ros::PlanningRequest buildPlanningRequest();
-    void modeSelected(int index);
-    void motionTypeSelected(int index);
-    void goalSelected(int index);
-    void pitchSelected(int index);
-    void axisOptionSelected(QString axis);
-    void applySettingsClicked();
+    void mode_selected_(int index);
+    void motion_type_selected_(int index);
+    void goal_selected_(int index);
+    void pitch_selected_(int index);
+    void axis_option_selected_(QString axis);
+    void apply_settings_clicked_();
     void spin();
 
   private:
-    const int marker_id_ = 8;
-    void updateUIState();
+    const QString AFFORDANCE_PLANNING_ = "Affordance Planning";
+    const QString IN_PLACE_ORIENTATION_CONTROL_ = "In-Place End Effector Orientation Control";
+    const QStringList AXES_ = {"", "Interactive Axis", "x", "y", "z", "-x", "-y", "-z"};
+    const QStringList PITCHES_ = {"", "Manual Input", "0.1", "0.2", "0.3", "0.4", "0.5"};
+    const QStringList TRANSLATION_GOALS_ = {"",    "Manual Input", "0.1", "0.2", "0.3", "0.4",
+                                            "0.5", "0.6",          "0.7", "0.8", "0.9", "1.0"};
 
-    QComboBox *mode_combo_box_;
-    QComboBox *motion_type_combo_box_;
-    QComboBox *goal_combo_box_;
-    QComboBox *pitch_combo_box_;
-    QComboBox *axis_combo_box_;
-    QLabel *value_label_;
-    QLabel *pitch_value_label_;
-    QLabel *goal_label_;
-    QLabel *pitch_label_;
-    QLabel *axis_label_;
-    QLabel *motion_type_label_;
-    QLineEdit *value_input_;
-    QLineEdit *pitch_value_input_;
+    const int marker_id_ = 8;
+    void update_ui_state_();
+    QComboBoxAndLabel mode_bl_;
+    QComboBoxAndLabel motion_type_bl_;
+    QComboBoxAndLabel axis_bl_;
+    QComboBoxAndLabel pitch_bl_;
+    QComboBoxAndLabel goal_bl_;
+    QLineEditAndLabel value_ll_;
+    QLineEditAndLabel pitch_value_ll_;
     QPushButton *plan_viz_button_;
     QPushButton *plan_viz_exe_button_;
     QPushButton *plan_exe_button_;
@@ -102,16 +129,10 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     QTimer *spin_timer_;
 
     // Advanced Settings Widgets
-    QLineEdit *accuracy_;
-    QLineEdit *closure_angle_;
-    QLineEdit *closure_linear_;
-    QLineEdit *ik_iterations_;
-    QLineEdit *trajectory_density_;
-    QComboBox *screw_order_combo_;
-    QComboBox *cca_type_combo_;
+    AdvancedSettingsWidgets advanced_settings_widgets_;
     QPushButton *apply_button_;
 
-    const std::map<QString, affordance_util::VirtualScrewOrder> virtual_screw_order_map_ = {
+    const std::map<QString, affordance_util::VirtualScrewOrder> vir_screw_order_map_ = {
         {QString("NONE"), affordance_util::VirtualScrewOrder::NONE},
         {QString("YZX"), affordance_util::VirtualScrewOrder::YZX},
         {QString("ZXY"), affordance_util::VirtualScrewOrder::ZXY},
@@ -120,6 +141,9 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
         {QString("ZX"), affordance_util::VirtualScrewOrder::ZX},
         {QString("XYZ"), affordance_util::VirtualScrewOrder::XYZ}}; // virtual screw order to Qstring map for the
                                                                     // advanced settings menu
+    const std::map<QString, CcaType> cca_type_map_ = {
+        {QString("Affordance Control"), CcaType::AFFORDANCE_CONTROL},
+        {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
 
     // CCA parameters
     AdvancedSettings advanced_settings_;
@@ -127,6 +151,19 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     double getAffordanceGoal_();
     bool new_settings_applied_ = false;
     std::shared_ptr<cca_ros_action::CcaRosActionClient> ccaRosActionClient;
+
+    static constexpr int PANEL_WIDTH_ = 400;
+    static constexpr int PANEL_HEIGHT_ = 475;
+
+    // Methods
+    QWidget *create_cca_ig_tab_();
+    QWidget *create_advanced_settings_tab_();
+    void create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout);
+    QHBoxLayout *create_combo_box_layout_(const QString &label, QComboBox *&combo_box, const QStringList &items);
+    QHBoxLayout *create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl, const QStringList &items);
+    QHBoxLayout *create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll);
+    void connect_signals_();
+    template <typename ValueType> QStringList get_map_keys_(const std::map<QString, ValueType> &map);
 };
 
 } // namespace cca_interactive_goals
