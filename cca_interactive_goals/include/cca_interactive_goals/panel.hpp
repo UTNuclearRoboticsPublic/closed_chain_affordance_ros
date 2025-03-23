@@ -1,5 +1,5 @@
-#ifndef RVIZ_UI_PANEL_PANEL_HPP_
-#define RVIZ_UI_PANEL_PANEL_HPP_
+#ifndef CCA_ROS_RVIZ_PLUGIN_HPP_
+#define CCA_ROS_RVIZ_PLUGIN_HPP_
 
 // Standard C++ headers
 #include <Eigen/Dense>
@@ -41,18 +41,18 @@
 // Local headers
 #include "cca_interactive_goals/interactive_marker_manager.hpp"
 
-namespace cca_interactive_goals
+namespace cca_ros_rviz_plugin
 {
 
 /**
- * @class CcaInteractiveGoals
+ * @class CcaRosRvizPlugin
  * @brief Interactive UI panel for RViz to control and visualize CCA planning.
  *
  * This panel provides a user interface for configuring and executing constrained motion
  * planning tasks using the Closed-Chain Affordance (CCA) planner. It allows users
  * to set up screw-based affordance planning and in-place EE orientation control.
  */
-class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker_manager::InteractiveMarkerManager
+class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_manager::InteractiveMarkerManager
 {
     Q_OBJECT
     // The Q_OBJECT macro marks this class as a Qt object. It enables Qt's signal-slot mechanism,
@@ -119,10 +119,10 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     };
 
     /**
-     * @brief Constructor for the CcaInteractiveGoals panel
+     * @brief Constructor for the CcaRosRvizPlugin panel
      * @param parent Parent widget
      */
-    explicit CcaInteractiveGoals(QWidget *parent = nullptr);
+    explicit CcaRosRvizPlugin(QWidget *parent = nullptr);
 
     /**
      * @brief Initialize ROS connections and set up the panel
@@ -313,7 +313,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
      */
 
     /**
-     * @brief Create the main CCA interactive goals tab
+     * @brief Create the main CCA Rviz Plugin tab
      * @return Pointer to the created widget
      */
     QWidget *create_cca_ig_tab_();
@@ -426,6 +426,6 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     void update_execution_buttons_state_(int goal_index);
 };
 
-} // namespace cca_interactive_goals
+} // namespace cca_ros_rviz_plugin
 
-#endif // RVIZ_UI_PANEL_PANEL_HPP_
+#endif // CCA_ROS_RVIZ_PLUGIN_HPP_

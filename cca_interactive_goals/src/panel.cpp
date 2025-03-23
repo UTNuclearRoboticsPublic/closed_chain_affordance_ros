@@ -1,9 +1,9 @@
 #include "cca_interactive_goals/panel.hpp"
 
-namespace cca_interactive_goals
+namespace cca_ros_rviz_plugin
 {
-CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
-    : rviz_common::Panel(parent), interactive_marker_manager::InteractiveMarkerManager("cca_interactive_goals")
+CcaRosRvizPlugin::CcaRosRvizPlugin(QWidget *parent)
+    : rviz_common::Panel(parent), interactive_marker_manager::InteractiveMarkerManager("cca_ros_rviz_plugin")
 {
     auto *tab_widget = new QTabWidget(this);
 
@@ -20,7 +20,7 @@ CcaInteractiveGoals::CcaInteractiveGoals(QWidget *parent)
     this->update_ui_state_();
 }
 
-void CcaInteractiveGoals::onInitialize()
+void CcaRosRvizPlugin::onInitialize()
 {
     // Do ROS client initializations in this function
     // Initialize the CCA Ros action client to be able to send planning requests
@@ -28,11 +28,11 @@ void CcaInteractiveGoals::onInitialize()
 
     // Set up timer for spinning the node
     spin_timer_ = new QTimer(this);
-    connect(spin_timer_, &QTimer::timeout, this, &CcaInteractiveGoals::spin);
+    connect(spin_timer_, &QTimer::timeout, this, &CcaRosRvizPlugin::spin);
     spin_timer_->start(10); // Spin every 10ms
 }
 
-QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
+QWidget *CcaRosRvizPlugin::create_cca_ig_tab_()
 {
     auto *cca_ig_tab_widget = new QWidget();
     auto *main_layout = new QVBoxLayout(cca_ig_tab_widget);
@@ -63,7 +63,7 @@ QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
     return cca_ig_tab_widget;
 }
 
-QWidget *CcaInteractiveGoals::create_advanced_settings_tab_()
+QWidget *CcaRosRvizPlugin::create_advanced_settings_tab_()
 {
     auto *advanced_settings_tab_widget = new QWidget();
     auto *advanced_layout = new QVBoxLayout(advanced_settings_tab_widget);
@@ -97,7 +97,7 @@ QWidget *CcaInteractiveGoals::create_advanced_settings_tab_()
     return advanced_settings_tab_widget;
 }
 
-void CcaInteractiveGoals::update_ui_state_()
+void CcaRosRvizPlugin::update_ui_state_()
 {
     // Disable all execution buttons
     set_execute_buttons_enabled_(false);
@@ -115,7 +115,7 @@ void CcaInteractiveGoals::update_ui_state_()
     this->hide_im(this->arrow_marker_name_);
 }
 
-void CcaInteractiveGoals::connect_signals_()
+void CcaRosRvizPlugin::connect_signals_()
 {
     connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_()));
     connect(motion_type_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(motion_type_selected_()));
@@ -130,7 +130,7 @@ void CcaInteractiveGoals::connect_signals_()
 }
 
 // Slot function implementations follow
-void CcaInteractiveGoals::mode_selected_()
+void CcaRosRvizPlugin::mode_selected_()
 {
     // Disable all execution buttons
     set_execute_buttons_enabled_(false);
@@ -164,7 +164,7 @@ void CcaInteractiveGoals::mode_selected_()
     }
 }
 
-void CcaInteractiveGoals::motion_type_selected_()
+void CcaRosRvizPlugin::motion_type_selected_()
 {
     // Disable execution buttons
     set_execute_buttons_enabled_(false);
@@ -204,7 +204,7 @@ void CcaInteractiveGoals::motion_type_selected_()
     setup_goal_controls_for_motion_type_(motion_type);
 }
 
-void CcaInteractiveGoals::goal_selected_(int index)
+void CcaRosRvizPlugin::goal_selected_(int index)
 {
     // Show value controls for custom value (index 1)
     if (index == 1)
@@ -221,7 +221,7 @@ void CcaInteractiveGoals::goal_selected_(int index)
     update_execution_buttons_state_(index);
 }
 
-void CcaInteractiveGoals::pitch_selected_(int index)
+void CcaRosRvizPlugin::pitch_selected_(int index)
 {
     // Show pitch value controls for custom pitch (index 1)
     set_line_edit_controls_(pitch_value_ll_, index == 1);
@@ -230,7 +230,7 @@ void CcaInteractiveGoals::pitch_selected_(int index)
     update_execution_buttons_state_(goal_bl_.combo_box->currentIndex());
 }
 
-void CcaInteractiveGoals::axis_option_selected_(QString axis)
+void CcaRosRvizPlugin::axis_option_selected_(QString axis)
 {
     if (axis.isEmpty())
         return;
@@ -245,7 +245,7 @@ void CcaInteractiveGoals::axis_option_selected_(QString axis)
     // Draw the appropriate interactive marker
     this->draw_ee_or_control_im(axis.toStdString());
 }
-void CcaInteractiveGoals::plan_button_clicked_()
+void CcaRosRvizPlugin::plan_button_clicked_()
 {
     // Enable stop button
     stop_button_->setEnabled(true);
@@ -257,7 +257,7 @@ void CcaInteractiveGoals::plan_button_clicked_()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::plan_exe_button_clicked_()
+void CcaRosRvizPlugin::plan_exe_button_clicked_()
 {
     // Enable stop button
     stop_button_->setEnabled(true);
@@ -269,7 +269,7 @@ void CcaInteractiveGoals::plan_exe_button_clicked_()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::exe_button_clicked_()
+void CcaRosRvizPlugin::exe_button_clicked_()
 {
     // Enable stop button
     stop_button_->setEnabled(true);
@@ -281,9 +281,9 @@ void CcaInteractiveGoals::exe_button_clicked_()
     ccaRosActionClient->send_goal(req);
 }
 
-void CcaInteractiveGoals::cancel_exe_button_clicked_() { ccaRosActionClient->cancel_goal(); }
+void CcaRosRvizPlugin::cancel_exe_button_clicked_() { ccaRosActionClient->cancel_goal(); }
 
-void CcaInteractiveGoals::apply_settings_clicked_()
+void CcaRosRvizPlugin::apply_settings_clicked_()
 {
     AdvancedSettings advanced_settings;
 
@@ -336,7 +336,7 @@ void CcaInteractiveGoals::apply_settings_clicked_()
 }
 
 // Planning request building function
-cca_ros::PlanningRequest CcaInteractiveGoals::build_planning_request_()
+cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
 {
 
     cca_ros::PlanningRequest req;
@@ -408,15 +408,15 @@ cca_ros::PlanningRequest CcaInteractiveGoals::build_planning_request_()
 }
 
 // UI Creation helper functions follow
-void CcaInteractiveGoals::create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout)
+void CcaRosRvizPlugin::create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout)
 {
     button = new QPushButton(text);
     button->setEnabled(false);
     layout->addWidget(button);
 }
 
-QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
-                                                           const QStringList &items)
+QHBoxLayout *CcaRosRvizPlugin::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
+                                                        const QStringList &items)
 {
     combo_box = new QComboBox;
     combo_box->addItems(items);
@@ -427,8 +427,8 @@ QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label,
     layout->addWidget(combo_box);
     return layout;
 }
-QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl,
-                                                           const QStringList &items)
+QHBoxLayout *CcaRosRvizPlugin::create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl,
+                                                        const QStringList &items)
 {
     bl.label = new QLabel(label);
     bl.combo_box = new QComboBox;
@@ -441,7 +441,7 @@ QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label,
     return layout;
 }
 
-QHBoxLayout *CcaInteractiveGoals::create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll)
+QHBoxLayout *CcaRosRvizPlugin::create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll)
 {
     ll.label = new QLabel(label);
     ll.line_edit = new QLineEdit;
@@ -453,7 +453,7 @@ QHBoxLayout *CcaInteractiveGoals::create_line_edit_layout_(const QString &label,
     return layout;
 }
 template <typename ValueType>
-QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType> &map, bool prepend_empty)
+QStringList CcaRosRvizPlugin::get_map_keys_(const std::map<QString, ValueType> &map, bool prepend_empty)
 {
     QStringList keys;
     // If asked, add an empty string in the beginning
@@ -470,7 +470,7 @@ QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType
 }
 
 // UI State Management helper functions follow
-void CcaInteractiveGoals::set_execute_buttons_enabled_(bool enabled)
+void CcaRosRvizPlugin::set_execute_buttons_enabled_(bool enabled)
 {
     plan_viz_button_->setEnabled(enabled);
     plan_viz_exe_button_->setEnabled(enabled);
@@ -478,7 +478,7 @@ void CcaInteractiveGoals::set_execute_buttons_enabled_(bool enabled)
     stop_button_->setEnabled(enabled);
 }
 
-void CcaInteractiveGoals::hide_all_controls_()
+void CcaRosRvizPlugin::hide_all_controls_()
 {
     // Hide all UI control groups
     set_combo_box_controls_(axis_bl_, false);
@@ -489,7 +489,7 @@ void CcaInteractiveGoals::hide_all_controls_()
     set_line_edit_controls_(pitch_value_ll_, false);
 }
 
-void CcaInteractiveGoals::set_combo_box_controls_(const QComboBoxAndLabel &controls, bool visible)
+void CcaRosRvizPlugin::set_combo_box_controls_(const QComboBoxAndLabel &controls, bool visible)
 {
     if (controls.label)
     {
@@ -502,7 +502,7 @@ void CcaInteractiveGoals::set_combo_box_controls_(const QComboBoxAndLabel &contr
     }
 }
 
-void CcaInteractiveGoals::set_line_edit_controls_(const QLineEditAndLabel &controls, bool visible)
+void CcaRosRvizPlugin::set_line_edit_controls_(const QLineEditAndLabel &controls, bool visible)
 {
     if (controls.label)
     {
@@ -515,7 +515,7 @@ void CcaInteractiveGoals::set_line_edit_controls_(const QLineEditAndLabel &contr
     }
 }
 
-void CcaInteractiveGoals::setup_goal_controls_for_motion_type_(const QString &motion_type)
+void CcaRosRvizPlugin::setup_goal_controls_for_motion_type_(const QString &motion_type)
 {
     // Enable goal boxes
     set_combo_box_controls_(goal_bl_, true);
@@ -535,7 +535,7 @@ void CcaInteractiveGoals::setup_goal_controls_for_motion_type_(const QString &mo
     }
 }
 
-void CcaInteractiveGoals::setup_value_label_text_()
+void CcaRosRvizPlugin::setup_value_label_text_()
 {
     QString motion_type = motion_type_bl_.combo_box->currentText();
     QString mode = mode_bl_.combo_box->currentText();
@@ -550,7 +550,7 @@ void CcaInteractiveGoals::setup_value_label_text_()
     }
 }
 
-void CcaInteractiveGoals::update_execution_buttons_state_(int goal_index)
+void CcaRosRvizPlugin::update_execution_buttons_state_(int goal_index)
 {
     bool enable_buttons = false;
 
@@ -568,7 +568,7 @@ void CcaInteractiveGoals::update_execution_buttons_state_(int goal_index)
 }
 
 // Planning request building helper functions follow
-double CcaInteractiveGoals::get_affordance_goal_()
+double CcaRosRvizPlugin::get_affordance_goal_()
 {
     double goal;
 
@@ -604,7 +604,7 @@ double CcaInteractiveGoals::get_affordance_goal_()
     return goal;
 }
 
-} // namespace cca_interactive_goals
+} // namespace cca_ros_rviz_plugin
 
-// Export the CcaInteractiveGoals class as a plugin for rviz_common::Panel
-PLUGINLIB_EXPORT_CLASS(cca_interactive_goals::CcaInteractiveGoals, rviz_common::Panel)
+// Export the CcaRosRvizPlugin class as a plugin for rviz_common::Panel
+PLUGINLIB_EXPORT_CLASS(cca_ros_rviz_plugin::CcaRosRvizPlugin, rviz_common::Panel)
