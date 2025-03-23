@@ -1,6 +1,4 @@
 #include "cca_interactive_goals/panel.hpp"
-// TODO: USE UNORDERED MAP FOR PLANNING TYPES SCREW TYPES ETC. WHERE APPROPRIATE FOR EFFICIENT LOOKUP, LIKE WITH VIRTUAL
-// SCREW ORDER
 
 namespace cca_interactive_goals
 {
@@ -134,8 +132,8 @@ QHBoxLayout *CcaInteractiveGoals::create_line_edit_layout_(const QString &label,
 
 void CcaInteractiveGoals::connect_signals_()
 {
-    connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_(int)));
-    connect(motion_type_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(motion_type_selected_(int)));
+    connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_()));
+    connect(motion_type_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(motion_type_selected_()));
     connect(goal_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(goal_selected_(int)));
     connect(axis_bl_.combo_box, SIGNAL(currentTextChanged(QString)), this, SLOT(axis_option_selected_(QString)));
     connect(pitch_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(pitch_selected_(int)));
@@ -326,7 +324,7 @@ double CcaInteractiveGoals::getAffordanceGoal_()
     return goal;
 }
 
-void CcaInteractiveGoals::mode_selected_(int index)
+void CcaInteractiveGoals::mode_selected_()
 {
     // Grey out execute buttons
     plan_viz_button_->setEnabled(false);
@@ -391,7 +389,7 @@ void CcaInteractiveGoals::mode_selected_(int index)
     }
 }
 
-void CcaInteractiveGoals::motion_type_selected_(int index)
+void CcaInteractiveGoals::motion_type_selected_()
 {
     plan_exe_button_->setEnabled(false);
     plan_viz_button_->setEnabled(false);

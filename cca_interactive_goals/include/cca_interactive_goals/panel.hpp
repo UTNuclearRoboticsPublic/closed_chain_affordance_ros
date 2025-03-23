@@ -97,8 +97,8 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     void exe_button_clicked_();
     void cancel_exe_button_clicked_();
     cca_ros::PlanningRequest buildPlanningRequest();
-    void mode_selected_(int index);
-    void motion_type_selected_(int index);
+    void mode_selected_();
+    void motion_type_selected_();
     void goal_selected_(int index);
     void pitch_selected_(int index);
     void axis_option_selected_(QString axis);
