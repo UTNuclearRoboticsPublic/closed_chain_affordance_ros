@@ -30,6 +30,18 @@ enum class ImControlEnable
     ALL          ///< Enables both rotation and translation controls
 };
 
+/**
+ * @brief Struct that holds information for enabling an interactive marker.
+ */
+struct ImControlEnableInfo
+{
+    std::string marker_name;    ///< Name of the interactive marker
+    ImControlEnable enable;     ///< What aspects of the interactive marker to enable
+    bool create = false;        ///< Whether to create the marker
+    bool reset = true;          ///< Whether to reset the marker pose
+    bool in_tool_frame = false; ///< Whether to draw in the tool frame
+};
+
 class InteractiveMarkerManager : public rclcpp::Node
 {
   public:
@@ -38,15 +50,18 @@ class InteractiveMarkerManager : public rclcpp::Node
     /**
      * @brief Enables or creates an interactive marker based on the provided parameters.
      *
-     * @param marker_name The name of the interactive marker.
-     * @param enable Specifies which part of the interactive marker to enable.
-     * @param create A boolean indicating whether to create the marker with a bound callback (default is false).
-     * @param reset A boolean specifying whether retain the marker's last moved pose or reset it (default is true).
-     * @param in_tool_frame A boolean specifying whether to draw the interactive marker in the tool frame (default is
-     * false, i.e. it is drawn in the "ref_frame" parameter frame).
+     * @param info A struct containing information on how to enable the interactive marker.
+     *             This includes the marker's name, the parts to enable, and options for creation,
+     *             resetting the pose, and drawing in the tool frame.
+     *
+     * @note The `info` struct holds the following fields:
+     *   - `marker_name`: The name of the interactive marker.
+     *   - `enable`: Specifies which parts of the interactive marker to enable.
+     *   - `create`: A boolean indicating whether to create the marker (default is `false`).
+     *   - `reset`: A boolean specifying whether to reset the marker's pose (default is `true`).
+     *   - `in_tool_frame`: A boolean indicating whether to draw the marker in the tool frame (default is `false`).
      */
-    void enable_im_controls(const std::string &marker_name, const ImControlEnable &enable, bool create = false,
-                            bool reset = true, bool in_tool_frame = false);
+    void enable_im_controls(const ImControlEnableInfo &info);
 
     /**
      * @brief Hides the specified interactive marker.
@@ -73,12 +88,14 @@ class InteractiveMarkerManager : public rclcpp::Node
      */
     void draw_ee_or_control_im(const std::string &axis);
 
+  protected:
+    static constexpr const char *arrow_marker_name_ =
+        "arrow_marker"; ///< Name of the interactive marker for the screw arrow
+
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
     std::string tool_frame_name_; ///< This is where the arrow will appear in "EE Orientation Only" planning mode
     std::string ref_frame_name_;  ///< This is where the arrow will appear first in the "Affordance" planning mode
-    static constexpr const char *arrow_marker_name_ =
-        "arrow_marker"; ///< Name of the interactive marker for the screw arrow
 
     // Variables for capturing the arrow pose
     Eigen::Vector3d arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());

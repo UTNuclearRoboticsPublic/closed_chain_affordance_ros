@@ -169,7 +169,7 @@ void CcaInteractiveGoals::onInitialize()
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
     // Hide the markers to start
-    this->hide_im("arrow_marker");
+    this->hide_im(this->arrow_marker_name_);
 
     // Set up timer for spinning the node
     spin_timer_ = new QTimer(this);
@@ -338,7 +338,7 @@ void CcaInteractiveGoals::mode_selected_(int index)
 
     bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
 
-    this->hide_im("arrow_marker");
+    this->hide_im(this->arrow_marker_name_);
 
     if (mode_selected)
     {
@@ -407,11 +407,15 @@ void CcaInteractiveGoals::motion_type_selected_(int index)
     if (motion_type_bl_.combo_box->currentText() == "Translation" ||
         motion_type_bl_.combo_box->currentText() == "Rotation" || motion_type_bl_.combo_box->currentText() == "Screw")
     {
-        this->enable_im_controls("arrow_marker", interactive_marker_manager::ImControlEnable::ALL, false, false);
+        interactive_marker_manager::ImControlEnableInfo arrow_enable_info;
+        arrow_enable_info.marker_name = this->arrow_marker_name_;
+        arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
+        arrow_enable_info.reset = false;
+        this->enable_im_controls(arrow_enable_info);
     }
     else
     {
-        this->hide_im("arrow_marker");
+        this->hide_im(this->arrow_marker_name_);
     }
     if (motion_type_bl_.combo_box->currentText() == "Screw")
     {

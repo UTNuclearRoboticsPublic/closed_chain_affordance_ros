@@ -28,7 +28,12 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
         "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
         this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-    enable_im_controls(arrow_marker_name_, ImControlEnable::ALL, true);
+    // Enable the arrow
+    ImControlEnableInfo arrow_enable_info;
+    arrow_enable_info.marker_name = arrow_marker_name_;
+    arrow_enable_info.enable = ImControlEnable::ALL;
+    arrow_enable_info.create = true;
+    enable_im_controls(arrow_enable_info);
 
     try
     {
@@ -69,19 +74,18 @@ void InteractiveMarkerManager::process_arrow_feedback(
     }
 }
 
-void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name, const ImControlEnable &enable,
-                                                  bool create, bool reset, bool in_tool_frame)
+void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &info)
 {
     visualization_msgs::msg::InteractiveMarker int_marker;
 
     // Retrieve marker if not create a new one
-    if (!create)
+    if (!info.create)
     {
-        server_->get(marker_name, int_marker);
+        server_->get(info.marker_name, int_marker);
     }
 
     // Clear and initialize marker
-    if (reset)
+    if (info.reset)
     {
         int_marker = visualization_msgs::msg::InteractiveMarker();
 
@@ -91,7 +95,7 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     }
 
     // Draw in tool frame if asked
-    if (in_tool_frame)
+    if (info.in_tool_frame)
     {
         int_marker.header.frame_id = tool_frame_name_;
     }
@@ -99,7 +103,7 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     {
         int_marker.header.frame_id = ref_frame_name_;
     }
-    int_marker.name = marker_name;
+    int_marker.name = info.marker_name;
     int_marker.description = "";
     int_marker.scale = ARROW_SCALE;
 
@@ -147,7 +151,7 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     };
 
     // Configure controls based on enable type
-    switch (enable)
+    switch (info.enable)
     {
     case ImControlEnable::ROTATION:
         addRotationControls();
@@ -165,7 +169,7 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     }
 
     // Insert and apply changes
-    if (create)
+    if (info.create)
     { // Insert with callback if it does not exist
         server_->insert(int_marker,
                         std::bind(&InteractiveMarkerManager::process_arrow_feedback, this, std::placeholders::_1));
@@ -180,7 +184,10 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
 void InteractiveMarkerManager::hide_im(const std::string &marker_name)
 {
     // Disable interactive marker controls
-    enable_im_controls(marker_name, ImControlEnable::NONE);
+    ImControlEnableInfo arrow_enable_info;
+    arrow_enable_info.marker_name = marker_name;
+    arrow_enable_info.enable = ImControlEnable::NONE;
+    enable_im_controls(arrow_enable_info);
 
     // Get the interactive marker object
     visualization_msgs::msg::InteractiveMarker int_marker;
@@ -197,15 +204,19 @@ void InteractiveMarkerManager::hide_im(const std::string &marker_name)
 
 void InteractiveMarkerManager::draw_ee_or_control_im(const std::string &axis)
 {
+    ImControlEnableInfo arrow_enable_info;
+    arrow_enable_info.marker_name = arrow_marker_name_;
     // Enable interactive marker for manual mode (with rotation control) and return
     if (axis == "Interactive Axis")
     {
-        enable_im_controls(arrow_marker_name_, ImControlEnable::ROTATION);
+        arrow_enable_info.enable = ImControlEnable::ROTATION;
+        enable_im_controls(arrow_enable_info);
         return;
     }
 
     // Enable the arrow with no interactive control
-    enable_im_controls(arrow_marker_name_, ImControlEnable::NONE);
+    arrow_enable_info.enable = ImControlEnable::NONE;
+    enable_im_controls(arrow_enable_info);
 
     // Get the interactive marker
     visualization_msgs::msg::InteractiveMarker int_marker;
