@@ -42,9 +42,11 @@ class InteractiveMarkerManager : public rclcpp::Node
      * @param enable Specifies which part of the interactive marker to enable.
      * @param create A boolean indicating whether to create the marker with a bound callback (default is false).
      * @param reset A boolean specifying whether retain the marker's last moved pose or reset it (default is true).
+     * @param in_tool_frame A boolean specifying whether to draw the interactive marker in the tool frame (default is
+     * false, i.e. it is drawn in the "ref_frame" parameter frame).
      */
     void enable_im_controls(const std::string &marker_name, const ImControlEnable &enable, bool create = false,
-                            bool reset = true);
+                            bool reset = true, bool in_tool_frame = false);
 
     /**
      * @brief Hides the specified interactive marker.
@@ -73,6 +75,8 @@ class InteractiveMarkerManager : public rclcpp::Node
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
+    std::string tool_frame_name_; ///< This is where the arrow will appear in "EE Orientation Only" planning mode
+    std::string ref_frame_name_;  ///< This is where the arrow will appear first in the "Affordance" planning mode
     static constexpr const char *arrow_marker_name_ =
         "arrow_marker"; ///< Name of the interactive marker for the screw arrow
 

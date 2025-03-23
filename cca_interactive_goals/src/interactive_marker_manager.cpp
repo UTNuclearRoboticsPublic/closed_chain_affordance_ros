@@ -30,6 +30,22 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
 
     enable_im_controls(arrow_marker_name_, ImControlEnable::ALL, true);
 
+    try
+    {
+        this->declare_parameter<std::string>("tool_frame");
+        tool_frame_name_ = this->get_parameter("tool_frame").as_string();
+        this->declare_parameter<std::string>("ref_frame");
+        ref_frame_name_ = this->get_parameter("ref_frame").as_string();
+    }
+    catch (const std::exception &e)
+    {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Failed to get parameter 'tool_frame' or 'ref_frame': %s. You may have forgetten to load the "
+                     "cca_<robot>_ros_viz_setup.yaml file with the "
+                     "rviz2 node.",
+                     e.what());
+    }
+
     RCLCPP_INFO(this->get_logger(), "Interactive marker manager initialized.");
 }
 
@@ -54,7 +70,7 @@ void InteractiveMarkerManager::process_arrow_feedback(
 }
 
 void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name, const ImControlEnable &enable,
-                                                  bool create, bool reset)
+                                                  bool create, bool reset, bool in_tool_frame)
 {
     visualization_msgs::msg::InteractiveMarker int_marker;
 
@@ -73,7 +89,16 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
         arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
         arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
     }
-    int_marker.header.frame_id = "arm0_base_link";
+
+    // Draw in tool frame if asked
+    if (in_tool_frame)
+    {
+        int_marker.header.frame_id = tool_frame_name_;
+    }
+    else
+    {
+        int_marker.header.frame_id = ref_frame_name_;
+    }
     int_marker.name = marker_name;
     int_marker.description = "";
     int_marker.scale = ARROW_SCALE;
