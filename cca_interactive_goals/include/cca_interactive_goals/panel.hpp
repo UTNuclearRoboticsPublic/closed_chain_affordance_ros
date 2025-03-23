@@ -107,6 +107,14 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     void spin();
 
   private:
+    void set_execute_buttons_enabled_(bool enabled);
+    void hide_all_controls_();
+    void set_combo_box_controls_(const QComboBoxAndLabel &controls, bool visible);
+    void set_line_edit_controls_(const QLineEditAndLabel &controls, bool visible);
+    void setup_goal_controls_for_motion_type_(const QString &motion_type);
+    void setup_value_label_text_();
+    void update_execution_buttons_state_(int goal_index);
+
     const QStringList AXES_ = {"", "Interactive Axis", "x", "y", "z", "-x", "-y", "-z"};
     const QStringList PITCHES_ = {"", "Manual Input", "0.1", "0.2", "0.3", "0.4", "0.5"};
     const QStringList TRANSLATION_GOALS_ = {"",    "Manual Input", "0.1", "0.2", "0.3", "0.4",

@@ -85,6 +85,24 @@ QWidget *CcaInteractiveGoals::create_advanced_settings_tab_()
     return advanced_settings_tab_widget;
 }
 
+void CcaInteractiveGoals::update_ui_state_()
+{
+    // Disable all execution buttons
+    set_execute_buttons_enabled_(false);
+
+    // Hide all controls first
+    hide_all_controls_();
+
+    // Set only motion_type controls to visible
+    set_combo_box_controls_(motion_type_bl_, true);
+
+    // Reset the motion type selection
+    motion_type_bl_.combo_box->setCurrentText("");
+
+    // Hide the arrow marker
+    this->hide_im(this->arrow_marker_name_);
+}
+
 void CcaInteractiveGoals::create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout)
 {
     button = new QPushButton(text);
@@ -167,13 +185,222 @@ void CcaInteractiveGoals::onInitialize()
     // Initialize the CCA Ros action client to be able to send planning requests
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
-    // Hide the markers to start
-    this->hide_im(this->arrow_marker_name_);
-
     // Set up timer for spinning the node
     spin_timer_ = new QTimer(this);
     connect(spin_timer_, &QTimer::timeout, this, &CcaInteractiveGoals::spin);
     spin_timer_->start(10); // Spin every 10ms
+}
+void CcaInteractiveGoals::mode_selected_()
+{
+    // Disable all execution buttons
+    set_execute_buttons_enabled_(false);
+
+    // Hide the arrow marker
+    this->hide_im(this->arrow_marker_name_);
+
+    // Check if a mode is selected
+    bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
+    if (!mode_selected)
+        return;
+
+    // Get the current selected mode
+    QString selected_mode = mode_bl_.combo_box->currentText();
+
+    // Reset all UI elements first
+    hide_all_controls_();
+
+    // Configure UI based on the selected mode
+    if (selected_mode == "Affordance")
+    {
+        // Show motion type controls
+        set_combo_box_controls_(motion_type_bl_, true);
+        motion_type_bl_.combo_box->setCurrentText("");
+    }
+    else if (selected_mode == "EE Orientation Only")
+    {
+        // Show axis controls
+        set_combo_box_controls_(axis_bl_, true);
+        axis_bl_.combo_box->setCurrentText("");
+    }
+}
+
+void CcaInteractiveGoals::motion_type_selected_()
+{
+    // Disable execution buttons
+    set_execute_buttons_enabled_(false);
+
+    // Hide value and pitch controls initially
+    set_line_edit_controls_(value_ll_, false);
+    set_combo_box_controls_(pitch_bl_, false);
+    set_line_edit_controls_(pitch_value_ll_, false);
+
+    // Reset pitch combo box
+    pitch_bl_.combo_box->setCurrentIndex(0);
+
+    QString motion_type = motion_type_bl_.combo_box->currentText();
+
+    // Handle interactive marker visibility
+    if (motion_type == "Translation" || motion_type == "Rotation" || motion_type == "Screw")
+    {
+        // Enable arrow marker controls
+        interactive_marker_manager::ImControlEnableInfo arrow_enable_info;
+        arrow_enable_info.marker_name = this->arrow_marker_name_;
+        arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
+        arrow_enable_info.reset = false;
+        this->enable_im_controls(arrow_enable_info);
+    }
+    else
+    {
+        this->hide_im(this->arrow_marker_name_);
+    }
+
+    // Show pitch controls for Screw motion type
+    if (motion_type == "Screw")
+    {
+        set_combo_box_controls_(pitch_bl_, true);
+    }
+
+    // Configure goal controls based on motion type
+    setup_goal_controls_for_motion_type_(motion_type);
+}
+
+void CcaInteractiveGoals::goal_selected_(int index)
+{
+    // Show value controls for custom value (index 1)
+    if (index == 1)
+    {
+        set_line_edit_controls_(value_ll_, true);
+        setup_value_label_text_();
+    }
+    else
+    {
+        set_line_edit_controls_(value_ll_, false);
+    }
+
+    // Enable execution buttons when valid selections are made
+    update_execution_buttons_state_(index);
+}
+
+void CcaInteractiveGoals::pitch_selected_(int index)
+{
+    // Show pitch value controls for custom pitch (index 1)
+    set_line_edit_controls_(pitch_value_ll_, index == 1);
+
+    // Enable execution buttons when valid selections are made
+    update_execution_buttons_state_(goal_bl_.combo_box->currentIndex());
+}
+
+void CcaInteractiveGoals::axis_option_selected_(QString axis)
+{
+    if (axis.isEmpty())
+        return;
+
+    // Setup goal controls for rotation
+    set_combo_box_controls_(goal_bl_, true);
+    goal_bl_.combo_box->setCurrentIndex(0);
+    goal_bl_.label->setText("Goal Angle(radians)");
+    goal_bl_.combo_box->clear();
+    goal_bl_.combo_box->addItems(ROTATION_GOALS_);
+
+    // Draw the appropriate interactive marker
+    this->draw_ee_or_control_im(axis.toStdString());
+}
+
+void CcaInteractiveGoals::set_execute_buttons_enabled_(bool enabled)
+{
+    plan_viz_button_->setEnabled(enabled);
+    plan_viz_exe_button_->setEnabled(enabled);
+    plan_exe_button_->setEnabled(enabled);
+    stop_button_->setEnabled(enabled);
+}
+
+void CcaInteractiveGoals::hide_all_controls_()
+{
+    // Hide all UI control groups
+    set_combo_box_controls_(axis_bl_, false);
+    set_combo_box_controls_(motion_type_bl_, false);
+    set_combo_box_controls_(goal_bl_, false);
+    set_line_edit_controls_(value_ll_, false);
+    set_combo_box_controls_(pitch_bl_, false);
+    set_line_edit_controls_(pitch_value_ll_, false);
+}
+
+void CcaInteractiveGoals::set_combo_box_controls_(const QComboBoxAndLabel &controls, bool visible)
+{
+    if (controls.label)
+    {
+        controls.label->setVisible(visible);
+    }
+    if (controls.combo_box)
+    {
+        controls.combo_box->setEnabled(visible);
+        controls.combo_box->setVisible(visible);
+    }
+}
+
+void CcaInteractiveGoals::set_line_edit_controls_(const QLineEditAndLabel &controls, bool visible)
+{
+    if (controls.label)
+    {
+        controls.label->setVisible(visible);
+    }
+    if (controls.line_edit)
+    {
+        controls.line_edit->setEnabled(visible);
+        controls.line_edit->setVisible(visible);
+    }
+}
+
+void CcaInteractiveGoals::setup_goal_controls_for_motion_type_(const QString &motion_type)
+{
+    // Enable goal boxes
+    set_combo_box_controls_(goal_bl_, true);
+    goal_bl_.combo_box->setCurrentIndex(0);
+
+    if (motion_type == "Translation")
+    {
+        goal_bl_.label->setText("Goal Distance(meters)");
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(TRANSLATION_GOALS_);
+    }
+    else if (motion_type == "Rotation" || motion_type == "Screw")
+    {
+        goal_bl_.label->setText("Goal Angle(radians)");
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(ROTATION_GOALS_);
+    }
+}
+
+void CcaInteractiveGoals::setup_value_label_text_()
+{
+    QString motion_type = motion_type_bl_.combo_box->currentText();
+    QString mode = mode_bl_.combo_box->currentText();
+
+    if (motion_type == "Translation" && mode != "EE Orientation Only")
+    {
+        value_ll_.label->setText("Meters");
+    }
+    else if (motion_type == "Rotation" || motion_type == "Screw" || mode == "EE Orientation Only")
+    {
+        value_ll_.label->setText("Radians");
+    }
+}
+
+void CcaInteractiveGoals::update_execution_buttons_state_(int goal_index)
+{
+    bool enable_buttons = false;
+
+    if (goal_index != 0)
+    {
+        QString motion_type = motion_type_bl_.combo_box->currentText();
+
+        if (motion_type != "Screw" || pitch_bl_.combo_box->currentIndex() != 0)
+        {
+            enable_buttons = true;
+        }
+    }
+
+    set_execute_buttons_enabled_(enable_buttons);
 }
 
 void CcaInteractiveGoals::plan_button_clicked_()
@@ -213,6 +440,58 @@ void CcaInteractiveGoals::exe_button_clicked_()
 }
 
 void CcaInteractiveGoals::cancel_exe_button_clicked_() { ccaRosActionClient->cancel_goal(); }
+
+void CcaInteractiveGoals::apply_settings_clicked_()
+{
+    AdvancedSettings advanced_settings;
+
+    // Use the advanced_settings_widgets_ struct to access the widgets
+    if (advanced_settings_widgets_.accuracy->text().toFloat() != 0)
+    {
+        advanced_settings.planner_config.accuracy = advanced_settings_widgets_.accuracy->text().toFloat();
+    }
+
+    if (advanced_settings_widgets_.closure_angle->text().toFloat() != 0)
+    {
+        advanced_settings.planner_config.closure_err_threshold_ang =
+            advanced_settings_widgets_.closure_angle->text().toFloat();
+    }
+
+    if (advanced_settings_widgets_.closure_linear->text().toFloat() != 0)
+    {
+        advanced_settings.planner_config.closure_err_threshold_lin =
+            advanced_settings_widgets_.closure_linear->text().toFloat();
+    }
+
+    if (advanced_settings_widgets_.ik_iterations->text().toInt() != 0)
+    {
+        advanced_settings.planner_config.ik_max_itr = advanced_settings_widgets_.ik_iterations->text().toInt();
+    }
+
+    if (advanced_settings_widgets_.trajectory_density->text().toInt() != 0)
+    {
+        advanced_settings.task_description.trajectory_density =
+            advanced_settings_widgets_.trajectory_density->text().toInt();
+    }
+
+    // Use the screw_order_combo_ from the struct
+    if (advanced_settings_widgets_.vir_screw_order->currentIndex() != 0)
+    {
+        advanced_settings.task_description.vir_screw_order =
+            vir_screw_order_map_.at(advanced_settings_widgets_.vir_screw_order->currentText());
+    }
+
+    // Use the cca_type_combo_ from the struct if needed
+    if (advanced_settings_widgets_.cca_type->currentIndex() != 0)
+    {
+        advanced_settings.cca_type = cca_type_map_.at(advanced_settings_widgets_.cca_type->currentText());
+    }
+
+    advanced_settings_ = advanced_settings;
+    new_settings_applied_ = true;
+
+    RCLCPP_INFO(this->get_logger(), "New Advanced Settings Applied");
+}
 
 cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
 {
@@ -319,282 +598,6 @@ double CcaInteractiveGoals::get_affordance_goal_()
         }
     }
     return goal;
-}
-
-void CcaInteractiveGoals::mode_selected_()
-{
-    // Grey out execute buttons
-    plan_viz_button_->setEnabled(false);
-    plan_viz_exe_button_->setEnabled(false);
-    plan_exe_button_->setEnabled(false);
-    stop_button_->setEnabled(false);
-
-    // Setup other widgets based on selection
-    bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
-
-    this->hide_im(this->arrow_marker_name_);
-
-    if (mode_selected)
-    {
-        if (mode_bl_.combo_box->currentText() == "Affordance")
-        {
-
-            axis_bl_.combo_box->setEnabled(false);
-            axis_bl_.combo_box->setVisible(false);
-            axis_bl_.label->setVisible(false);
-            goal_bl_.label->setVisible(false);
-            goal_bl_.combo_box->setEnabled(false);
-            goal_bl_.combo_box->setVisible(false);
-            value_ll_.line_edit->setVisible(false);
-            value_ll_.line_edit->setEnabled(false);
-            value_ll_.label->setVisible(false);
-            pitch_bl_.label->setVisible(false);
-            pitch_bl_.combo_box->setVisible(false);
-            pitch_value_ll_.line_edit->setVisible(false);
-            pitch_value_ll_.label->setVisible(false);
-
-            // Set necessary widgets to visible
-            motion_type_bl_.label->setVisible(true);
-            motion_type_bl_.combo_box->setEnabled(true);
-            motion_type_bl_.combo_box->setVisible(true);
-            motion_type_bl_.combo_box->setCurrentText("");
-        }
-        else if (mode_bl_.combo_box->currentText() == "EE Orientation Only")
-        {
-            motion_type_bl_.label->setVisible(false);
-            motion_type_bl_.combo_box->setEnabled(false);
-            motion_type_bl_.combo_box->setVisible(false);
-            goal_bl_.label->setVisible(false);
-            goal_bl_.combo_box->setEnabled(false);
-            goal_bl_.combo_box->setVisible(false);
-            value_ll_.line_edit->setVisible(false);
-            value_ll_.line_edit->setEnabled(false);
-            value_ll_.label->setVisible(false);
-            pitch_bl_.label->setVisible(false);
-            pitch_bl_.combo_box->setVisible(false);
-            pitch_value_ll_.line_edit->setVisible(false);
-            pitch_value_ll_.label->setVisible(false);
-
-            // Set necessary widgets to visible
-            axis_bl_.combo_box->setEnabled(true);
-            axis_bl_.combo_box->setVisible(true);
-            axis_bl_.label->setVisible(true);
-            axis_bl_.combo_box->setCurrentText("");
-        }
-    }
-}
-
-void CcaInteractiveGoals::motion_type_selected_()
-{
-    plan_exe_button_->setEnabled(false);
-    plan_viz_button_->setEnabled(false);
-    plan_viz_exe_button_->setEnabled(false);
-    value_ll_.line_edit->setVisible(false);
-    value_ll_.line_edit->setEnabled(false);
-    value_ll_.label->setVisible(false);
-    pitch_bl_.label->setVisible(false);
-    pitch_bl_.combo_box->setVisible(false);
-    pitch_value_ll_.line_edit->setVisible(false);
-    pitch_value_ll_.label->setVisible(false);
-    pitch_bl_.combo_box->setCurrentIndex(0);
-    if (motion_type_bl_.combo_box->currentText() == "Translation" ||
-        motion_type_bl_.combo_box->currentText() == "Rotation" || motion_type_bl_.combo_box->currentText() == "Screw")
-    {
-        interactive_marker_manager::ImControlEnableInfo arrow_enable_info;
-        arrow_enable_info.marker_name = this->arrow_marker_name_;
-        arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
-        arrow_enable_info.reset = false;
-        this->enable_im_controls(arrow_enable_info);
-    }
-    else
-    {
-        this->hide_im(this->arrow_marker_name_);
-    }
-    if (motion_type_bl_.combo_box->currentText() == "Screw")
-    {
-        pitch_bl_.label->setVisible(true);
-        pitch_bl_.combo_box->setVisible(true);
-        pitch_value_ll_.line_edit->setVisible(false);
-        pitch_value_ll_.label->setVisible(false);
-    }
-    // Enable goal boxes
-    goal_bl_.label->setVisible(true);
-    goal_bl_.combo_box->setEnabled(true);
-    goal_bl_.combo_box->setVisible(true);
-    goal_bl_.combo_box->setCurrentIndex(0);
-    if (motion_type_bl_.combo_box->currentText() == "Translation")
-    {
-        goal_bl_.label->setText("Goal Distance(meters)");
-        goal_bl_.combo_box->clear();
-        goal_bl_.combo_box->addItems(TRANSLATION_GOALS_);
-    }
-    else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
-             motion_type_bl_.combo_box->currentText() == "Screw")
-    {
-        goal_bl_.label->setText("Goal Angle(radians)");
-        goal_bl_.combo_box->clear();
-        goal_bl_.combo_box->addItems(ROTATION_GOALS_);
-    }
-}
-
-void CcaInteractiveGoals::goal_selected_(int index)
-{
-    if (index == 1)
-    {
-        value_ll_.label->setVisible(true);
-        value_ll_.line_edit->setEnabled(true);
-        value_ll_.line_edit->setVisible(true);
-        if (motion_type_bl_.combo_box->currentText() == "Translation" &&
-            mode_bl_.combo_box->currentText() != "EE Orientation Only")
-        {
-            value_ll_.label->setText("Meters");
-        }
-        else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
-                 motion_type_bl_.combo_box->currentText() == "Screw" ||
-                 mode_bl_.combo_box->currentText() == "EE Orientation Only")
-        {
-            value_ll_.label->setText("Radians");
-        }
-    }
-    else
-    {
-        value_ll_.label->setVisible(false);
-        value_ll_.line_edit->setEnabled(false);
-        value_ll_.line_edit->setVisible(false);
-    }
-    if (index != 0 && (motion_type_bl_.combo_box->currentText() != "Screw" || pitch_bl_.combo_box->currentIndex() != 0))
-    {
-        plan_exe_button_->setEnabled(true);
-        plan_viz_button_->setEnabled(true);
-        plan_viz_exe_button_->setEnabled(true);
-    }
-    else
-    {
-        plan_exe_button_->setEnabled(false);
-        plan_viz_button_->setEnabled(false);
-        plan_viz_exe_button_->setEnabled(false);
-    }
-}
-
-void CcaInteractiveGoals::pitch_selected_(int index)
-{
-    if (index == 1)
-    {
-        pitch_value_ll_.line_edit->setVisible(true);
-        pitch_value_ll_.label->setVisible(true);
-    }
-    else
-    {
-        pitch_value_ll_.line_edit->setVisible(false);
-        pitch_value_ll_.label->setVisible(false);
-    }
-    if (index != 0 && goal_bl_.combo_box->currentIndex() != 0)
-    {
-        plan_exe_button_->setEnabled(true);
-        plan_viz_button_->setEnabled(true);
-        plan_viz_exe_button_->setEnabled(true);
-    }
-    else
-    {
-        plan_exe_button_->setEnabled(false);
-        plan_viz_button_->setEnabled(false);
-        plan_viz_exe_button_->setEnabled(false);
-    }
-}
-
-void CcaInteractiveGoals::axis_option_selected_(QString axis)
-{
-    if (axis != "")
-    {
-        goal_bl_.label->setVisible(true);
-        goal_bl_.combo_box->setEnabled(true);
-        goal_bl_.combo_box->setVisible(true);
-        goal_bl_.combo_box->setCurrentIndex(0);
-        goal_bl_.label->setText("Goal Angle(radians)");
-        goal_bl_.combo_box->clear();
-        goal_bl_.combo_box->addItems(ROTATION_GOALS_);
-    }
-
-    this->draw_ee_or_control_im(axis.toStdString());
-}
-
-void CcaInteractiveGoals::apply_settings_clicked_()
-{
-    AdvancedSettings advanced_settings;
-
-    // Use the advanced_settings_widgets_ struct to access the widgets
-    if (advanced_settings_widgets_.accuracy->text().toFloat() != 0)
-    {
-        advanced_settings.planner_config.accuracy = advanced_settings_widgets_.accuracy->text().toFloat();
-    }
-
-    if (advanced_settings_widgets_.closure_angle->text().toFloat() != 0)
-    {
-        advanced_settings.planner_config.closure_err_threshold_ang =
-            advanced_settings_widgets_.closure_angle->text().toFloat();
-    }
-
-    if (advanced_settings_widgets_.closure_linear->text().toFloat() != 0)
-    {
-        advanced_settings.planner_config.closure_err_threshold_lin =
-            advanced_settings_widgets_.closure_linear->text().toFloat();
-    }
-
-    if (advanced_settings_widgets_.ik_iterations->text().toInt() != 0)
-    {
-        advanced_settings.planner_config.ik_max_itr = advanced_settings_widgets_.ik_iterations->text().toInt();
-    }
-
-    if (advanced_settings_widgets_.trajectory_density->text().toInt() != 0)
-    {
-        advanced_settings.task_description.trajectory_density =
-            advanced_settings_widgets_.trajectory_density->text().toInt();
-    }
-
-    // Use the screw_order_combo_ from the struct
-    if (advanced_settings_widgets_.vir_screw_order->currentIndex() != 0)
-    {
-        advanced_settings.task_description.vir_screw_order =
-            vir_screw_order_map_.at(advanced_settings_widgets_.vir_screw_order->currentText());
-    }
-
-    // Use the cca_type_combo_ from the struct if needed
-    if (advanced_settings_widgets_.cca_type->currentIndex() != 0)
-    {
-        advanced_settings.cca_type = cca_type_map_.at(advanced_settings_widgets_.cca_type->currentText());
-    }
-
-    advanced_settings_ = advanced_settings;
-    new_settings_applied_ = true;
-
-    RCLCPP_INFO(this->get_logger(), "New Advanced Settings Applied");
-}
-
-void CcaInteractiveGoals::update_ui_state_()
-{
-    plan_viz_button_->setEnabled(false);
-    plan_viz_exe_button_->setEnabled(false);
-    plan_exe_button_->setEnabled(false);
-    stop_button_->setEnabled(false);
-    axis_bl_.combo_box->setEnabled(false);
-    axis_bl_.combo_box->setVisible(false);
-    axis_bl_.label->setVisible(false);
-    goal_bl_.label->setVisible(false);
-    goal_bl_.combo_box->setEnabled(false);
-    goal_bl_.combo_box->setVisible(false);
-    value_ll_.line_edit->setVisible(false);
-    value_ll_.line_edit->setEnabled(false);
-    value_ll_.label->setVisible(false);
-    pitch_bl_.label->setVisible(false);
-    pitch_bl_.combo_box->setVisible(false);
-    pitch_value_ll_.line_edit->setVisible(false);
-    pitch_value_ll_.label->setVisible(false);
-
-    // Set necessary widgets to visible
-    motion_type_bl_.label->setVisible(true);
-    motion_type_bl_.combo_box->setEnabled(true);
-    motion_type_bl_.combo_box->setVisible(true);
-    motion_type_bl_.combo_box->setCurrentText("");
 }
 
 void CcaInteractiveGoals::spin() { rclcpp::spin_some(this->get_node_base_interface()); }
