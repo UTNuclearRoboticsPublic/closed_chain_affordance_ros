@@ -41,6 +41,7 @@ class InteractiveMarkerManager : public rclcpp::Node
      * @param marker_name The name of the interactive marker.
      * @param enable Specifies which part of the interactive marker to enable.
      * @param create A boolean indicating whether to create the marker with a bound callback (default is false).
+     * @param reset A boolean specifying whether retain the marker's last moved pose or reset it (default is true).
      */
     void enable_im_controls(const std::string &marker_name, const ImControlEnable &enable, bool create = false,
                             bool reset = true);
