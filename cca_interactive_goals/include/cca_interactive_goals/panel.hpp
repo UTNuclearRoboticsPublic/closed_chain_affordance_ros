@@ -89,8 +89,8 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 
     virtual void onInitialize() override;
 
-    virtual void load(const rviz_common::Config &config) override;
-    virtual void save(rviz_common::Config config) const override;
+    inline void load(const rviz_common::Config &config) override { rviz_common::Panel::load(config); }
+    inline void save(rviz_common::Config config) const override { rviz_common::Panel::save(config); }
 
   protected Q_SLOTS:
     void plan_button_clicked_();
@@ -139,6 +139,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
 
     static constexpr int PANEL_WIDTH_ = 400;
     static constexpr int PANEL_HEIGHT_ = 475;
+    static constexpr int LAYOUT_SPACING_ = 10;
     bool new_settings_applied_ = false;
 
     QComboBoxAndLabel mode_bl_;

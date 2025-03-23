@@ -28,7 +28,7 @@ QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
     main_layout->addLayout(
         this->create_combo_box_layout_("Planning Type:", mode_bl_, this->get_map_keys_(planning_type_map_)));
     auto *dynamic_content_layout = new QVBoxLayout;
-    dynamic_content_layout->setSpacing(10);
+    dynamic_content_layout->setSpacing(LAYOUT_SPACING_);
 
     dynamic_content_layout->addLayout(
         this->create_combo_box_layout_("Motion Type:", motion_type_bl_, this->get_map_keys_(motion_type_map_, true)));
@@ -175,10 +175,6 @@ void CcaInteractiveGoals::onInitialize()
     connect(spin_timer_, &QTimer::timeout, this, &CcaInteractiveGoals::spin);
     spin_timer_->start(10); // Spin every 10ms
 }
-
-void CcaInteractiveGoals::load(const rviz_common::Config &config) { rviz_common::Panel::load(config); }
-
-void CcaInteractiveGoals::save(rviz_common::Config config) const { rviz_common::Panel::save(config); }
 
 void CcaInteractiveGoals::plan_button_clicked_()
 {
