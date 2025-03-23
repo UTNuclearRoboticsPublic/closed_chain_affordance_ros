@@ -163,7 +163,8 @@ QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType
 
 void CcaInteractiveGoals::onInitialize()
 {
-    // Do ROS client initializations here
+    // Do ROS client initializations in this function
+    // Initialize the CCA Ros action client to be able to send planning requests
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
     // Hide the markers to start
@@ -181,11 +182,11 @@ void CcaInteractiveGoals::save(rviz_common::Config config) const { rviz_common::
 
 void CcaInteractiveGoals::plan_button_clicked_()
 {
-    // Handle plan viz button click
-    auto req = buildPlanningRequest();
+    // Enable stop button
     stop_button_->setEnabled(true);
 
-    RCLCPP_INFO(this->get_logger(), "planViz button pressed");
+    // Fill out planning request and send it to the server
+    auto req = buildPlanningRequest();
     req.visualize_trajectory = true;
     req.execute_trajectory = false;
     ccaRosActionClient->send_goal(req);
@@ -193,11 +194,11 @@ void CcaInteractiveGoals::plan_button_clicked_()
 
 void CcaInteractiveGoals::plan_exe_button_clicked_()
 {
-    // Handle plan viz execute button click
-    auto req = buildPlanningRequest();
+    // Enable stop button
     stop_button_->setEnabled(true);
 
-    RCLCPP_INFO(this->get_logger(), "planVizExe button pressed");
+    // Fill out planning request and send it to the server
+    auto req = buildPlanningRequest();
     req.visualize_trajectory = true;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
@@ -205,11 +206,11 @@ void CcaInteractiveGoals::plan_exe_button_clicked_()
 
 void CcaInteractiveGoals::exe_button_clicked_()
 {
-    // Handle plan execute button click
-    auto req = buildPlanningRequest();
+    // Enable stop button
     stop_button_->setEnabled(true);
 
-    RCLCPP_INFO(this->get_logger(), "planExe button pressed");
+    // Fill out planning request and send it to the server
+    auto req = buildPlanningRequest();
     req.visualize_trajectory = false;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
@@ -222,7 +223,7 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
 
     cca_ros::PlanningRequest req;
 
-    // Set planning request start state for testing purposes
+    // Set planning request start state for testing purposes -- temporary, to be removed
     const Eigen::VectorXd READY_CONFIG =
         (Eigen::VectorXd(6) << -0.00015592575073242188, -0.8980185389518738, 1.8094338178634644, 0.000377655029296875,
          -0.8991076946258545, 0.0015475749969482422)
@@ -264,7 +265,7 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
     }
 
     // Get affordance goal
-    req.task_description.goal.affordance = getAffordanceGoal_();
+    req.task_description.goal.affordance = get_affordance_goal_();
 
     // Get affordance pose
     const auto screw_info = this->get_arrow_pose(mode_bl_.combo_box->currentText().toStdString(),
@@ -288,10 +289,10 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
     return req;
 }
 
-double CcaInteractiveGoals::getAffordanceGoal_()
+double CcaInteractiveGoals::get_affordance_goal_()
 {
-    RCLCPP_INFO(this->get_logger(), "Getting affordance goal");
     double goal;
+
     if ((motion_type_bl_.combo_box->currentText() == "Rotation" ||
          motion_type_bl_.combo_box->currentText() == "Screw" ||
          mode_bl_.combo_box->currentText() == "EE Orientation Only") &&
@@ -333,7 +334,6 @@ void CcaInteractiveGoals::mode_selected_()
     stop_button_->setEnabled(false);
 
     // Setup other widgets based on selection
-
     bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
 
     this->hide_im(this->arrow_marker_name_);
@@ -380,7 +380,6 @@ void CcaInteractiveGoals::mode_selected_()
             pitch_value_ll_.label->setVisible(false);
 
             // Set necessary widgets to visible
-
             axis_bl_.combo_box->setEnabled(true);
             axis_bl_.combo_box->setVisible(true);
             axis_bl_.label->setVisible(true);
@@ -605,6 +604,6 @@ void CcaInteractiveGoals::update_ui_state_()
 void CcaInteractiveGoals::spin() { rclcpp::spin_some(this->get_node_base_interface()); }
 
 } // namespace cca_interactive_goals
-// TODO: get marker frame id from outside to make this robot-agnostic
-#include <pluginlib/class_list_macros.hpp>
+
+// Export the CcaInteractiveGoals class as a plugin for rviz_common::Panel
 PLUGINLIB_EXPORT_CLASS(cca_interactive_goals::CcaInteractiveGoals, rviz_common::Panel)

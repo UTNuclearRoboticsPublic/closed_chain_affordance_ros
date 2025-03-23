@@ -27,6 +27,7 @@
 #include <QString>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <pluginlib/class_list_macros.hpp> // To export this class as a plugin
 #include <rclcpp/rclcpp.hpp>
 #include <rviz_common/panel.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
@@ -162,7 +163,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     std::shared_ptr<cca_ros_action::CcaRosActionClient> ccaRosActionClient;
 
     // Methods
-    double getAffordanceGoal_();
+    double get_affordance_goal_();
     void update_ui_state_();
     QWidget *create_cca_ig_tab_();
     QWidget *create_advanced_settings_tab_();
