@@ -27,13 +27,13 @@ QWidget *CcaInteractiveGoals::create_cca_ig_tab_()
     auto *cca_ig_tab_widget = new QWidget();
     auto *main_layout = new QVBoxLayout(cca_ig_tab_widget);
 
-    main_layout->addLayout(this->create_combo_box_layout_("Select Mode:", mode_bl_,
-                                                          {AFFORDANCE_PLANNING_, IN_PLACE_ORIENTATION_CONTROL_}));
+    main_layout->addLayout(
+        this->create_combo_box_layout_("Planning Type:", mode_bl_, this->get_map_keys_(planning_type_map_)));
     auto *dynamic_content_layout = new QVBoxLayout;
     dynamic_content_layout->setSpacing(10);
 
-    dynamic_content_layout->addLayout(this->create_combo_box_layout_("Motion Type:", motion_type_bl_,
-                                                                     {"", "Translation", "Rotation", "Screw Motion"}));
+    dynamic_content_layout->addLayout(
+        this->create_combo_box_layout_("Motion Type:", motion_type_bl_, this->get_map_keys_(motion_type_map_, true)));
     dynamic_content_layout->addLayout(this->create_combo_box_layout_("Axis:", axis_bl_, AXES_));
     dynamic_content_layout->addLayout(this->create_combo_box_layout_("Pitch(meters/radian):", pitch_bl_, PITCHES_));
     dynamic_content_layout->addLayout(this->create_line_edit_layout_("Pitch Value(meters/radian):", pitch_value_ll_));
@@ -73,9 +73,8 @@ QWidget *CcaInteractiveGoals::create_advanced_settings_tab_()
     form_layout->addRow("IK Max Iterations:", advanced_settings_widgets_.ik_iterations);
     form_layout->addRow("Trajectory Density:", advanced_settings_widgets_.trajectory_density);
 
-    // Directly use the populated maps
     form_layout->addRow(create_combo_box_layout_("Virtual Screw Order:", advanced_settings_widgets_.vir_screw_order,
-                                                 this->get_map_keys_(vir_screw_order_map_)));
+                                                 this->get_map_keys_(vir_screw_order_map_, true)));
     form_layout->addRow(
         create_combo_box_layout_("CCA Type:", advanced_settings_widgets_.cca_type, this->get_map_keys_(cca_type_map_)));
 
@@ -95,8 +94,6 @@ void CcaInteractiveGoals::create_button_(QPushButton *&button, const QString &te
     layout->addWidget(button);
 }
 
-// QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
-//                                                            const QStringList &items)
 QHBoxLayout *CcaInteractiveGoals::create_combo_box_layout_(const QString &label, QComboBox *&combo_box,
                                                            const QStringList &items)
 {
@@ -149,9 +146,16 @@ void CcaInteractiveGoals::connect_signals_()
     connect(apply_button_, SIGNAL(clicked()), this, SLOT(apply_settings_clicked_()));
 }
 
-template <typename ValueType> QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType> &map)
+template <typename ValueType>
+QStringList CcaInteractiveGoals::get_map_keys_(const std::map<QString, ValueType> &map, bool prepend_empty)
 {
     QStringList keys;
+    // If asked, add an empty string in the beginning
+    if (prepend_empty)
+    {
+        keys.append("");
+    }
+
     for (const auto &pair : map)
     {
         keys.append(pair.first); // Append the key to the list
@@ -226,24 +230,20 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
          -0.8991076946258545, 0.0015475749969482422)
             .finished();
     req.start_state.robot = READY_CONFIG;
-    if (mode_bl_.combo_box->currentText() == "Affordance Planning") // Affordance Planning
+
+    // Deduce planning type
+    const auto planning_type = planning_type_map_.at(mode_bl_.combo_box->currentText());
+    req.task_description = cc_affordance_planner::TaskDescription(planning_type);
+
+    // If affordance, fill out relevant screw-type (and pitch) info
+    if (planning_type == cc_affordance_planner::PlanningType::AFFORDANCE)
     {
-        req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
+        const auto motion_type = motion_type_map_.at(motion_type_bl_.combo_box->currentText());
+        req.task_description.affordance_info.type = motion_type;
 
-        // Determine motion type for affordance planning
-        if (motion_type_bl_.combo_box->currentText() == "Translation")
+        if (motion_type == affordance_util::ScrewType::SCREW)
         {
-            req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
-        }
-        else if (motion_type_bl_.combo_box->currentText() == "Rotation")
-        {
-            req.task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
-        }
-        else if (motion_type_bl_.combo_box->currentText() == "Screw Motion")
-        {
-            req.task_description.affordance_info.type = affordance_util::ScrewType::SCREW;
-
-            // Determine pitch value
+            // Fill out the pitch from the dropdown menu
             if (pitch_bl_.combo_box->currentText() != "Manual Input")
             {
                 req.task_description.affordance_info.pitch =
@@ -264,22 +264,17 @@ cca_ros::PlanningRequest CcaInteractiveGoals::buildPlanningRequest()
             }
         }
     }
-    else if (mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control")
-    {
-        req.task_description =
-            cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY);
-    }
 
     // Get affordance goal
     req.task_description.goal.affordance = getAffordanceGoal_();
 
     // Get affordance pose
-    auto screw_info = this->get_arrow_pose(mode_bl_.combo_box->currentText().toStdString(),
-                                           axis_bl_.combo_box->currentText().toStdString());
+    const auto screw_info = this->get_arrow_pose(mode_bl_.combo_box->currentText().toStdString(),
+                                                 axis_bl_.combo_box->currentText().toStdString());
     req.task_description.affordance_info.axis = screw_info.axis;
     req.task_description.affordance_info.location = screw_info.location;
 
-    // Extract task-specific settingsa from advanced settings
+    // Extract task-specific settings from advanced settings
     if (new_settings_applied_)
     {
         req.planner_config = advanced_settings_.planner_config;
@@ -300,8 +295,8 @@ double CcaInteractiveGoals::getAffordanceGoal_()
     RCLCPP_INFO(this->get_logger(), "Getting affordance goal");
     double goal;
     if ((motion_type_bl_.combo_box->currentText() == "Rotation" ||
-         motion_type_bl_.combo_box->currentText() == "Screw Motion" ||
-         mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control") &&
+         motion_type_bl_.combo_box->currentText() == "Screw" ||
+         mode_bl_.combo_box->currentText() == "EE Orientation Only") &&
         (goal_bl_.combo_box->currentText() != "Manual Input"))
     {
         goal = M_PI * (goal_bl_.combo_box->currentIndex() - 1) / 4.0; // multiple of pi/4
@@ -347,7 +342,7 @@ void CcaInteractiveGoals::mode_selected_(int index)
 
     if (mode_selected)
     {
-        if (mode_bl_.combo_box->currentText() == "Affordance Planning")
+        if (mode_bl_.combo_box->currentText() == "Affordance")
         {
 
             axis_bl_.combo_box->setEnabled(false);
@@ -370,7 +365,7 @@ void CcaInteractiveGoals::mode_selected_(int index)
             motion_type_bl_.combo_box->setVisible(true);
             motion_type_bl_.combo_box->setCurrentText("");
         }
-        else if (mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control")
+        else if (mode_bl_.combo_box->currentText() == "EE Orientation Only")
         {
             motion_type_bl_.label->setVisible(false);
             motion_type_bl_.combo_box->setEnabled(false);
@@ -410,8 +405,7 @@ void CcaInteractiveGoals::motion_type_selected_(int index)
     pitch_value_ll_.label->setVisible(false);
     pitch_bl_.combo_box->setCurrentIndex(0);
     if (motion_type_bl_.combo_box->currentText() == "Translation" ||
-        motion_type_bl_.combo_box->currentText() == "Rotation" ||
-        motion_type_bl_.combo_box->currentText() == "Screw Motion")
+        motion_type_bl_.combo_box->currentText() == "Rotation" || motion_type_bl_.combo_box->currentText() == "Screw")
     {
         this->enable_im_controls("arrow_marker", interactive_marker_manager::ImControlEnable::ALL);
     }
@@ -419,7 +413,7 @@ void CcaInteractiveGoals::motion_type_selected_(int index)
     {
         this->hide_im("arrow_marker");
     }
-    if (motion_type_bl_.combo_box->currentText() == "Screw Motion")
+    if (motion_type_bl_.combo_box->currentText() == "Screw")
     {
         pitch_bl_.label->setVisible(true);
         pitch_bl_.combo_box->setVisible(true);
@@ -442,7 +436,7 @@ void CcaInteractiveGoals::motion_type_selected_(int index)
         }
     }
     else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
-             motion_type_bl_.combo_box->currentText() == "Screw Motion")
+             motion_type_bl_.combo_box->currentText() == "Screw")
     {
         goal_bl_.label->setText("Goal Angle(radians)");
         std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
@@ -462,13 +456,13 @@ void CcaInteractiveGoals::goal_selected_(int index)
         value_ll_.line_edit->setEnabled(true);
         value_ll_.line_edit->setVisible(true);
         if (motion_type_bl_.combo_box->currentText() == "Translation" &&
-            mode_bl_.combo_box->currentText() != "In-Place End Effector Orientation Control")
+            mode_bl_.combo_box->currentText() != "EE Orientation Only")
         {
             value_ll_.label->setText("Meters");
         }
         else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
-                 motion_type_bl_.combo_box->currentText() == "Screw Motion" ||
-                 mode_bl_.combo_box->currentText() == "In-Place End Effector Orientation Control")
+                 motion_type_bl_.combo_box->currentText() == "Screw" ||
+                 mode_bl_.combo_box->currentText() == "EE Orientation Only")
         {
             value_ll_.label->setText("Radians");
         }
@@ -479,8 +473,7 @@ void CcaInteractiveGoals::goal_selected_(int index)
         value_ll_.line_edit->setEnabled(false);
         value_ll_.line_edit->setVisible(false);
     }
-    if (index != 0 &&
-        (motion_type_bl_.combo_box->currentText() != "Screw Motion" || pitch_bl_.combo_box->currentIndex() != 0))
+    if (index != 0 && (motion_type_bl_.combo_box->currentText() != "Screw" || pitch_bl_.combo_box->currentIndex() != 0))
     {
         plan_exe_button_->setEnabled(true);
         plan_viz_button_->setEnabled(true);

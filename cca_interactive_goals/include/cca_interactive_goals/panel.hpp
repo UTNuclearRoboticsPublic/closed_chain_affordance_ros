@@ -106,15 +106,38 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     void spin();
 
   private:
-    const QString AFFORDANCE_PLANNING_ = "Affordance Planning";
-    const QString IN_PLACE_ORIENTATION_CONTROL_ = "In-Place End Effector Orientation Control";
     const QStringList AXES_ = {"", "Interactive Axis", "x", "y", "z", "-x", "-y", "-z"};
     const QStringList PITCHES_ = {"", "Manual Input", "0.1", "0.2", "0.3", "0.4", "0.5"};
     const QStringList TRANSLATION_GOALS_ = {"",    "Manual Input", "0.1", "0.2", "0.3", "0.4",
                                             "0.5", "0.6",          "0.7", "0.8", "0.9", "1.0"};
+    const std::map<QString, affordance_util::VirtualScrewOrder> vir_screw_order_map_ = {
+        {QString("NONE"), affordance_util::VirtualScrewOrder::NONE},
+        {QString("YZX"), affordance_util::VirtualScrewOrder::YZX},
+        {QString("ZXY"), affordance_util::VirtualScrewOrder::ZXY},
+        {QString("XY"), affordance_util::VirtualScrewOrder::XY},
+        {QString("YZ"), affordance_util::VirtualScrewOrder::YZ},
+        {QString("ZX"), affordance_util::VirtualScrewOrder::ZX},
+        {QString("XYZ"), affordance_util::VirtualScrewOrder::XYZ}}; // virtual screw order to Qstring map for the
+                                                                    // advanced settings menu
+    const std::map<QString, CcaType> cca_type_map_ = {
+        {QString("Affordance Control"), CcaType::AFFORDANCE_CONTROL},
+        {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
 
-    const int marker_id_ = 8;
-    void update_ui_state_();
+    const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
+        {QString("Affordance Control"), cc_affordance_planner::PlanningType::AFFORDANCE},
+        {QString("EE Orientation Only"), cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY}};
+    // {QString("Cartesian Goal"), cc_affordance_planner::PlanningType::CARTESIAN_GOAL}, /// FUTURE WORK
+    // {QString("Approach"), cc_affordance_planner::PlanningType::APPROACH}}; /// FUTURE WORK
+
+    const std::map<QString, affordance_util::ScrewType> motion_type_map_ = {
+        {QString("Translation"), affordance_util::ScrewType::TRANSLATION},
+        {QString("Rotation"), affordance_util::ScrewType::ROTATION},
+        {QString("Screw"), affordance_util::ScrewType::SCREW}};
+
+    static constexpr int PANEL_WIDTH_ = 400;
+    static constexpr int PANEL_HEIGHT_ = 475;
+    bool new_settings_applied_ = false;
+
     QComboBoxAndLabel mode_bl_;
     QComboBoxAndLabel motion_type_bl_;
     QComboBoxAndLabel axis_bl_;
@@ -132,30 +155,13 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     AdvancedSettingsWidgets advanced_settings_widgets_;
     QPushButton *apply_button_;
 
-    const std::map<QString, affordance_util::VirtualScrewOrder> vir_screw_order_map_ = {
-        {QString("NONE"), affordance_util::VirtualScrewOrder::NONE},
-        {QString("YZX"), affordance_util::VirtualScrewOrder::YZX},
-        {QString("ZXY"), affordance_util::VirtualScrewOrder::ZXY},
-        {QString("XY"), affordance_util::VirtualScrewOrder::XY},
-        {QString("YZ"), affordance_util::VirtualScrewOrder::YZ},
-        {QString("ZX"), affordance_util::VirtualScrewOrder::ZX},
-        {QString("XYZ"), affordance_util::VirtualScrewOrder::XYZ}}; // virtual screw order to Qstring map for the
-                                                                    // advanced settings menu
-    const std::map<QString, CcaType> cca_type_map_ = {
-        {QString("Affordance Control"), CcaType::AFFORDANCE_CONTROL},
-        {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
-
-    // CCA parameters
+    // CCA-related variables
     AdvancedSettings advanced_settings_;
-
-    double getAffordanceGoal_();
-    bool new_settings_applied_ = false;
     std::shared_ptr<cca_ros_action::CcaRosActionClient> ccaRosActionClient;
 
-    static constexpr int PANEL_WIDTH_ = 400;
-    static constexpr int PANEL_HEIGHT_ = 475;
-
     // Methods
+    double getAffordanceGoal_();
+    void update_ui_state_();
     QWidget *create_cca_ig_tab_();
     QWidget *create_advanced_settings_tab_();
     void create_button_(QPushButton *&button, const QString &text, QVBoxLayout *layout);
@@ -163,7 +169,8 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     QHBoxLayout *create_combo_box_layout_(const QString &label, QComboBoxAndLabel &bl, const QStringList &items);
     QHBoxLayout *create_line_edit_layout_(const QString &label, QLineEditAndLabel &ll);
     void connect_signals_();
-    template <typename ValueType> QStringList get_map_keys_(const std::map<QString, ValueType> &map);
+    template <typename ValueType>
+    QStringList get_map_keys_(const std::map<QString, ValueType> &map, bool prepend_empty = false);
 };
 
 } // namespace cca_interactive_goals
