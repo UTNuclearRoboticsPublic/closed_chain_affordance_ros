@@ -407,7 +407,7 @@ void CcaInteractiveGoals::motion_type_selected_(int index)
     if (motion_type_bl_.combo_box->currentText() == "Translation" ||
         motion_type_bl_.combo_box->currentText() == "Rotation" || motion_type_bl_.combo_box->currentText() == "Screw")
     {
-        this->enable_im_controls("arrow_marker", interactive_marker_manager::ImControlEnable::ALL);
+        this->enable_im_controls("arrow_marker", interactive_marker_manager::ImControlEnable::ALL, false, false);
     }
     else
     {

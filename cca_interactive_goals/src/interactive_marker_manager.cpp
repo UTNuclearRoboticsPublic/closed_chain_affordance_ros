@@ -54,7 +54,7 @@ void InteractiveMarkerManager::process_arrow_feedback(
 }
 
 void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name, const ImControlEnable &enable,
-                                                  bool create)
+                                                  bool create, bool reset)
 {
     visualization_msgs::msg::InteractiveMarker int_marker;
 
@@ -65,7 +65,14 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
     }
 
     // Clear and initialize marker
-    int_marker = visualization_msgs::msg::InteractiveMarker();
+    if (reset)
+    {
+        int_marker = visualization_msgs::msg::InteractiveMarker();
+
+        // Reset recorded arrow pose as well
+        arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+        arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+    }
     int_marker.header.frame_id = "arm0_base_link";
     int_marker.name = marker_name;
     int_marker.description = "";
@@ -143,10 +150,6 @@ void InteractiveMarkerManager::enable_im_controls(const std::string &marker_name
         server_->insert(int_marker);
     }
     server_->applyChanges();
-
-    // Reset arrow pose
-    arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-    arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
 }
 
 void InteractiveMarkerManager::hide_im(const std::string &marker_name)
