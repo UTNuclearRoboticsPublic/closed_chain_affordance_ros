@@ -9,25 +9,18 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(interactive_markers REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
-find_package(rclcpp_action REQUIRED)
 find_package(cca_ros REQUIRED)
 find_package(cca_ros_action REQUIRED)
-find_package(cca_ros_util REQUIRED)
-find_package(cca_ros_viz_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
 
 # Non-ROS packages
-find_package(Eigen3 REQUIRED)
 find_package(cc_affordance_planner REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 
-# rviz_ui_panel
 include_directories(include)
 
 set(HEADERS
@@ -65,11 +58,7 @@ ament_target_dependencies(${PROJECT_NAME}
   rviz_rendering
   rviz_default_plugins
   interactive_markers
-  tf2
-  tf2_geometry_msgs
-  rclcpp_action
   cca_ros
-  cca_ros_util
   cca_ros_action
 )
 
