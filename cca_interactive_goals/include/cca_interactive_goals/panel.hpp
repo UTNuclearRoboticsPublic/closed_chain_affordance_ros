@@ -110,6 +110,8 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
     const QStringList PITCHES_ = {"", "Manual Input", "0.1", "0.2", "0.3", "0.4", "0.5"};
     const QStringList TRANSLATION_GOALS_ = {"",    "Manual Input", "0.1", "0.2", "0.3", "0.4",
                                             "0.5", "0.6",          "0.7", "0.8", "0.9", "1.0"};
+    const QStringList ROTATION_GOALS_ = {"", "Manual Input", "π/4", "π/2", "3π/4", "π", "5π/4", "3π/2", "7π/4", "2π"};
+
     const std::map<QString, affordance_util::VirtualScrewOrder> vir_screw_order_map_ = {
         {QString("NONE"), affordance_util::VirtualScrewOrder::NONE},
         {QString("YZX"), affordance_util::VirtualScrewOrder::YZX},
@@ -124,7 +126,7 @@ class CcaInteractiveGoals : public rviz_common::Panel, public interactive_marker
         {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
 
     const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
-        {QString("Affordance Control"), cc_affordance_planner::PlanningType::AFFORDANCE},
+        {QString("Affordance"), cc_affordance_planner::PlanningType::AFFORDANCE},
         {QString("EE Orientation Only"), cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY}};
     // {QString("Cartesian Goal"), cc_affordance_planner::PlanningType::CARTESIAN_GOAL}, /// FUTURE WORK
     // {QString("Approach"), cc_affordance_planner::PlanningType::APPROACH}}; /// FUTURE WORK

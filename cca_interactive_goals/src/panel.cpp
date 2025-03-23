@@ -428,23 +428,15 @@ void CcaInteractiveGoals::motion_type_selected_(int index)
     if (motion_type_bl_.combo_box->currentText() == "Translation")
     {
         goal_bl_.label->setText("Goal Distance(meters)");
-        for (int i = 2; i <= 11; i++)
-        {
-            double value = (i - 1) * 0.1;
-            QString text = QString::number(value, 'f', 1);
-            goal_bl_.combo_box->setItemText(i, text);
-        }
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(TRANSLATION_GOALS_);
     }
     else if (motion_type_bl_.combo_box->currentText() == "Rotation" ||
              motion_type_bl_.combo_box->currentText() == "Screw")
     {
         goal_bl_.label->setText("Goal Angle(radians)");
-        std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
-                                                 "3π/2", "7π/4", "2π",   "9π/4", "5π/2"};
-        for (int i = 2; i <= 11; i++)
-        {
-            goal_bl_.combo_box->setItemText(i, pi_fractions[i - 2].c_str());
-        }
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(ROTATION_GOALS_);
     }
 }
 
@@ -522,12 +514,8 @@ void CcaInteractiveGoals::axis_option_selected_(QString axis)
         goal_bl_.combo_box->setVisible(true);
         goal_bl_.combo_box->setCurrentIndex(0);
         goal_bl_.label->setText("Goal Angle(radians)");
-        std::vector<std::string> pi_fractions = {"π/4",  "π/2",  "3π/4", "π",    "5π/4",
-                                                 "3π/2", "7π/4", "2π",   "9π/4", "5π/2"};
-        for (int i = 2; i <= 11; i++)
-        {
-            goal_bl_.combo_box->setItemText(i, pi_fractions[i - 2].c_str());
-        }
+        goal_bl_.combo_box->clear();
+        goal_bl_.combo_box->addItems(ROTATION_GOALS_);
     }
 
     this->draw_ee_or_control_im(axis.toStdString());
