@@ -1,9 +1,0 @@
-<library path="cca_interactive_goals">
-  <class name="cca_ros_rviz_plugin/CcaRosRvizPlugin"
-         type="cca_ros_rviz_plugin::CcaRosRvizPlugin"
-         base_class_type="rviz_common::Panel">
-    <description>
-	    Rviz plugin for screw-based constrained manipulation planning using the Closed-Chain Affordance framework
-    </description>
-  </class>
-</library>
