@@ -53,16 +53,10 @@ set(SOURCES
 	src/${PROJECT_NAME}/interactive_marker_manager.cpp
 )
 
-# Qt UI definition
-qt5_wrap_ui(UIC_FILES
-  src/ui/cca_ros_rviz_plugin.ui
-)
-
 # Build the shared library for the plugin
 add_library(${PROJECT_NAME} SHARED
   ${SOURCES}
   ${HEADERS}
-  ${UIC_FILES}
 )
 
 # Create the main executable
@@ -96,7 +90,7 @@ install(TARGETS
   ${PROJECT_NAME}_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install include headers
@@ -105,10 +99,9 @@ install(DIRECTORY
   DESTINATION include
 )
 
-# Install additional resources (RViz configs and UI files)
+# Install additional resources
 install(DIRECTORY
   rviz
-  src/ui
   DESTINATION share/${PROJECT_NAME}/
 )
 
