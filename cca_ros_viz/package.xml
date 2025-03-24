@@ -3,20 +3,35 @@
 <package format="3">
   <name>cca_ros_viz</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Houses ROS visualization code for CCA including the RVIZ plugin</description>
   <maintainer email="jpanthi@utexas.edu">crasun</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
+  <!-- Build tool -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- Dependencies -->
   <depend>rclcpp</depend>
   <depend>cca_ros_viz_msgs</depend>
   <depend>moveit_visual_tools</depend>
+  <depend>interactive_goal_interfaces</depend>
+  <depend>interactive_markers</depend>
+  <depend>rviz_common</depend>
+  <depend>rviz_rendering</depend>
+  <depend>rviz_default_plugins</depend>
+  <depend>pluginlib</depend>
+  <depend>Qt5</depend>
+  <depend>cca_ros</depend>
+  <depend>cca_ros_action</depend>
 
+  <!-- Test dependencies -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
+  <!-- Export section for pluginlib -->
   <export>
     <build_type>ament_cmake</build_type>
+    <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>
+

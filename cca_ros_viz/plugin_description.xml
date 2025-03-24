@@ -1,0 +1,9 @@
+<library path="cca_ros_viz"> <!-- This is the name of the library from the CMakeLists -->
+  <class name="cca_ros_rviz_plugin/CcaRosRvizPlugin"
+         type="cca_ros_rviz_plugin::CcaRosRvizPlugin"
+         base_class_type="rviz_common::Panel">
+    <description>
+	    Rviz plugin for screw-based constrained manipulation planning using the Closed-Chain Affordance framework
+    </description>
+  </class>
+</library>

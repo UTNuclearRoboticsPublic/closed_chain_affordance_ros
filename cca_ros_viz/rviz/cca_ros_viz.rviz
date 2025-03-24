@@ -31,8 +31,8 @@ Panels:
     Name: Time
     SyncMode: 0
     SyncSource: ""
-  - Class: cca_interactive_goals/CcaInteractiveGoals
-    Name: CcaInteractiveGoals
+  - Class: cca_ros_rviz_plugin/CcaRosRvizPlugin
+    Name: CcaRosRvizPlugin
 Visualization Manager:
   Class: ""
   Displays:
@@ -524,7 +524,7 @@ Visualization Manager:
       Yaw: 0.5053932666778564
     Saved: ~
 Window Geometry:
-  CcaInteractiveGoals:
+  CcaRosRvizPlugin:
     collapsed: false
   Displays:
     collapsed: false
