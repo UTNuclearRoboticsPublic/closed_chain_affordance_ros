@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(affordance_util_ros)
+project(ros_cpp_util)
 
 # Set C++ standard to 17
 set(CMAKE_CXX_STANDARD 17)

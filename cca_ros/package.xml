@@ -12,7 +12,7 @@
   <!--Dependencies that need to be built before this package can be built-->
   <depend>rclcpp</depend>
   <depend>cca_ros_msgs</depend>
-  <depend>affordance_util_ros</depend>
+  <depend>ros_cpp_util</depend>
   <!--******************************************************************-->
 
   <test_depend>ament_lint_auto</test_depend>

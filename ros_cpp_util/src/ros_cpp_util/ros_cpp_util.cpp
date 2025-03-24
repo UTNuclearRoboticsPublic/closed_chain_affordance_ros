@@ -1,5 +1,5 @@
-#include <affordance_util_ros/affordance_util_ros.hpp>
-namespace affordance_util_ros
+#include <ros_cpp_util/ros_cpp_util.hpp>
+namespace ros_cpp_util
 {
 
 CustomException::CustomException(const char *message) : msg(message) {}
@@ -269,4 +269,4 @@ control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_bui
 
     return fjtg_msg;
 }
-} // namespace affordance_util_ros
+} // namespace ros_cpp_util

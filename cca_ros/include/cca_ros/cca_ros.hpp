@@ -40,7 +40,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
-#include <affordance_util_ros/affordance_util_ros.hpp>
+#include <ros_cpp_util/ros_cpp_util.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros_msgs/srv/cca_ros_viz.hpp>
@@ -204,8 +204,8 @@ class CcaRos : public rclcpp::Node
     std::string ref_frame_;                        ///< Reference frame for transformations
     std::string tool_frame_;                       ///< Tool frame for the robot's end-effector
 
-    affordance_util_ros::JointTrajPoint robot_joint_states_;   ///< Processed and ordered robot joint states
-    affordance_util_ros::JointTrajPoint gripper_joint_states_; ///< Processed and ordered gripper joint states
+    ros_cpp_util::JointTrajPoint robot_joint_states_;   ///< Processed and ordered robot joint states
+    ros_cpp_util::JointTrajPoint gripper_joint_states_; ///< Processed and ordered gripper joint states
 
     bool unified_executor_available_ =
         false; ///< Indicates whether an action server is available to execute the robot and gripper trajectory together

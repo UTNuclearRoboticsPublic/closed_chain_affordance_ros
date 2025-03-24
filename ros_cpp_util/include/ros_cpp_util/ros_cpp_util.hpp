@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
-//      Title     : affordance_util_ros.hpp
-//      Project   : affordance_util_ros
+//      Title     : ros_cpp_util.hpp
+//      Project   : ros_cpp_util
 //      Created   : Fall 2023
 //      Author    : Janak Panthi (Crasun Jans)
 //      Copyright : Copyright© The University of Texas at Austin, 2014-2026. All
@@ -29,8 +29,8 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
-#ifndef AFFORDANCE_UTIL_ROS
-#define AFFORDANCE_UTIL_ROS
+#ifndef ROS_CPP_UTIL_HPP_
+#define ROS_CPP_UTIL_HPP_
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -44,7 +44,7 @@
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <unordered_map>
 
-namespace affordance_util_ros
+namespace ros_cpp_util
 {
 
 class CustomException : public std::exception
@@ -153,6 +153,6 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
 control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_builder(
     const std::vector<Eigen::VectorXd> &bare_trajectory, const Eigen::VectorXd &config_offset,
     const std::vector<std::string> &joint_names, const double &time_step = 0.05);
-} // namespace affordance_util_ros
+} // namespace ros_cpp_util
 
-#endif // AFFORDANCE_UTIL_ROS
+#endif // ROS_CPP_UTIL_HPP_

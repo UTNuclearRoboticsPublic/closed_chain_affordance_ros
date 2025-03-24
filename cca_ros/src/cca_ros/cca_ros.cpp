@@ -88,7 +88,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest& planning
   if (!task_description.affordance_info.location_frame.empty())
   {
     const Eigen::Isometry3d aff_htm =
-        affordance_util_ros::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
+        ros_cpp_util::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
     if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
     {
       RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
@@ -359,7 +359,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests& plannin
     if (!task_description.affordance_info.location_frame.empty())
     {
       const Eigen::Isometry3d aff_htm =
-          affordance_util_ros::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
+          ros_cpp_util::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
       if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
       {
         RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
@@ -552,14 +552,14 @@ std::string CcaRos::get_cc_affordance_robot_description_(const std::string& robo
   const std::string package_name = "cca_" + robot_name;
   const std::string rel_dir = "/config/";
   const std::string filename = package_name + "_description.yaml";
-  return affordance_util_ros::get_filepath_inside_pkg(package_name, rel_dir, filename);
+  return ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 
 // Callback for joint_states topic.
 void CcaRos::joint_states_cb_(const JointState::SharedPtr msg)
 {
-  robot_joint_states_ = affordance_util_ros::get_ordered_joint_states(msg, robot_joint_names_);
-  gripper_joint_states_ = affordance_util_ros::get_ordered_joint_states(msg, gripper_joint_names_);
+  robot_joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, robot_joint_names_);
+  gripper_joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, gripper_joint_names_);
 }
 
 // Retrieve robot joint states at the start of the affordance.
@@ -640,7 +640,7 @@ CcaRos::create_goal_msg_(const std::vector<Eigen::VectorXd>& trajectory, bool in
   FollowJointTrajectoryGoal robot_and_gripper_goal;
 
   // Always create the robot goal message
-  robot_goal = affordance_util_ros::follow_joint_trajectory_msg_builder(
+  robot_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
       trajectory, Eigen::VectorXd::Zero(robot_joint_names_.size()), robot_joint_names_, robot_traj_time_step);
 
   if (includes_gripper_trajectory)
@@ -657,7 +657,7 @@ CcaRos::create_goal_msg_(const std::vector<Eigen::VectorXd>& trajectory, bool in
                                            gripper_joint_names_.end());
 
       // Build goal message for combined robot and gripper trajectory
-      robot_and_gripper_goal = affordance_util_ros::follow_joint_trajectory_msg_builder(
+      robot_and_gripper_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
           trajectory, Eigen::VectorXd::Zero(robot_and_gripper_joint_names.size()), robot_and_gripper_joint_names,
           robot_and_gripper_traj_time_step);
     }
@@ -675,7 +675,7 @@ CcaRos::create_goal_msg_(const std::vector<Eigen::VectorXd>& trajectory, bool in
       }
 
       // Build goal message for gripper trajectory
-      gripper_goal = affordance_util_ros::follow_joint_trajectory_msg_builder(
+      gripper_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
           gripper_trajectory, Eigen::VectorXd::Zero(1), gripper_joint_names_, gripper_traj_time_step);
     }
   }
