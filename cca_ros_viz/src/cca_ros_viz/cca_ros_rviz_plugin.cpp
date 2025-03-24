@@ -7,7 +7,7 @@ CcaRosRvizPlugin::CcaRosRvizPlugin(QWidget *parent)
 {
     auto *tab_widget = new QTabWidget(this);
 
-    tab_widget->addTab(this->create_cca_ig_tab_(), "CCA_IG");
+    tab_widget->addTab(this->create_cca_ig_tab_(), "CCA Planning");
     tab_widget->addTab(this->create_advanced_settings_tab_(), "Advanced Settings");
 
     auto *panel_layout = new QVBoxLayout;
