@@ -100,7 +100,7 @@ CcaRosActionClient::CcaRosActionClient() : rclcpp::Node("cca_ros_action_client")
 void CcaRosActionClient::send_goal(const cca_ros::PlanningRequest &req)
 {
     // Create goal
-    auto goal_msg = cca_ros_viz_msgs::action::CcaRosAction::Goal();
+    auto goal_msg = cca_ros_msgs::action::CcaRosAction::Goal();
     goal_msg.req = cca_ros_util::convert_req_to_cca_ros_action(req);
 
     if (!this->action_client_->wait_for_action_server())

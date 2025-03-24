@@ -11,7 +11,7 @@
 
   <!--Dependencies that need to be built before this package can be built-->
   <depend>rclcpp</depend>
-  <depend>cca_ros_viz_msgs</depend>
+  <depend>cca_ros_msgs</depend>
   <depend>affordance_util_ros</depend>
   <!--******************************************************************-->
 

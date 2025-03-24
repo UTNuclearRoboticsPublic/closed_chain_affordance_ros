@@ -12,7 +12,7 @@
 
   <!-- Dependencies -->
   <depend>rclcpp</depend>
-  <depend>cca_ros_viz_msgs</depend>
+  <depend>cca_ros_msgs</depend>
   <depend>moveit_visual_tools</depend>
   <depend>interactive_goal_interfaces</depend>
   <depend>interactive_markers</depend>
@@ -34,4 +34,3 @@
     <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>
-

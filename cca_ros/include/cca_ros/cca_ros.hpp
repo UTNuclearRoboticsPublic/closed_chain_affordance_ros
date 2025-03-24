@@ -43,7 +43,7 @@
 #include <affordance_util_ros/affordance_util_ros.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
-#include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
+#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
 #include <cmath>
 #include <geometry_msgs/msg/pose.hpp>
@@ -113,7 +113,7 @@ class CcaRos : public rclcpp::Node
   public:
     // Type aliases
     using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
-    using CcaRosViz = cca_ros_viz_msgs::srv::CcaRosViz;
+    using CcaRosViz = cca_ros_msgs::srv::CcaRosViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
 

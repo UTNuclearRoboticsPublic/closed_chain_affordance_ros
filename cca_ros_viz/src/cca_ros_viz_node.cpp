@@ -29,7 +29,7 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
-#include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
+#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <pluginlib/class_loader.hpp>
@@ -60,7 +60,7 @@ class CcaRosVizServer : public rclcpp::Node
         joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
 
         // Create and advertise planning and visualization service
-        srv_ = this->create_service<cca_ros_viz_msgs::srv::CcaRosViz>(
+        srv_ = this->create_service<cca_ros_msgs::srv::CcaRosViz>(
             "/cca_ros_viz_server", std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
                                              std::placeholders::_1, std::placeholders::_2));
 
@@ -114,7 +114,7 @@ class CcaRosVizServer : public rclcpp::Node
     std::thread spinner_thread_; // To spin the node in a separate thread
 
     rclcpp::Logger node_logger_;                                       // logger associated with the node
-    rclcpp::Service<cca_ros_viz_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
+    rclcpp::Service<cca_ros_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
 
@@ -158,8 +158,8 @@ class CcaRosVizServer : public rclcpp::Node
     }
 
     // Methods
-    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Request> serv_req,
-                                      std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Response> serv_res)
+    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Request> serv_req,
+                                      std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Response> serv_res)
     {
 
         bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);

@@ -3,8 +3,8 @@
 
 #include "cca_ros_action/visibility_control.h"
 #include <cca_ros/cca_ros.hpp>
+#include <cca_ros_msgs/action/cca_ros_action.hpp>
 #include <cca_ros_util/cca_ros_util.hpp>
-#include <cca_ros_viz_msgs/action/cca_ros_action.hpp>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -12,7 +12,7 @@
 
 namespace cca_ros_action
 {
-using CcaRosAction = cca_ros_viz_msgs::action::CcaRosAction;
+using CcaRosAction = cca_ros_msgs::action::CcaRosAction;
 
 constexpr const char *CCA_ROS_AS_NAME = "/cca_ros_action"; ///< Name of the action server
 

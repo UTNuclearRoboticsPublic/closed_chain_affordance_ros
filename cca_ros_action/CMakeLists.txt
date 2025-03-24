@@ -19,7 +19,7 @@ find_package(rclcpp REQUIRED)  # ROS 2 communication library
 find_package(rclcpp_action REQUIRED)
 find_package(cca_ros REQUIRED)
 find_package(cca_ros_util REQUIRED)
-find_package(cca_ros_viz_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
+find_package(cca_ros_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
 
 # Include directories for headers
 include_directories(
@@ -34,24 +34,24 @@ add_library(${PROJECT_NAME}
 )
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp rclcpp_action cca_ros cca_ros_util cca_ros_viz_msgs)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp rclcpp_action cca_ros cca_ros_util cca_ros_msgs)
 
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
 # Add executable
 add_executable(${PROJECT_NAME}_node
-  src/${PROJECT_NAME}_node.cpp 
+  src/${PROJECT_NAME}_node.cpp
 )
 
 # Link non-ROS libraries to executable
-target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME}) 
+target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME})
 
 # Specify ROS dependencies
 ament_target_dependencies(${PROJECT_NAME}_node PUBLIC rclcpp)
 
 # Export dependencies for downstream ROS packages
-ament_export_dependencies(rclcpp_action cca_ros cca_ros_util cca_ros_viz_msgs)
+ament_export_dependencies(rclcpp_action cca_ros cca_ros_util cca_ros_msgs)
 
 # Install include directory
 install(

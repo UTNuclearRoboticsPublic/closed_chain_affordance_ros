@@ -1,5 +1,5 @@
-cca_ros_viz_msgs/PlannerConfig planner_config
-cca_ros_viz_msgs/TaskDescription task_description
-cca_ros_viz_msgs/KinematicState start_state
+cca_ros_msgs/PlannerConfig planner_config
+cca_ros_msgs/TaskDescription task_description
+cca_ros_msgs/KinematicState start_state
 bool visualize_trajectory true
 bool execute_trajectory false
