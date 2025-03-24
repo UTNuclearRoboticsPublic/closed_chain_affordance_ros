@@ -4,13 +4,13 @@ This repository provides robot-agnostic ROS2 packages that interface the [Closed
 
 ## Core Dependencies
 
-Essential dependencies include:
 - `affordance_util` and `cc_affordance_planner` from the [Closed-Chain Affordance repository](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
 
-### Additional Dependencies
-
+### Optional Dependencies
+For visualization:
 - `moveit`: Motion planning framework
 - `moveit_visual_tools`: Visualization utilities for MoveIt
+For using as a Behavior Tree action:
 - `behaviortree_cpp`: Behavior tree implementation
 
 ## Build Instructions
@@ -27,19 +27,15 @@ Essential dependencies include:
    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
    source install/setup.bash
    ```
+## Readily-Supported Robots
 
-## Supported Robots
-
-The planner supports the following robots through dedicated packages:
+An additional `cca_<robot>` package containing robot-specific information is required to launch the planner for a particular robot. Packages are currently available for the following robots, with links provided below. Creating a package for a new robot is straightforward and largely automated, as discussed in the [Implementing the Framework on a New Robot](#implementing-the-framework-on-a-new-robot) section.
 - [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_spot.git)
 - [Kinova Gen3 7DoF arm](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_kinova_gen3_7dof.git)
 
 ## Rviz CCA Planning Plugin
 
-A user-friendly Rviz plugin enables visual trajectory planning and execution by:
-- Dragging interactive markers
-- Specifying task goals
-- Providing intuitive trajectory visualization and manipulation
+A user-friendly Rviz plugin is also available and enables visual trajectory planning and execution by simply dragging interactive markers and specifying task types and goals. Launch instructions are provided in the [Interactive Rviz Plugin Planning](#interactive-rviz-plugin-planning) section.
 
 ## Implementing the Framework on a New Robot
 
