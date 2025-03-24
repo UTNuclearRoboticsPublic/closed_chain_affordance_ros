@@ -1,6 +1,6 @@
-# Closed-Chain Affordance Planning Framework - ROS2 Interface
+# ROS2 Interface for the CCA Planner
 
-This repository provides robot-agnostic ROS2 packages that interface the [Closed-Chain Affordance planner](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git) with robotic systems.
+This repository provides robot-agnostic ROS2 packages that interface the [Closed-Chain Affordance(CCA) planner](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git) with robotic systems. The CCA planner offers an intuitive approach to planning robot manipulation tasks by conceptualizing them as linear, rotational, or screw motions. Defining a task is as simple as specifying an axis, location, and pitch (if applicable). Additionally, it provides the capability to control the end-effector's orientation along the task path.
 
 ## Core Dependencies
 
