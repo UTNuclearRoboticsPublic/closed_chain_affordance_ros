@@ -1,3 +1,10 @@
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : robot_state_recorder_node.cpp
+//      Project   : robot_state_recorder
+//      Created   : Spring 2025
+//      Author    : Janak Panthi (Crasun Jans)
+///////////////////////////////////////////////////////////////////////////////
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>

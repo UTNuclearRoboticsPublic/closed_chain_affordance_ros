@@ -1,3 +1,10 @@
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : interactive_marker_manager.hpp
+//      Project   : interactive_marker_manager
+//      Created   : Spring 2025
+//      Author    : Janak Panthi (Crasun Jans)
+///////////////////////////////////////////////////////////////////////////////
+
 #ifndef INTERACTIVE_MARKER_MANAGER_HPP_
 #define INTERACTIVE_MARKER_MANAGER_HPP_
 

@@ -1,3 +1,10 @@
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : cca_ros_rviz_plugin.hpp
+//      Project   : cca_ros_rviz_plugin
+//      Created   : Spring 2025
+//      Author    : Janak Panthi (Crasun Jans) and John Lyle
+///////////////////////////////////////////////////////////////////////////////
+
 #ifndef CCA_ROS_RVIZ_PLUGIN_HPP_
 #define CCA_ROS_RVIZ_PLUGIN_HPP_
 
