@@ -24,9 +24,13 @@ const std::map<std::string, Eigen::Quaterniond> InteractiveMarkerManager::AXIS_O
 InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name) : rclcpp::Node(node_name)
 {
 
+    // Initialize servers and clients
     server_ = std::make_shared<interactive_markers::InteractiveMarkerServer>(
         "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
         this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
+
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     // Enable the arrow
     ImControlEnableInfo arrow_enable_info;
@@ -94,18 +98,24 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
     }
 
-    // Draw in tool frame if asked
-    if (info.in_tool_frame)
-    {
-        int_marker.header.frame_id = tool_frame_name_;
-    }
-    else
-    {
-        int_marker.header.frame_id = ref_frame_name_;
-    }
+    int_marker.header.frame_id = ref_frame_name_;
     int_marker.name = info.marker_name;
     int_marker.description = "";
     int_marker.scale = ARROW_SCALE;
+
+    // Draw in tool frame if asked
+    if (info.in_tool_frame)
+    {
+        const Eigen::Isometry3d aff_htm = ros_cpp_util::get_htm(ref_frame_name_, tool_frame_name_, *tf_buffer_);
+        int_marker.pose.position.x = aff_htm.translation().x();
+        int_marker.pose.position.y = aff_htm.translation().y();
+        int_marker.pose.position.z = aff_htm.translation().z();
+        if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Will place arrow at %s instead.",
+                         tool_frame_name_.c_str(), ref_frame_name_.c_str());
+        }
+    }
 
     // Lambda to add control using static axis vectors
     auto addControl = [&](const std::string &name, const Eigen::Vector3d &axis, bool isRotation) {
@@ -206,6 +216,7 @@ void InteractiveMarkerManager::draw_ee_or_control_im(const std::string &axis)
 {
     ImControlEnableInfo arrow_enable_info;
     arrow_enable_info.marker_name = arrow_marker_name_;
+    arrow_enable_info.in_tool_frame = true;
     // Enable interactive marker for manual mode (with rotation control) and return
     if (axis == "Interactive Axis")
     {

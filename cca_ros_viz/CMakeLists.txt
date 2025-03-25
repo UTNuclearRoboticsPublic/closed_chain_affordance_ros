@@ -25,6 +25,7 @@ find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
 find_package(cca_ros REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(cca_ros_action REQUIRED)
 
 # Non-ROS Packages
@@ -70,6 +71,7 @@ ament_target_dependencies(${PROJECT_NAME}
   rviz_rendering
   rviz_default_plugins
   interactive_markers
+  tf2_ros
   cca_ros
   cca_ros_action
 )
@@ -119,6 +121,16 @@ ament_export_dependencies(
   rclcpp
   rviz_common
   rviz_rendering
+  rviz_default_plugins
+  interactive_markers
+  tf2_ros
+  cca_ros
+  cca_ros_action
+  moveit_core
+  moveit_ros_planning
+  moveit_visual_tools
+  cca_ros_msgs
+  geometry_msgs
 )
 
 # Finalize package definition

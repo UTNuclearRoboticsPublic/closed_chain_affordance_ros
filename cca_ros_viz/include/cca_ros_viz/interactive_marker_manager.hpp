@@ -20,9 +20,14 @@
 // ROS headers
 #include <interactive_markers/interactive_marker_server.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <visualization_msgs/msg/interactive_marker.hpp>
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
 #include <visualization_msgs/msg/marker.hpp>
+
+// Custom ROS utilities
+#include <ros_cpp_util/ros_cpp_util.hpp>
 
 namespace interactive_marker_manager
 {
@@ -101,6 +106,9 @@ class InteractiveMarkerManager : public rclcpp::Node
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                           ///< TF2 buffer for transformation lookup
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};     ///< TF2 transform listener
+
     std::string tool_frame_name_; ///< This is where the arrow will appear in "EE Orientation Only" planning mode
     std::string ref_frame_name_;  ///< This is where the arrow will appear first in the "Affordance" planning mode
 
