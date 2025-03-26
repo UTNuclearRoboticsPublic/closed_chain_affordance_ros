@@ -33,23 +33,24 @@
 #ifndef CCA_ROS_HPP
 #define CCA_ROS_HPP
 
-#include "control_msgs/action/follow_joint_trajectory.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_action/rclcpp_action.hpp"
-#include "tf2_ros/transform_listener.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
-#include <ros_cpp_util/ros_cpp_util.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
 #include <cmath>
+#include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <ros_cpp_util/ros_cpp_util.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <thread>
 
 namespace cca_ros

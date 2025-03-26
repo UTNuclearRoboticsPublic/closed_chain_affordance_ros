@@ -25,12 +25,12 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     try
     {
         const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
-        robot_slist_ = robotConfig.Slist;                        // Robot screw axes
-        M_ = robotConfig.M;                                      // Home configuration matrix
-        ref_frame_ = robotConfig.ref_frame_name;                 // Reference frame
-        tool_frame_ = robotConfig.tool_name;                     // Tool frame, unused atm. TODO
-        robot_joint_names_ = robotConfig.joint_names;            // Robot joint names
-        gripper_joint_names_ = {robotConfig.gripper_joint_name}; // Gripper joint names
+        robot_slist_ = robotConfig.Slist;                         // Robot screw axes
+        M_ = robotConfig.M;                                       // Home configuration matrix
+        ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
+        tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
+        robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
+        gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
     }
     catch (const std::exception &e)
     {
@@ -43,7 +43,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic, 1000, std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
-    // Setup TF buffer and listener for affordance location from apriltag
+    // Setup TF buffer and listener to lookup affordance location from apriltag
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
