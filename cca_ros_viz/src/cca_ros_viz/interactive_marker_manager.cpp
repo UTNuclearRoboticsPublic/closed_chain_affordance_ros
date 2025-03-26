@@ -45,6 +45,12 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
         tool_frame_name_ = this->get_parameter("tool_frame").as_string();
         this->declare_parameter<std::string>("ref_frame");
         ref_frame_name_ = this->get_parameter("ref_frame").as_string();
+        this->declare_parameter<std::string>("ee_frame");
+        ee_frame_name_ = this->get_parameter("ee_frame").as_string();
+        this->declare_parameter<std::vector<double>>("ee_to_tool_offset");
+        auto tool_offset = this->get_parameter("ee_to_tool_offset").as_double_array();
+        ee_to_tool_offset_ =
+            Eigen::Vector3d(tool_offset[0], tool_offset[1], tool_offset[2]); // Location of tool in the EE frame
     }
     catch (const std::exception &e)
     {
@@ -55,6 +61,10 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
                      e.what());
     }
 
+    // Initialize the tf broadcaster and timer to publish transform between the EE and tool frames
+    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(tf_publish_rate_),
+                                     std::bind(&InteractiveMarkerManager::publish_transform_, this));
     RCLCPP_INFO(this->get_logger(), "Interactive marker manager initialized.");
 }
 
@@ -292,5 +302,29 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
         }
     }
     return screw_info;
+}
+void InteractiveMarkerManager::publish_transform_()
+{
+    // Create the transform message
+    geometry_msgs::msg::TransformStamped transform_stamped;
+
+    // Set header details
+    transform_stamped.header.stamp = this->now();
+    transform_stamped.header.frame_id = ee_frame_name_;
+    transform_stamped.child_frame_id = tool_frame_name_;
+
+    // Set translation (x, y, z)
+    transform_stamped.transform.translation.x = ee_to_tool_offset_[0];
+    transform_stamped.transform.translation.y = ee_to_tool_offset_[1];
+    transform_stamped.transform.translation.z = ee_to_tool_offset_[2];
+
+    // We assume orientation same as ee_frame_
+    transform_stamped.transform.rotation.x = 0.0;
+    transform_stamped.transform.rotation.y = 0.0;
+    transform_stamped.transform.rotation.z = 0.0;
+    transform_stamped.transform.rotation.w = 1.0;
+
+    // Publish the transform
+    tf_broadcaster_->sendTransform(transform_stamped);
 }
 } // namespace interactive_marker_manager
