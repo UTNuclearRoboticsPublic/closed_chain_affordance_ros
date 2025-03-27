@@ -1,82 +1,91 @@
-# Closed-Chain Affordance Planning Framework - ROS2 Interface
+# ROS2 Interface for the CCA Planner
+
+This repository provides robot-agnostic ROS2 packages that interface the [Closed-Chain Affordance(CCA) planner](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git) with robotic systems. The CCA planner offers an intuitive approach to planning joint trajectories for robot manipulation tasks that can be thought of as linear, rotational, or screw motions. Defining a task is as simple as specifying an axis, location, and pitch (if applicable). Additionally, it provides the capability to control the end-effector's orientation along the task path.
+
+## Core Dependencies
+
+- `affordance_util` and `cc_affordance_planner` packages from the [Closed-Chain Affordance repository](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
+
+### Optional Dependencies
+- `moveit`: For self-collision checking
+- `moveit_visual_tools`: For visualization of joint movement
+- `behaviortree_cpp`: To utilize the CCA Behavior Tree action node
 
 ## Build Instructions
-This repository contains robot-agnostic ROS2 packages used to interface the Closed-chain Affordance planner with a robot. Follow these steps:
 
-1. Install the Closed-chain Affordance Cpp libraries by following instructions from this repository:</br>
-   [Cpp library installation instructions](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
-
-2. Clone the packages from this branch into your ROS2 workspace's `src` folder and build and source them:
-   ```
+1. Clone the packages into your ROS2 workspace's `src` folder:
+   ```bash
    cd ~/<ros_workspace_name>/src
-   ```
-   ```
    git clone git@github.com:UTNuclearRoboticsPublic/closed_chain_affordance_ros.git
    ```
-   ```
+
+2. Build and source the workspace:
+   ```bash
    cd ~/<ros_workspace_name>
-   ```
-   ```
-   colcon build --packages-select affordance_util_ros cca_ros_viz cc_affordance_planner_ros
-   ```
-   ```
+   colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
    source install/setup.bash
    ```
+## Readily-Supported Robots
 
-3. If using an AprilTag to detect affordance, also build and source the following packages:
-   ```
-   colcon build --packages-select apriltag_msgs apriltag_ros
-   ```
-   ```
-   source install/setup.bash
-   ```
-### Notable Dependencies
-1. The cca_ros_viz package provides a ROS service to visualize the planned trajectory in Rviz. To utilize this functionality, ensure moveit is installed along with the moveit_visual_tools package.
-2. For AprilTag usage, install the ROS apriltag package with 'sudo apt install ros-<ROS_DISTRO>-apriltag`.
+An additional `cca_<robot>` package containing robot-specific information is required to launch the planner for a particular robot. Packages are currently available for the following robots, with links provided below. Creating a package for a new robot is straightforward and largely automated, as discussed in the [Implementing the Framework on a New Robot](#implementing-the-framework-on-a-new-robot) section.
+- [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_spot.git)
+- [Kinova Gen3 7DoF arm](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_kinova_gen3_7dof.git)
 
-## Run Instructions
-The entry point for this planner is a launch file in a package named as `cca_<robot>` that contains robot-related information for closed-chain affordance planning. The framework is implemented for the following robots, and the links direct you to the repositories containing those packages and instructions on how to run the planner for each robot.
-   - [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_spot.git)
+## Rviz CCA Planning Plugin
 
-## Instructions to Implement the Framework on a New Robot
+A user-friendly Rviz plugin is also available and enables visual trajectory planning and execution by simply dragging interactive markers and specifying task types and goals. Launch instructions are provided in the [Interactive Rviz Plugin Planning](#interactive-rviz-plugin-planning) section.
 
-### Creating and Building the `cca_<robot>` Package
+## Implementing the Framework on a New Robot
 
-Implementing this framework on a new robot is straightforward. All you need to do is create and build the `cca_<robot>` package that contains robot-related information for closed-chain affordance planning. To streamline this package creation, a  script is available. Navigate to the `closed_chain_affordance_ros` directory and run the package-creator script.
-   ```
+### Creating the `cca_<robot>` Package
+
+1. Use the package creator script:
+   ```bash
    cd ~/<ros_workspace_name>/src/closed_chain_affordance_ros
-   ```
-   ```
    ./cca_robot_package_creator.sh
    ```
 
-The package will contain two files in its `config` folder: `cca_<robot>_description.yaml` and `cca_<robot>_ros_setup.yaml`, which will have empty fields with instructions to fill out. Fill them out. Next, to execute an affordance with the robot, provide affordance information in the `cca_<robot>_node.cpp` file located in the `src` folder of the package. Once this is done, build and source the package:
-   ```
+2. Configure the generated package:
+   - Complete `cca_<robot>_description.yaml` and `cca_<robot>_ros_setup.yaml` in the `config` folder
+   - For programmatic trajectory planning and execution, implement task (affordance) details in `cca_<robot>_node.cpp`
+
+3. Build the new package:
+   ```bash
    cd ~/<ros_workspace_name>
-   ```
-   ```
    colcon build --packages-select cca_<robot>
-   ```
-   ```
    source install/setup.bash
    ```
 
 ### Running the Planner
 
-1. Before running this framework, the following three things need to happen. Since there are numerous ways to accomplish this, depending on your system, we do not provide specific instructions here.
-   - A `follow_joint_trajectory` action server is running on the robot to receive joint trajectory commands.
-   - `robot_description` has been loaded onto the parameter server.
-   - `robot_state_publisher` is running to publish TF data to RViz.
+#### Prerequisites
 
-2. Run the service server to visualize the planned trajectory in Rviz with the following command:
-   ```
-   ros2 run cca_ros_viz cca_ros_viz_node
+- For trajectory execution, ensure a `follow_joint_trajectory` action server is running on the robot
+
+#### Programmatic Trajectory Planning
+
+1. Launch trajectory visualization server:
+   ```bash
+   ros2 launch cca_<robot> cca_<robot>_viz.launch.py
    ```
 
-3. Run the planner, replacing `<robot>` with the robot name used to create the `cca_<robot>` package:
-   ```
+2. Run the planner for defined tasks:
+   ```bash
    ros2 launch cca_<robot> cca_<robot>.launch.py
    ```
 
+#### Interactive Rviz Plugin Planning
+
+1. Start the CCA ROS action server:
+   ```bash
+   ros2 launch cca_<robot> cca_<robot>_action_server.launch.py
+   ```
+
+2. Launch Rviz with the interactive planning plugin:
+   ```bash
+   ros2 launch cca_<robot> cca_<robot>_viz.launch.py
+   ```
+
 ## Author
-Janak Panthi aka Crasun Jans
+
+Janak Panthi (aka Crasun Jans)

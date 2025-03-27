@@ -1,7 +1,14 @@
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : robot_state_recorder_node.cpp
+//      Project   : robot_state_recorder
+//      Created   : Spring 2025
+//      Author    : Janak Panthi (Crasun Jans)
+///////////////////////////////////////////////////////////////////////////////
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
-#include <affordance_util_ros/affordance_util_ros.hpp>
+#include <ros_cpp_util/ros_cpp_util.hpp>
 #include <condition_variable>
 #include <csignal>
 #include <fstream>
@@ -39,7 +46,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
         // Get abs path to the directory where we will save data
         const std::string rel_data_save_path = "/../data/";
-        abs_data_save_path_ = affordance_util_ros::get_abs_path_to_rel_dir(__FILE__, rel_data_save_path);
+        abs_data_save_path_ = ros_cpp_util::get_abs_path_to_rel_dir(__FILE__, rel_data_save_path);
 
         // Extract robot config info
         const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
@@ -67,7 +74,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     // ROS variables
     rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr follow_joint_traj_sub_;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
-    affordance_util_ros::JointTrajPoint joint_states_;
+    ros_cpp_util::JointTrajPoint joint_states_;
     // Robot data
     Eigen::MatrixXd slist_;
     std::vector<std::string> joint_names_;
@@ -124,8 +131,8 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         // function
         /* const auto &unordered_pred_traj_ = msg->goal.trajectory; */
         const auto &unordered_pred_traj_ = *msg;
-        const std::vector<affordance_util_ros::JointTrajPoint> pred_traj_ =
-            affordance_util_ros::get_ordered_joint_traj(unordered_pred_traj_, joint_names_);
+        const std::vector<ros_cpp_util::JointTrajPoint> pred_traj_ =
+            ros_cpp_util::get_ordered_joint_traj(unordered_pred_traj_, joint_names_);
         std::cout << "Writing predicted data now" << std::endl;
         write_pred_data(pred_traj_);
         std::cout << "Finished writing predicted data" << std::endl;
@@ -137,7 +144,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         // Lock the mutex and update joint_states and data-ready flag
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            joint_states_ = affordance_util_ros::get_ordered_joint_states(msg, joint_names_);
+            joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, joint_names_);
             joint_states_ready_ = true;
         }
 
@@ -146,7 +153,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     }
 
     // Function to write predicted data to file
-    void write_pred_data(const std::vector<affordance_util_ros::JointTrajPoint> &pred_traj_)
+    void write_pred_data(const std::vector<ros_cpp_util::JointTrajPoint> &pred_traj_)
     {
 
         const std::string filename = "pred_tf_and_joint_states_data.csv";
@@ -256,7 +263,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
             // putting the thread to sleep at other times and releasing the mutex.
             // When it is ready, copy it, set data-ready flag to false, release the
             // mutex, and move on
-            affordance_util_ros::JointTrajPoint joint_states_copy;
+            ros_cpp_util::JointTrajPoint joint_states_copy;
             {
                 std::unique_lock<std::mutex> lock(mutex_);
                 joint_states_cv_.wait(lock, [this] { return (joint_states_ready_ || g_exit_flag); });
@@ -304,7 +311,7 @@ int main(int argc, char **argv)
     const std::string rel_dir = "/config/";                          // relative directory where yaml file is located
     const std::string filename = package_name + "_description.yaml"; // yaml file name
     const std::string robot_config_file_path =
-        affordance_util_ros::get_filepath_inside_pkg(package_name, rel_dir, filename);
+        ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
     const std::string as_server_name = "/arm_controller/follow_joint_trajectory";
     auto node = std::make_shared<JointTrajAndTfRecorder>(robot_config_file_path, as_server_name);
 

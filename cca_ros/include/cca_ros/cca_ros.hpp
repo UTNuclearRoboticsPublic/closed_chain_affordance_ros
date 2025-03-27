@@ -33,21 +33,24 @@
 #ifndef CCA_ROS_HPP
 #define CCA_ROS_HPP
 
-#include "control_msgs/action/follow_joint_trajectory.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_action/rclcpp_action.hpp"
-#include "tf2_ros/transform_listener.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
-#include <affordance_util_ros/affordance_util_ros.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
-#include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
+#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
+#include <cmath>
+#include <control_msgs/action/follow_joint_trajectory.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <ros_cpp_util/ros_cpp_util.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <thread>
 
 namespace cca_ros
@@ -55,11 +58,15 @@ namespace cca_ros
 using namespace std::chrono_literals;
 using FollowJointTrajectoryGoal = control_msgs::action::FollowJointTrajectory_Goal;
 
+/**
+ * @brief Struct containing the kinematic state of a robot
+ */
 struct KinematicState
 {
     Eigen::VectorXd robot;
     double gripper;
 };
+
 /**
  * @brief Enum indicating the status of the CC Affordance Planner during execution.
  */
@@ -72,6 +79,32 @@ enum Status
 };
 
 /**
+ * @brief Struct containing planning request for the CCA ROS planner
+ */
+struct PlanningRequest
+{
+    cc_affordance_planner::PlannerConfig planner_config = cc_affordance_planner::PlannerConfig();
+    cc_affordance_planner::TaskDescription task_description;
+    KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
+    std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
+    bool visualize_trajectory = true;
+    bool execute_trajectory = false;
+};
+
+/**
+ * @brief Struct containing planning requests for the CCA ROS planner
+ */
+struct PlanningRequests
+{
+    std::vector<cc_affordance_planner::PlannerConfig> planner_config;
+    std::vector<cc_affordance_planner::TaskDescription> task_description;
+    KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
+    std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
+    bool visualize_trajectory = true;
+    bool execute_trajectory = false;
+};
+
+/**
  * @brief Class representing the CC Affordance Planner node in ROS.
  * This class manages the process of planning, visualizing, and executing trajectories
  * for robot affordances using closed-chain kinematics.
@@ -81,26 +114,20 @@ class CcaRos : public rclcpp::Node
   public:
     // Type aliases
     using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
-    using CcaRosViz = cca_ros_viz_msgs::srv::CcaRosViz;
+    using CcaRosViz = cca_ros_msgs::srv::CcaRosViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
 
-    // Variables
-    bool visualize_trajectory;
-    bool execute_trajectory;
     /**
      * @brief Constructs a CcaRos node.
      *
      * @param node_name Name of the ROS node.
      * @param options Options for the node, e.g., parameter overrides.
-     * @param visualize_trajectory Whether to visualize the solved trajectory. Default is true.
-     * @param execute_trajectory Whether to execute the solved trajectory on the robot. Default is false.
      */
-    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options, bool visualize_trajectory = true,
-                    bool execute_trajectory = false);
+    explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
     /**
-     * @brief Destructs a CcaRos node.
+     * @brief Cleans up and destructs a CcaRos node .
      */
     ~CcaRos();
 
@@ -111,122 +138,38 @@ class CcaRos : public rclcpp::Node
      * The planning is done from the current state of the robot unless a robot start configuration is passed.
      * Additionally, a pointer to the status of the planner can be provided to get updates on the process.
      *
-     * @param planner_config Configuration settings for the CC Affordance planner. The struct includes:
-     * - **accuracy**: Defines the threshold for the affordance goal. For example, if the goal is to rotate 5 radians
-     * with 10% accuracy, the threshold would be set to 0.1, allowing a result within 5 ± 0.5 radians.
-     * - **ik_max_itr**: (Advanced) Maximum iterations for the closed-chain inverse kinematics solver. Default is 200.
-     * - **update_method**: (Advanced) Specifies the update method to use for solving the inverse kinematics problem.
-     * Options are:
-     *   - `INVERSE`: Uses the inverse of the Jacobian.
-     *   - `TRANSPOSE`: Uses the transpose of the Jacobian.
-     *   - `BEST`: Automatically selects the best method based on context (default).
-     * - **closure_error_threshold_ang**: (Advanced) Angular error threshold for the closed-chain mechanism. Default is
-     * 1e-4 radians.
-     * - **closure_error_threshold_lin**: (Advanced) Linear error threshold for the closed-chain mechanism. Default is
-     * 1e-5 meters.
-     *
-     * @param taskDescription Description of the task to plan for, structured as:
-     * - **motion_type**: Specifies the type of motion, with possible values:
-     *   - `cc_affordance_planner::APPROACH`: Cartesian approach motion.
-     *   - `cc_affordance_planner::AFFORDANCE`: Affordance motion (default).
-     * - **affordance_info**: Describes the affordance with the following fields:
-     *   - **type**: Type of affordance (e.g., rotation, translation).
-     *   - **axis**: The screw axis for the affordance motion (Eigen::Vector3d).
-     *   - **location**: The point or location associated with the screw axis (Eigen::Vector3d).
-     *   - **location_frame**: (Optional) Name of the reference frame for the affordance location. If specified, the
-     * planner will attempt to find the affordance location using TF.
-     * - **trajectory_density**: Specifies the density of the trajectory. This is the number of points along the
-     * trajectory from the start to the goal. For instance, a goal of 0.5 radians can have 5 trajectory points spaced by
-     * 0.1 radians.
-     * - **goal**: The specific goal to achieve, which can be one or more of the following:
-     *   - **affordance**: The final value of the affordance.
-     *   - **ee_orientation**: Desired end-effector orientation (Eigen::Quaterniond).
-     *   - **grasp_pose**: Cartesian goal for the end-effector to achieve during approach motion. Not relevant for
-     * AFFORDANCE motion.
-     *   - **gripper**: Desired state of the gripper specified as a joint value.
-     * - **vir_screw_order**: (Optional) Specifies the virtual screw order for the closed-chain model. Default is
-     * `affordance_util::VirtualScrewOrder::XYZ`, which assumes rotational freedom around the x, y, and z axes in order.
-     *
-     * @param status (Optional) Pointer to the cca_ros::Status indicating the current status of the
-     * planner. The status is set to `PROCESSING` during the planning phase, and it will be updated to either
-     * `SUCCEEDED` or `FAILED` based on the result.
-     * @param startConfig (Optional) Initial configuration of the robot and gripper as
-     * cca_ros::KinematicState. If this is not specified, the planner will use the current robot
-     * configuration obtained from the joint states topic.
+     * @param planning_request cca_ros::PlanningRequest containing planning information. See repo README for detailed
+     * information about the struct members.
      *
      * @return bool True if the planning and execution are successful; false otherwise.
      */
-    bool run_cc_affordance_planner(
-        const cc_affordance_planner::PlannerConfig &planner_config,
-        const cc_affordance_planner::TaskDescription &taskDescription,
-        const std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN),
-        const KinematicState &startConfig = KinematicState{Eigen::VectorXd(),
-                                                           std::numeric_limits<double>::quiet_NaN()});
+    bool plan_visualize_and_execute(const cca_ros::PlanningRequest &planning_request);
 
     /**
-     * @brief Runs the CC Affordance planner for multiple tasks producing a single joint trajectory. Visualizes and
-     * executes it on the robot.
+     * @brief Runs the CCA planner for multiple tasks, producing a single joint trajectory.
+     *        Visualizes and executes it on the robot.
      *
-     * The planning is done sequentially for each task from the current robot state or optionally from a specified robot
-     * start configuration. A pointer to track the status of the overall planning and execution can also be passed.
+     * The planning is done sequentially for each task, starting from the current robot state or optionally
+     * from a specified robot start configuration. A pointer to track the status of the overall planning and
+     * execution can also be passed.
      *
-     * @param planner_configs Vector of configuration settings for the CC Affordance planner. Each config struct
-     * contains:
-     * - **accuracy**: Defines the threshold for the affordance goal. For example, if the goal is to rotate 5 radians
-     * with 10% accuracy, the threshold would be set to 0.1, allowing a result within 5 ± 0.5 radians.
-     * - **ik_max_itr**: (Advanced) Maximum iterations for the closed-chain inverse kinematics solver. Default is 200.
-     * - **update_method**: (Advanced) Specifies the update method to use for solving the inverse kinematics problem.
-     * Options are:
-     *   - `INVERSE`: Uses the inverse of the Jacobian.
-     *   - `TRANSPOSE`: Uses the transpose of the Jacobian.
-     *   - `BEST`: Automatically selects the best method based on context (default).
-     * - **closure_error_threshold_ang**: (Advanced) Angular error threshold for the closed-chain mechanism. Default is
-     * 1e-4 radians.
-     * - **closure_error_threshold_lin**: (Advanced) Linear error threshold for the closed-chain mechanism. Default is
-     * 1e-5 meters.
+     * @param planning_requests cca_ros::PlanningRequests containing planning information. See repo README for detailed
+     * information about the struct members.
      *
-     * @param task_descriptions Vector of task descriptions, where each task describes a different goal for the planner.
-     * The task struct contains:
-     * - **motion_type**: Specifies the type of motion, with possible values:
-     *   - `cc_affordance_planner::APPROACH`: Cartesian approach motion.
-     *   - `cc_affordance_planner::AFFORDANCE`: Affordance motion (default).
-     * - **affordance_info**: Describes the affordance with the following fields:
-     *   - **type**: Type of affordance (e.g., rotation, translation).
-     *   - **axis**: The screw axis for the affordance motion (Eigen::Vector3d).
-     *   - **location**: The point or location associated with the screw axis (Eigen::Vector3d).
-     *   - **location_frame**: (Optional) Name of the reference frame for the affordance location. If specified, the
-     * planner will attempt to find the affordance location using TF.
-     * - **trajectory_density**: Specifies the density of the trajectory. This is the number of points along the
-     * trajectory from the start to the goal. For instance, a goal of 0.5 radians can have 5 trajectory points spaced by
-     * 0.1 radians.
-     * - **goal**: The specific goal to achieve, which can be one or more of the following:
-     *   - **affordance**: The final value of the affordance.
-     *   - **ee_orientation**: Desired end-effector orientation (Eigen::Quaterniond).
-     *   - **grasp_pose**: Cartesian goal for the end-effector to achieve during approach motion. Not relevant for
-     * AFFORDANCE motion.
-     *   - **gripper**: Desired state of the gripper specified as a joint value.
-     * - **vir_screw_order**: (Optional) Specifies the virtual screw order for the closed-chain model. Default is
-     * `affordance_util::VirtualScrewOrder::XYZ`, which assumes rotational freedom around the x, y, and z axes in order.
-     *
-     * @param status (Optional) Pointer to the cca_ros::Status indicating the result of the planning
-     * and execution. Statuses are:
-     * - `PROCESSING`: The planner is currently working on the tasks.
-     * - `SUCCEEDED`: All tasks were successfully planned, visualized, and executed.
-     * - `FAILED`: One or more tasks failed during planning or execution.
-     *
-     * @param startConfig (Optional) Initial configuration of the robot and gripper as
-     * cca_ros::KinematicState. If this is not specified, the planner will use the current robot
-     * configuration obtained from the joint states topic.
-     * @return bool True if all tasks were successfully planned and executed, false otherwise.
+     * @return bool `true` if all tasks were successfully planned and executed, `false` otherwise.
      */
-    bool run_cc_affordance_planner(
-        const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
-        const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions,
-        const std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN),
-        const KinematicState &startConfig = KinematicState{Eigen::VectorXd(),
-                                                           std::numeric_limits<double>::quiet_NaN()});
 
-    void cleanup_between_calls();
+    bool plan_visualize_and_execute(const cca_ros::PlanningRequests &planning_requests);
+
+    /**
+     * @brief Joins and cleans up status-checking thread
+     */
+    void cleanup_threads();
+
+    /**
+     * @brief Cancels trajectory execution on robot
+     */
+    void cancel_execution();
 
   private:
     std::shared_ptr<Status> status_{nullptr};                 ///< Current status of planning and execution
@@ -253,9 +196,6 @@ class CcaRos : public rclcpp::Node
     std::string gripper_traj_execution_as_name_;           ///< Action server name for gripper trajectory execution
     std::string robot_and_gripper_traj_execution_as_name_; ///< Action server name for robot and gripper trajectory
                                                            ///< execution together
-    std::string planning_group_;                           ///< MoveIt planning group for visualization
-    std::string robot_description_parameter_;              ///< Parameter for the robot description
-    std::string rviz_fixed_frame_;                         ///< Fixed frame for RViz visualization
 
     // Robot data
     Eigen::MatrixXd robot_slist_;                  ///< Screw axes list for the robot
@@ -265,11 +205,18 @@ class CcaRos : public rclcpp::Node
     std::string ref_frame_;                        ///< Reference frame for transformations
     std::string tool_frame_;                       ///< Tool frame for the robot's end-effector
 
-    affordance_util_ros::JointTrajPoint robot_joint_states_;   ///< Processed and ordered robot joint states
-    affordance_util_ros::JointTrajPoint gripper_joint_states_; ///< Processed and ordered gripper joint states
+    ros_cpp_util::JointTrajPoint robot_joint_states_;   ///< Processed and ordered robot joint states
+    ros_cpp_util::JointTrajPoint gripper_joint_states_; ///< Processed and ordered gripper joint states
 
     bool unified_executor_available_ =
         false; ///< Indicates whether an action server is available to execute the robot and gripper trajectory together
+
+    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
+        unified_gh_future_; ///< Goal handle future for the unified trajectory executor
+    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
+        robot_gh_future_; ///< Goal handle future for the robot trajectory executor
+    std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
+        gripper_gh_future_; /// Goal handle future for the gripper trajectory executor
 
     /**
      * @brief Validates a single task description for the CC Affordance Planner ROS node.
@@ -319,8 +266,10 @@ class CcaRos : public rclcpp::Node
      * @param q_aff Affordance location.
      * @return True if successful, false otherwise.
      */
-    bool visualize_trajectory_(const FollowJointTrajectoryGoal &goal, const Eigen::VectorXd &w_aff,
-                               const Eigen::VectorXd &q_aff);
+    bool visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
+                               const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
+                               const Eigen::VectorXd &w_aff, const Eigen::VectorXd &q_aff,
+                               const std::optional<geometry_msgs::msg::Pose> &aff_ref_pose = std::nullopt);
 
     /**
      * @brief Executes the given trajectory on the robot.
@@ -329,11 +278,13 @@ class CcaRos : public rclcpp::Node
      * @param send_goal_options Options for sending the trajectory execution goal.
      * @param traj_execution_as_name Name of the action server.
      * @param goal follow_joint_trajectory goal message containing the trajectory to execute
-     * @return True if successful, false otherwise.
+     * @param goal_handle_future follow_joint_trajectory-type action goal handle
+     * @return True if successful, false otherwise. Also, returns the goal handle by reference
      */
     bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                              rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
-                             const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal);
+                             const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
+                             std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> &goal_handle_future);
 
     /**
      * @brief Callback for handling the result of robot trajectory execution.
@@ -391,6 +342,16 @@ class CcaRos : public rclcpp::Node
      */
     std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
         const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory);
+
+    /**
+     * @brief Given a robot joint trajectory computes the corresponding cartesian trajectory that the robot tool will
+     * trace
+     *
+     * @param trajectory robot joint trajectory
+     *
+     * @return
+     */
+    std::vector<geometry_msgs::msg::Pose> compute_cartesian_trajectory_(const std::vector<Eigen::VectorXd> &trajectory);
 
     /**
      * @brief Initializes proper action clients in the constructor

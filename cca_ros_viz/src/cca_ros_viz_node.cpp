@@ -29,7 +29,7 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
-#include <cca_ros_viz_msgs/srv/cca_ros_viz.hpp>
+#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <pluginlib/class_loader.hpp>
@@ -50,18 +50,19 @@ class CcaRosVizServer : public rclcpp::Node
 {
   public:
     explicit CcaRosVizServer(const rclcpp::NodeOptions &options)
-        : Node("cca_ros_viz_server_node", options),
-          node_logger_(this->get_logger()),
-          executor_(std::make_shared<rclcpp::executors::SingleThreadedExecutor>())
+        : Node("cca_ros_viz_server_node", options), node_logger_(this->get_logger())
     {
 
+        // Extract parameters
+        // robot_description and robot_description_semantic automatically extracted during runtime
+        planning_group_ = this->get_parameter("planning_group").as_string();
+        rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
+        joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
+
         // Create and advertise planning and visualization service
-        srv_ = this->create_service<cca_ros_viz_msgs::srv::CcaRosViz>(
+        srv_ = this->create_service<cca_ros_msgs::srv::CcaRosViz>(
             "/cca_ros_viz_server", std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
                                              std::placeholders::_1, std::placeholders::_2));
-
-        // Create a publisher to publish EE trajectory
-        ee_traj_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/ee_trajectory", 10);
 
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
@@ -69,50 +70,51 @@ class CcaRosVizServer : public rclcpp::Node
         RCLCPP_INFO_STREAM(node_logger_, "/cca_ros_viz service server is active");
     }
 
-    ~CcaRosVizServer() { rclcpp::shutdown(); }
-    void start_and_spin_executor()
+    ~CcaRosVizServer()
     {
-        // Add node to executor and start executor thread
-        node_handle_ = this->shared_from_this();
-        executor_->add_node(this->shared_from_this());
-        std::thread([this]() { executor_->spin(); }).detach();
+        // Cleanup spinner thread
+        if (spinner_thread_.joinable())
+        {
+            spinner_thread_.join();
+        }
+    }
+    void initialize()
+    {
+        // Spin node in a separate thread so we can start reading robot state
+        node_handle = this->shared_from_this();
+        spinner_thread_ = std::thread([this]() { rclcpp::spin(node_handle); });
 
         // Initialize planning parameters
         robot_model_loader::RobotModelLoaderPtr robot_model_loader =
-            std::make_shared<robot_model_loader::RobotModelLoader>(node_handle_);
-        psm_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle_, robot_model_loader);
+            std::make_shared<robot_model_loader::RobotModelLoader>(node_handle);
+        psm_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle, robot_model_loader);
         moveit::core::RobotModelPtr robot_model = robot_model_loader->getModel();
-        /* robot_state = std::make_shared<moveit::core::RobotState>(robot_model); */
         planning_pipeline_ = std::make_shared<planning_pipeline::PlanningPipeline>(
-            robot_model, node_handle_, "planning_plugin", "request_adapters");
+            robot_model, node_handle, "planning_plugin", "request_adapters");
         robot_state_ = std::make_shared<moveit::core::RobotState>(
             planning_scene_monitor::LockedPlanningSceneRO(psm_)
                 ->getCurrentState()); // planning scene is locked while reading robot
-        joint_model_group_ = robot_model->getJointModelGroup("arm");
+        joint_model_group_ = robot_model->getJointModelGroup(planning_group_);
         psm_->startSceneMonitor();
         psm_->startWorldGeometryMonitor(); // listens to world geometry, collision objects and (optionally) octomap
                                            // changes
         psm_->startStateMonitor(
-            "/spot_driver/joint_states"); // listens to joint state updates and attached collision object changes
+            joint_states_topic_); // listens to joint state updates and attached collision object changes
         rviz_visual_tools_.reset(
-            new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_tools", node_handle_));
-        /* dynamic_cast<rclcpp::Node *>(this))); */
+            new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
         rviz_visual_tools_->loadMarkerPub();
         rviz_visual_tools_->enableBatchPublishing();
-        moveit_visual_tools_ = std::make_shared<moveit_visual_tools::MoveItVisualTools>(node_handle_, "arm0_base_link",
+        moveit_visual_tools_ = std::make_shared<moveit_visual_tools::MoveItVisualTools>(node_handle, rviz_fixed_frame_,
                                                                                         "cca_ros_viz", psm_);
     }
 
   private:
     // Variables
-    rclcpp::Node::SharedPtr node_handle_; // handle for the node
+    rclcpp::Node::SharedPtr node_handle;
+    std::thread spinner_thread_; // To spin the node in a separate thread
 
-    rclcpp::Logger node_logger_; // logger associated with the node
-    std::shared_ptr<rclcpp::executors::SingleThreadedExecutor>
-        executor_;                // executor needed for MoveIt robot state checking
-    std::thread executor_thread_; // thread
-    rclcpp::Service<cca_ros_viz_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr ee_traj_pub_; // publisher for EE trajectory
+    rclcpp::Logger node_logger_;                                       // logger associated with the node
+    rclcpp::Service<cca_ros_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
 
@@ -123,9 +125,41 @@ class CcaRosVizServer : public rclcpp::Node
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
     moveit_visual_tools::MoveItVisualToolsPtr moveit_visual_tools_;
 
+    std::string planning_group_;
+    std::string rviz_fixed_frame_;
+    std::string joint_states_topic_;
+
+    // Note, T_w_r is HTM from world frame, usually the root frame of the urdf to the service request reference frame
+    Eigen::Isometry3d transform_pose_to_world_frame(const Eigen::Isometry3d &T_w_r,
+                                                    const geometry_msgs::msg::Pose &pose)
+    {
+        // Convert the pose to an Eigen::Isometry3d type
+        Eigen::Isometry3d eigen_pose;
+        eigen_pose.linear() =
+            Eigen::Quaterniond(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z)
+                .toRotationMatrix();
+        eigen_pose.translation() = Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
+
+        // Translate the pose to the planning frame
+        return T_w_r * eigen_pose; // Return transformed pose
+    }
+
+    bool is_pose_specified(const geometry_msgs::msg::Pose &pose)
+    {
+        // Check if the pose has non-default position and orientation values
+        if (pose.position.x == 0.0 && pose.position.y == 0.0 && pose.position.z == 0.0 && pose.orientation.x == 0.0 &&
+            pose.orientation.y == 0.0 && pose.orientation.z == 0.0 && pose.orientation.w == 1.0)
+        {
+            // Pose is default, likely not specified
+            return false;
+        }
+        // Pose has been specified
+        return true;
+    }
+
     // Methods
-    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Request> serv_req,
-                                      std::shared_ptr<cca_ros_viz_msgs::srv::CcaRosViz::Response> serv_res)
+    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Request> serv_req,
+                                      std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Response> serv_res)
     {
 
         bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
@@ -139,7 +173,7 @@ class CcaRosVizServer : public rclcpp::Node
         // Create motion plan request
         planning_interface::MotionPlanRequest req;
         planning_interface::MotionPlanResponse res;
-        req.group_name = serv_req->planning_group;
+        req.group_name = planning_group_;
 
         // Moveit messages to visualize planned path and hold planning pipeline response
         moveit_msgs::msg::DisplayTrajectory display_trajectory;
@@ -147,14 +181,12 @@ class CcaRosVizServer : public rclcpp::Node
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
+        // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request reference
+        // frame
+        Eigen::Isometry3d T_w_r = robot_state_->getGlobalLinkTransform(serv_req->ref_frame);
+
         if (!(serv_req->aff_screw_axis).empty()) // If affordance screw is specified, draw it
         {
-            // Display the affordance screw axis
-            // Note the affordance screw axis in the service request is wrt to the reference frame and here we are
-            // publishing wrt to the planning frame
-            Eigen::Isometry3d T_p_r = robot_state_->getGlobalLinkTransform(
-                serv_req->ref_frame); // planning frame (which is usually the base frame from the URDF) to the reference
-                                      // frame.
 
             // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance screw
             // axis wrt to the x-axis.
@@ -168,13 +200,22 @@ class CcaRosVizServer : public rclcpp::Node
             aff_screw_pose.translation() = Eigen::Vector3d((serv_req->aff_location).data());
 
             // Translate the pose to planning frame
-            aff_screw_pose = T_p_r * aff_screw_pose;
+            aff_screw_pose = T_w_r * aff_screw_pose;
+
+            // If affordance ref frame is specified, draw it
+            if (this->is_pose_specified(serv_req->aff_ref_pose))
+            {
+                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->aff_ref_pose);
+
+                rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
+            }
 
             // Publish
             rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
             rviz_visual_tools_->trigger();
         }
 
+        size_t i = 0;
         for (const auto &point : serv_req->joint_traj.points)
         {
             // copy the joint trajectory point to a std::vector<double> type
@@ -214,12 +255,11 @@ class CcaRosVizServer : public rclcpp::Node
                                                  response.trajectory.joint_trajectory.points.back().positions);
             moveit::core::robotStateToRobotStateMsg(*robot_state_, req.start_state);
 
-            // Compute forward kinematics to the EE and store the position and orientation in the marker variable
-            Eigen::Isometry3d ee_htm = robot_state_->getGlobalLinkTransform(serv_req->tool_frame);
-
-            // Publish the EE frame
-            rviz_visual_tools_->publishAxis(ee_htm);
+            // Publish the tool frame
+            Eigen::Isometry3d tool_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->cartesian_traj[i]);
+            rviz_visual_tools_->publishAxis(tool_pose);
             rviz_visual_tools_->trigger();
+            i++;
         }
 
         RCLCPP_INFO(node_logger_, "Successfully planned and visualized the trajectory");
@@ -233,10 +273,12 @@ int main(int argc, char **argv)
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
     auto node = std::make_shared<CcaRosVizServer>(node_options);
-    node->start_and_spin_executor();
+    node->initialize();
 
     while (rclcpp::ok())
     {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep to avoid busy waiting
     }
+    rclcpp::shutdown();
     return 0;
 }

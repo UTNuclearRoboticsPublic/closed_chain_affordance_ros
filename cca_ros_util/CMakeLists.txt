@@ -2,10 +2,12 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(cca_ros)
+project(cca_ros_util)
 
 # Set C++ standard to 17
 set(CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Enable stricter warnings for GCC and Clang compilers
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -15,14 +17,9 @@ endif()
 # Find required packages
 # ROS packages
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)  # ROS 2 communication library
-find_package(rclcpp_action REQUIRED)
-find_package(tf2_ros REQUIRED)  # ROS 2 library for managing coordinate frames
-find_package(ros_cpp_util REQUIRED)  # Basic ROS 2 utility functions for affordance work
-find_package(cca_ros_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
-find_package(sensor_msgs REQUIRED)
-find_package(control_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(cca_ros REQUIRED)
+find_package(cca_ros_msgs REQUIRED)
 
 # Non-ROS packages
 find_package(Eigen3 REQUIRED)
@@ -42,14 +39,14 @@ add_library(${PROJECT_NAME}
 )
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC ros_cpp_util PUBLIC cca_ros_msgs PUBLIC rclcpp_action PUBLIC tf2_ros sensor_msgs PUBLIC control_msgs PUBLIC geometry_msgs)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC cca_ros PUBLIC cca_ros_msgs)
 
 # Link the executable against external libraries
 target_link_libraries(${PROJECT_NAME} PUBLIC affordance_util::affordance_util PUBLIC cc_affordance_planner::cc_affordance_planner PUBLIC Eigen3::Eigen
 )
 
 # Export dependencies for downstream ROS packages
-ament_export_dependencies(ros_cpp_util cca_ros_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs affordance_util cc_affordance_planner Eigen3)
+ament_export_dependencies(cca_ros cca_ros_msgs affordance_util cc_affordance_planner Eigen3)
 
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)

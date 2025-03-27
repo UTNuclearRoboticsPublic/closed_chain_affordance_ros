@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(cca_ros)
+project(ros_cpp_util)
 
 # Set C++ standard to 17
 set(CMAKE_CXX_STANDARD 17)
@@ -12,22 +12,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Find required packages
+# Find and link required packages
+find_package(Eigen3 REQUIRED)  # Linear algebra library
 # ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)  # ROS 2 communication library
-find_package(rclcpp_action REQUIRED)
 find_package(tf2_ros REQUIRED)  # ROS 2 library for managing coordinate frames
-find_package(ros_cpp_util REQUIRED)  # Basic ROS 2 utility functions for affordance work
-find_package(cca_ros_msgs REQUIRED)  # To plan and visualize joint and EE trajectories
-find_package(sensor_msgs REQUIRED)
-find_package(control_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-
-# Non-ROS packages
-find_package(Eigen3 REQUIRED)
-find_package(affordance_util REQUIRED)
-find_package(cc_affordance_planner REQUIRED)
+find_package(control_msgs REQUIRED)  # ROS 2 messages for robot control
+find_package(geometry_msgs REQUIRED)  # ROS 2 messages for geometry
+find_package(sensor_msgs REQUIRED)  # ROS 2 messages for sensor data
 
 # Include directories for headers
 include_directories(
@@ -41,15 +34,14 @@ add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}/${PROJECT_NAME}.cpp  # Source file for the library
 )
 
+# Link Eigen libraries against this project library
+target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
+
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC ros_cpp_util PUBLIC cca_ros_msgs PUBLIC rclcpp_action PUBLIC tf2_ros sensor_msgs PUBLIC control_msgs PUBLIC geometry_msgs)
+ament_target_dependencies(${PROJECT_NAME} rclcpp tf2_ros control_msgs geometry_msgs sensor_msgs)
 
-# Link the executable against external libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC affordance_util::affordance_util PUBLIC cc_affordance_planner::cc_affordance_planner PUBLIC Eigen3::Eigen
-)
-
-# Export dependencies for downstream ROS packages
-ament_export_dependencies(ros_cpp_util cca_ros_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs affordance_util cc_affordance_planner Eigen3)
+# Export ROS dependencies so downstream pkgs that depend on this pkg can trigger find_package() calls to these
+ament_export_dependencies(rclcpp tf2_ros control_msgs geometry_msgs sensor_msgs)
 
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
