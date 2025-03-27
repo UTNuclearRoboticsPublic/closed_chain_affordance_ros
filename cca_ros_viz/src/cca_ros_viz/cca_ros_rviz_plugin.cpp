@@ -341,13 +341,6 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
 
     cca_ros::PlanningRequest req;
 
-    // Set planning request start state for testing purposes -- temporary, to be removed
-    const Eigen::VectorXd READY_CONFIG =
-        (Eigen::VectorXd(6) << -0.00015592575073242188, -0.8980185389518738, 1.8094338178634644, 0.000377655029296875,
-         -0.8991076946258545, 0.0015475749969482422)
-            .finished();
-    req.start_state.robot = READY_CONFIG;
-
     // Deduce planning type
     const auto planning_type = planning_type_map_.at(mode_bl_.combo_box->currentText());
     req.task_description = cc_affordance_planner::TaskDescription(planning_type);
