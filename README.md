@@ -4,14 +4,12 @@ This repository provides robot-agnostic ROS2 packages that interface the [Closed
 
 ## Core Dependencies
 
-- `affordance_util` and `cc_affordance_planner` from the [Closed-Chain Affordance repository](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
+- `affordance_util` and `cc_affordance_planner` packages from the [Closed-Chain Affordance repository](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
 
 ### Optional Dependencies
-For visualization:
-- `moveit`: Motion planning framework
-- `moveit_visual_tools`: Visualization utilities for MoveIt
-For using as a Behavior Tree action:
-- `behaviortree_cpp`: Behavior tree implementation
+- `moveit`: For self-collision checking
+- `moveit_visual_tools`: For visualization of joint movement
+- `behaviortree_cpp`: To utilize the CCA Behavior Tree action node
 
 ## Build Instructions
 
