@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>robot_state_recorder</name>
+  <name>cca_ros</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="jpanthi@utexas.edu">crasun</maintainer>
@@ -9,10 +9,11 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!--Dependencies that need to be built before this package can be built-->
   <depend>rclcpp</depend>
-  <depend>trajectory_msgs</depend>
-  <depend>sensor_msgs</depend>
+  <depend>cca_ros_msgs</depend>
   <depend>ros_cpp_util</depend>
+  <!--******************************************************************-->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

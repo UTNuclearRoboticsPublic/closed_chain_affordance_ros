@@ -1,0 +1,4 @@
+cca_ros_msgs/PlanningRequest req
+---
+bool success
+---
