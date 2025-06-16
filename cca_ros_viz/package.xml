@@ -13,14 +13,14 @@
   <!-- Dependencies -->
   <depend>rclcpp</depend>
   <depend>cca_ros_msgs</depend>
-  <depend>moveit_visual_tools</depend>
-  <depend>interactive_goal_interfaces</depend>
   <depend>interactive_markers</depend>
   <depend>rviz_common</depend>
   <depend>rviz_rendering</depend>
   <depend>rviz_default_plugins</depend>
+  <depend>moveit_core</depend>
+  <depend>moveit_ros_planning</depend>
+  <depend>moveit_visual_tools</depend>
   <depend>pluginlib</depend>
-  <depend>Qt5</depend>
   <depend>cca_ros</depend>
   <depend>cca_ros_action</depend>
 

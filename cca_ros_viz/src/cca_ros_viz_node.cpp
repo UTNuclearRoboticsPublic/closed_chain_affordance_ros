@@ -29,22 +29,17 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
-#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
+#include <fmt/core.h>
 #include <rclcpp/rclcpp.hpp>
-
-#include <pluginlib/class_loader.hpp>
+#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 
 // MoveIt
 #include <moveit/kinematic_constraints/utils.h>
-#include <moveit/planning_interface/planning_interface.h>
-#include <moveit/planning_pipeline/planning_pipeline.h>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/conversions.h>
 #include <moveit_msgs/msg/display_trajectory.hpp>
-#include <moveit_msgs/msg/planning_scene.hpp>
 #include <moveit_visual_tools/moveit_visual_tools.h>
-#include <fmt/core.h>
 
 using namespace std::chrono_literals;
 class CcaRosVizServer : public rclcpp::Node
@@ -90,8 +85,6 @@ class CcaRosVizServer : public rclcpp::Node
             std::make_shared<robot_model_loader::RobotModelLoader>(node_handle);
         psm_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle, robot_model_loader);
         moveit::core::RobotModelPtr robot_model = robot_model_loader->getModel();
-        planning_pipeline_ = std::make_shared<planning_pipeline::PlanningPipeline>(
-            robot_model, node_handle, "planning_plugin", "request_adapters");
         robot_state_ = std::make_shared<moveit::core::RobotState>(
             planning_scene_monitor::LockedPlanningSceneRO(psm_)
                 ->getCurrentState()); // planning scene is locked while reading robot
@@ -118,7 +111,6 @@ class CcaRosVizServer : public rclcpp::Node
         moveit_planned_path_pub_; // publisher to show moveit planned path
 
     planning_scene_monitor::PlanningSceneMonitorPtr psm_;
-    planning_pipeline::PlanningPipelinePtr planning_pipeline_;
     moveit::core::RobotStatePtr robot_state_;
     moveit::core::JointModelGroup *joint_model_group_;
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
@@ -170,14 +162,6 @@ class CcaRosVizServer : public rclcpp::Node
         // Clear messages
         rviz_visual_tools_->deleteAllMarkers();
 
-        // Create motion plan request
-        planning_interface::MotionPlanRequest req;
-        planning_interface::MotionPlanResponse res;
-        req.group_name = planning_group_;
-
-        // Moveit messages to visualize planned path and hold planning pipeline response
-        moveit_msgs::msg::DisplayTrajectory display_trajectory;
-        moveit_msgs::msg::MotionPlanResponse response;
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
@@ -227,8 +211,6 @@ class CcaRosVizServer : public rclcpp::Node
             goal_state.setJointGroupPositions(joint_model_group_, planning_end_state);
             moveit_msgs::msg::Constraints joint_goal =
                 kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group_);
-            req.goal_constraints.clear();
-            req.goal_constraints.push_back(joint_goal);
 
             // Acquire read-only lock on the planning scene before doing anything
             {
@@ -291,6 +273,7 @@ class CcaRosVizServer : public rclcpp::Node
         }
 
 	// Since no joint limit or self-collision violation, now visualize the trajectory
+        moveit_msgs::msg::DisplayTrajectory display_trajectory;
 	// Set start state
     	moveit_msgs::msg::RobotState start_state;
     	start_state.joint_state.name = serv_req->joint_traj.joint_names;

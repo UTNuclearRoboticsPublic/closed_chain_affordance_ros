@@ -24,6 +24,7 @@ find_package(interactive_markers REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
+find_package(pluginlib REQUIRED)
 find_package(cca_ros REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(cca_ros_action REQUIRED)
@@ -70,6 +71,7 @@ ament_target_dependencies(${PROJECT_NAME}
   rviz_common
   rviz_rendering
   rviz_default_plugins
+  pluginlib
   interactive_markers
   tf2_ros
   cca_ros
@@ -122,6 +124,7 @@ ament_export_dependencies(
   rviz_common
   rviz_rendering
   rviz_default_plugins
+  pluginlib
   interactive_markers
   tf2_ros
   cca_ros
