@@ -44,6 +44,7 @@
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
 #include <moveit_visual_tools/moveit_visual_tools.h>
+#include <fmt/core.h>
 
 using namespace std::chrono_literals;
 class CcaRosVizServer : public rclcpp::Node
@@ -104,8 +105,6 @@ class CcaRosVizServer : public rclcpp::Node
             new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
         rviz_visual_tools_->loadMarkerPub();
         rviz_visual_tools_->enableBatchPublishing();
-        moveit_visual_tools_ = std::make_shared<moveit_visual_tools::MoveItVisualTools>(node_handle, rviz_fixed_frame_,
-                                                                                        "cca_ros_viz", psm_);
     }
 
   private:
@@ -123,7 +122,6 @@ class CcaRosVizServer : public rclcpp::Node
     moveit::core::RobotStatePtr robot_state_;
     moveit::core::JointModelGroup *joint_model_group_;
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
-    moveit_visual_tools::MoveItVisualToolsPtr moveit_visual_tools_;
 
     std::string planning_group_;
     std::string rviz_fixed_frame_;
@@ -161,6 +159,8 @@ class CcaRosVizServer : public rclcpp::Node
     void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Request> serv_req,
                                       std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Response> serv_res)
     {
+
+        serv_res->success = false;// start as false
 
         bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
         if (!has_sub)
@@ -215,10 +215,11 @@ class CcaRosVizServer : public rclcpp::Node
             rviz_visual_tools_->trigger();
         }
 
-        size_t i = 0;
+	long total_viol_check_duration = 0; // for joint limits and collision checking
+
         for (const auto &point : serv_req->joint_traj.points)
         {
-            // copy the joint trajectory point to a std::vector<double> type
+            // Copy the joint trajectory point to a std::vector<double> type
             std::vector<double> planning_end_state(point.positions.begin(), point.positions.end());
 
             // Set the planning goal state to that trajectory point
@@ -229,40 +230,89 @@ class CcaRosVizServer : public rclcpp::Node
             req.goal_constraints.clear();
             req.goal_constraints.push_back(joint_goal);
 
-            // Acquire read-only lock on the planning scene before planning and generate plan
+            // Acquire read-only lock on the planning scene before doing anything
             {
                 planning_scene_monitor::LockedPlanningSceneRO lscene(psm_);
-                planning_pipeline_->generatePlan(lscene, req, res);
+
+		// Check for joint limit and self-collision violation
+		auto start_time = std::chrono::high_resolution_clock::now(); // start time for this point in traj
+
+		// Set up collision requests and results
+		collision_detection::CollisionRequest collision_request;
+		collision_request.contacts = true;
+		collision_request.max_contacts = 1000;
+		collision_detection::CollisionResult collision_result;
+		collision_result.clear();
+
+		// Check and store violation check
+		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group_);
+		psm_->getPlanningScene()->checkSelfCollision(collision_request, collision_result, goal_state);
+		bool self_collision_violation = collision_result.collision;
+
+		// Capture how long it took to check for violations
+		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
+		long point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+		total_viol_check_duration += point_duration;
+
+		// Log violation
+		if (joint_limit_violation || self_collision_violation) {
+
+		    std::string violation_type =
+                    (joint_limit_violation && self_collision_violation) ? "Joint Limit Violation & Self-Collision" :
+                    joint_limit_violation ? "Joint Limit Violation" : "Self-Collision";
+
+		    
+		    const double* goal_positions = goal_state.getVariablePositions();
+		    size_t num_joints = goal_state.getVariableCount();  // Get the number of joint values
+
+		    std::ostringstream oss;
+		    for (size_t k = 0; k < num_joints; ++k) {
+		        if (k > 0) oss << ", ";
+		        oss << goal_positions[k];
+		    }
+
+		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point: [%s]",
+		    	     violation_type.c_str(), oss.str().c_str());
+
+		    // If self-collision occurs, print the contacts
+		    if (self_collision_violation){
+			    collision_detection::CollisionResult::ContactMap::const_iterator it;
+			    for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it)
+			    {
+			      RCLCPP_ERROR(node_logger_, "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str());
+			    }
+		    
+		    }
+
+		    return;
+
+		}
             }
-
-            // Check if planning was successful, exit if not
-            if (res.error_code_.val != res.error_code_.SUCCESS)
-            {
-                RCLCPP_ERROR(node_logger_, "Could not compute plan successfully");
-                return;
-            }
-
-            // Visualize the plan
-            res.getMessage(response); // copy the generated plan to the moveit_msgs response variable
-            display_trajectory.trajectory_start =
-                response.trajectory_start;                                // update the start of the display trajectory
-            display_trajectory.trajectory.push_back(response.trajectory); // update the whole trajectory
-            moveit_planned_path_pub_->publish(display_trajectory);        // publish the trajectory
-            moveit_visual_tools_->publishTrajectoryLine(display_trajectory.trajectory.back(), joint_model_group_);
-
-            // Set the start state in the planning scene to the final state of the last plan
-            robot_state_->setJointGroupPositions(joint_model_group_,
-                                                 response.trajectory.joint_trajectory.points.back().positions);
-            moveit::core::robotStateToRobotStateMsg(*robot_state_, req.start_state);
-
-            // Publish the tool frame
-            Eigen::Isometry3d tool_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->cartesian_traj[i]);
-            rviz_visual_tools_->publishAxis(tool_pose);
-            rviz_visual_tools_->trigger();
-            i++;
         }
 
+	// Since no joint limit or self-collision violation, now visualize the trajectory
+	// Set start state
+    	moveit_msgs::msg::RobotState start_state;
+    	start_state.joint_state.name = serv_req->joint_traj.joint_names;
+    	start_state.joint_state.position = serv_req->joint_traj.points.front().positions;
+        display_trajectory.trajectory_start = start_state;
+	// Set trajectory
+        moveit_msgs::msg::RobotTrajectory robot_traj;
+        robot_traj.joint_trajectory = serv_req->joint_traj;
+        display_trajectory.trajectory.push_back(robot_traj);
+
+	// Publish
+        moveit_planned_path_pub_->publish(display_trajectory);        // publish the trajectory
+
+        // Publish the tool trajectory
+	for (const auto& pose : serv_req->cartesian_traj)
+	{
+	    rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
+	}
+	rviz_visual_tools_->trigger();  // only once after batching
+
         RCLCPP_INFO(node_logger_, "Successfully planned and visualized the trajectory");
+	// RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration); For experiment purposes
         serv_res->success = true;
     }
 };
