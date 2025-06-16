@@ -272,20 +272,19 @@ class CcaRosVizServer : public rclcpp::Node
             }
         }
 
-	// Since no joint limit or self-collision violation, now visualize the trajectory
-        moveit_msgs::msg::DisplayTrajectory display_trajectory;
-	// Set start state
-    	moveit_msgs::msg::RobotState start_state;
-    	start_state.joint_state.name = serv_req->joint_traj.joint_names;
-    	start_state.joint_state.position = serv_req->joint_traj.points.front().positions;
-        display_trajectory.trajectory_start = start_state;
-	// Set trajectory
-        moveit_msgs::msg::RobotTrajectory robot_traj;
-        robot_traj.joint_trajectory = serv_req->joint_traj;
-        display_trajectory.trajectory.push_back(robot_traj);
+	// Since no joint‐limit or self‐collision violation, now visualize the trajectory
+	moveit_msgs::msg::DisplayTrajectory display_trajectory;
 
-	// Publish
-        moveit_planned_path_pub_->publish(display_trajectory);        // publish the trajectory
+	// Set start state 
+	display_trajectory.trajectory_start.joint_state.name     = serv_req->joint_traj.joint_names;
+	display_trajectory.trajectory_start.joint_state.position = serv_req->joint_traj.points.front().positions;
+
+	// Fill out the trajectory
+	auto &robot_traj = display_trajectory.trajectory.emplace_back();
+	robot_traj.joint_trajectory = serv_req->joint_traj;
+
+	// Publish the joint trajectory
+	moveit_planned_path_pub_->publish(display_trajectory);
 
         // Publish the tool trajectory
 	for (const auto& pose : serv_req->cartesian_traj)
@@ -294,7 +293,7 @@ class CcaRosVizServer : public rclcpp::Node
 	}
 	rviz_visual_tools_->trigger();  // only once after batching
 
-        RCLCPP_INFO(node_logger_, "Successfully planned and visualized the trajectory");
+        RCLCPP_INFO(node_logger_, "Successfully visualized requested joint trajectory");
 	// RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration); For experiment purposes
         serv_res->success = true;
     }
