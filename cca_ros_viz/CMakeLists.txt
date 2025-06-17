@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(cca_ros_viz)
 
-# Set C++ standard to 17 for modern C++ support
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard to 20 for modern C++ support
+set(CMAKE_CXX_STANDARD 20)
 
 # Enable stricter warnings for better code quality
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")

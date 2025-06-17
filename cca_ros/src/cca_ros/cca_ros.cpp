@@ -51,7 +51,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 // Destructor for CcaRos, cleans up.
 CcaRos::~CcaRos()
 {
-    this->cleanup_threads();
     rclcpp::shutdown();
 }
 
@@ -256,7 +255,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
                     std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
 
                 // Start a thread to check result status
-                result_status_thread_ = std::thread(&CcaRos::check_robot_and_gripper_result_status_, this);
+                result_status_thread_ = std::jthread(&CcaRos::check_robot_and_gripper_result_status_, this);
 
                 // Execute trajectories for both robot and gripper
                 return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
@@ -462,8 +461,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
                     std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
 
                 // Start a thread to check result status
-                this->cleanup_threads(); // Ensure previous call was properly cleaned up
-                result_status_thread_ = std::thread(&CcaRos::check_robot_and_gripper_result_status_, this);
+                result_status_thread_ = std::jthread(&CcaRos::check_robot_and_gripper_result_status_, this);
 
                 // Execute trajectories for both robot and gripper
                 return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
@@ -899,14 +897,6 @@ void CcaRos::check_robot_and_gripper_result_status_()
 
         // Sleep for a short duration to avoid busy-waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    }
-}
-
-void CcaRos::cleanup_threads()
-{
-    if (result_status_thread_.joinable())
-    {
-        result_status_thread_.join();
     }
 }
 

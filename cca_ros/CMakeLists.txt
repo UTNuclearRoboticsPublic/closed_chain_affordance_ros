@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project(cca_ros)
 
-# Set C++ standard to 17
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard to 20
+set(CMAKE_CXX_STANDARD 20)
 
 # Enable stricter warnings for GCC and Clang compilers
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")

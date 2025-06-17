@@ -162,11 +162,6 @@ class CcaRos : public rclcpp::Node
     bool plan_visualize_and_execute(const cca_ros::PlanningRequests &planning_requests);
 
     /**
-     * @brief Joins and cleans up status-checking thread
-     */
-    void cleanup_threads();
-
-    /**
      * @brief Cancels trajectory execution on robot
      */
     void cancel_execution();
@@ -176,7 +171,7 @@ class CcaRos : public rclcpp::Node
     std::shared_ptr<Status> robot_result_status_ = {nullptr}; ///< Current status of robot trajectory execution result
     std::shared_ptr<Status> gripper_result_status_ = {
         nullptr};                      ///< Current status of gripper trajectory execution result
-    std::thread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
+    std::jthread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
     std::mutex status_mutex_;          ///< Mutex to protect access to status_
     rclcpp::Logger node_logger_;       ///< Node-specific logger
     std::string viz_ss_name_;          ///< Name of the plan and visualization server
