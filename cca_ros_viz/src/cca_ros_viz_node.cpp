@@ -152,7 +152,59 @@ class CcaRosVizServer : public rclcpp::Node
         return true;
     }
 
-    // Methods
+    // Reorders the trajectory to match a given joint name order (e.g., for a planning group or the full robot)
+    trajectory_msgs::msg::JointTrajectory reorder_trajectory_(
+        const trajectory_msgs::msg::JointTrajectory &input_traj,
+        const std::vector<std::string> &target_joint_names)
+    {
+        trajectory_msgs::msg::JointTrajectory ordered_traj;
+        ordered_traj.header = input_traj.header;
+        ordered_traj.joint_names = target_joint_names;
+    
+        // Build name → index map from input
+        std::unordered_map<std::string, size_t> name_to_index;
+        for (size_t i = 0; i < input_traj.joint_names.size(); ++i)
+        {
+    	name_to_index[input_traj.joint_names[i]] = i;
+        }
+    
+        // Pull a fresh robot state
+        moveit::core::RobotState fresh_state(*robot_state_);
+        {
+    	planning_scene_monitor::LockedPlanningSceneRO scene(psm_);
+    	fresh_state = scene->getCurrentState();
+        }
+    
+        // Reorder each point according to target_joint_names
+        for (const auto &point : input_traj.points)
+        {
+    	trajectory_msgs::msg::JointTrajectoryPoint new_point;
+    	new_point.time_from_start = point.time_from_start;
+    	new_point.positions.resize(target_joint_names.size());
+    
+    	for (size_t i = 0; i < target_joint_names.size(); ++i)
+    	{
+    	    const auto &name = target_joint_names[i];
+    	    auto it = name_to_index.find(name);
+    	    if (it != name_to_index.end())
+    	    {
+    		new_point.positions[i] = point.positions[it->second];
+    	    }
+    	    else
+    	    {
+    		new_point.positions[i] = fresh_state.getVariablePosition(name);
+    		RCLCPP_ERROR(node_logger_, "Joint '%s' missing in trajectory point. Using current robot state.",
+    			     name.c_str());
+    	    }
+    	}
+    
+    	ordered_traj.points.push_back(std::move(new_point));
+        }
+    
+        return ordered_traj;
+    }
+
+
     void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Request> serv_req,
                                       std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Response> serv_res)
     {
@@ -204,9 +256,12 @@ class CcaRosVizServer : public rclcpp::Node
             rviz_visual_tools_->trigger();
         }
 
+	// (Re)order trajectory to match MoveIt planning group order
+	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_model_group_->getVariableNames());
+
 	long total_viol_check_duration = 0; // for joint limits and collision checking
 
-        for (const auto &point : serv_req->joint_traj.points)
+        for (const auto &point : ordered_group_traj.points)
         {
             // Copy the joint trajectory point to a std::vector<double> type
             std::vector<double> planning_end_state(point.positions.begin(), point.positions.end());
@@ -278,15 +333,18 @@ class CcaRosVizServer : public rclcpp::Node
         }
 
 	// Since no joint‐limit or self‐collision violation, now visualize the trajectory
+	// Transform the trajectory to the full robot trajectory for visualization, i.e. by adding the current state of the unplanned joints
+	trajectory_msgs::msg::JointTrajectory ordered_robot_traj = reorder_trajectory_(serv_req->joint_traj, robot_state_->getVariableNames());
+
 	moveit_msgs::msg::DisplayTrajectory display_trajectory;
 
 	// Set start state 
-	display_trajectory.trajectory_start.joint_state.name     = serv_req->joint_traj.joint_names;
-	display_trajectory.trajectory_start.joint_state.position = serv_req->joint_traj.points.front().positions;
+	display_trajectory.trajectory_start.joint_state.name     = ordered_robot_traj.joint_names;
+	display_trajectory.trajectory_start.joint_state.position = ordered_robot_traj.points.front().positions;
 
 	// Fill out the trajectory
 	auto &robot_traj = display_trajectory.trajectory.emplace_back();
-	robot_traj.joint_trajectory = serv_req->joint_traj;
+	robot_traj.joint_trajectory = ordered_robot_traj;
 
 	// Publish the joint trajectory
 	moveit_planned_path_pub_->publish(display_trajectory);
