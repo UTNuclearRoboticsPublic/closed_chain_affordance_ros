@@ -94,6 +94,11 @@ class CcaRosVizServer : public rclcpp::Node
                                            // changes
         psm_->startStateMonitor(
             joint_states_topic_); // listens to joint state updates and attached collision object changes
+
+        // Make the planning‐scene service available for diffs and publish the scene -- needed to reflect joint states correctly
+        psm_->providePlanningSceneService();
+        psm_->startPublishingPlanningScene(planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
+
         rviz_visual_tools_.reset(
             new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
         rviz_visual_tools_->loadMarkerPub();
