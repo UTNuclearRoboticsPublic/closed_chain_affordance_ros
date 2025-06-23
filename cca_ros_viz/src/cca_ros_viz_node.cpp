@@ -193,8 +193,8 @@ class CcaRosVizServer : public rclcpp::Node
     	    else
     	    {
     		new_point.positions[i] = fresh_state.getVariablePosition(name);
-    		RCLCPP_ERROR(node_logger_, "Joint '%s' missing in trajectory point. Using current robot state.",
-    			     name.c_str());
+    		// RCLCPP_ERROR(node_logger_, "Joint '%s' missing in trajectory point. Using current robot state.",
+    		// 	     name.c_str());
     	    }
     	}
     
