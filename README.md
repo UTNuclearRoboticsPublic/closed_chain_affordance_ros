@@ -14,6 +14,7 @@ This repository provides robot-agnostic ROS2 packages that interface the [Closed
 - `moveit`: For self-collision checking
 - `moveit_visual_tools`: For visualization of joint movement
 - `behaviortree_cpp`: To utilize the CCA Behavior Tree action node
+Install as `sudo apt install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-behaviortree-cpp`
   
 With ROS sourced, you may install the optional dependencies with:
  ```bash
