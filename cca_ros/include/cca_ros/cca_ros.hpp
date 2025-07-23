@@ -79,16 +79,27 @@ enum Status
 };
 
 /**
+ * @brief Struct to hold timesteps for the trajectory
+ */
+struct TrajectoryTimeStep {
+    double robot = 0.3; // seconds
+    double gripper = 0.2; // seconds 
+    double robot_and_gripper = 0.3; // seconds
+};
+
+/**
  * @brief Struct containing planning request for the CCA ROS planner
  */
 struct PlanningRequest
 {
+
     cc_affordance_planner::PlannerConfig planner_config = cc_affordance_planner::PlannerConfig();
     cc_affordance_planner::TaskDescription task_description;
     KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
     bool visualize_trajectory = true;
     bool execute_trajectory = false;
+    TrajectoryTimeStep time_step;
 };
 
 /**
@@ -102,6 +113,7 @@ struct PlanningRequests
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
     bool visualize_trajectory = true;
     bool execute_trajectory = false;
+    TrajectoryTimeStep time_step; //TODO: We may wanna have different time steps per task_description, maybe its better to have this be a member of task description instead
 };
 
 /**
@@ -336,7 +348,7 @@ class CcaRos : public rclcpp::Node
      * together. Robot msg is always returned. Other two are conditional.
      */
     std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
-        const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory);
+        const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step);
 
     /**
      * @brief Given a robot joint trajectory computes the corresponding cartesian trajectory that the robot tool will

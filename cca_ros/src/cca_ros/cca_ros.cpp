@@ -63,6 +63,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
     // Create const references for readability
     const cc_affordance_planner::PlannerConfig &planner_config = planning_request.planner_config;
     const cca_ros::KinematicState &start_state = planning_request.start_state;
+    const TrajectoryTimeStep& time_step = planning_request.time_step;
 
     // Validate input
     try
@@ -193,7 +194,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
 
     // Convert the trajectory to ROS msg for visualization and/or execution
     const auto [robot_goal_msg, gripper_goal_msg, robot_and_gripper_goal_msg] =
-        create_goal_msg_(plannerResult.joint_trajectory, includes_gripper_trajectory);
+        create_goal_msg_(plannerResult.joint_trajectory, includes_gripper_trajectory, time_step);
 
     // Visualize the trajectory
     if (planning_request.visualize_trajectory)
@@ -288,6 +289,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
     const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions = planning_requests.task_description;
     const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs = planning_requests.planner_config;
     const cca_ros::KinematicState &start_state = planning_requests.start_state;
+    const TrajectoryTimeStep& time_step = planning_requests.time_step;
 
     // Validate input
     try
@@ -416,7 +418,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
 
     // Convert the trajectory to ROS msg for visualization and/or execution
     const auto [robot_goal_msg, gripper_goal_msg, robot_and_gripper_goal_msg] =
-        create_goal_msg_(solution, includes_gripper_trajectory);
+        create_goal_msg_(solution, includes_gripper_trajectory, time_step);
 
     // Visualize the trajectory
     if (planning_requests.visualize_trajectory)
@@ -627,13 +629,8 @@ std::vector<geometry_msgs::msg::Pose> CcaRos::compute_cartesian_trajectory_(
 
 // Function to create goal messages for robot and optionally for gripper
 std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> CcaRos::create_goal_msg_(
-    const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory)
+    const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step)
 {
-    // Define time steps for robot and gripper trajectories
-    constexpr double robot_traj_time_step = 0.3;             // Time step for robot trajectory
-    constexpr double gripper_traj_time_step = 0.2;           // Time step for gripper trajectory
-    constexpr double robot_and_gripper_traj_time_step = 0.3; // Time step for the combined robot and gripper trajectory
-
     // Initialize goal messages
     FollowJointTrajectoryGoal gripper_goal;
     FollowJointTrajectoryGoal robot_goal;
@@ -641,7 +638,7 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
 
     // Always create the robot goal message
     robot_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
-        trajectory, Eigen::VectorXd::Zero(robot_joint_names_.size()), robot_joint_names_, robot_traj_time_step);
+        trajectory, Eigen::VectorXd::Zero(robot_joint_names_.size()), robot_joint_names_, time_step.robot);
 
     if (includes_gripper_trajectory)
     {
@@ -659,7 +656,7 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
             // Build goal message for combined robot and gripper trajectory
             robot_and_gripper_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
                 trajectory, Eigen::VectorXd::Zero(robot_and_gripper_joint_names.size()), robot_and_gripper_joint_names,
-                robot_and_gripper_traj_time_step);
+                time_step.robot_and_gripper);
         }
         else
         {
@@ -676,7 +673,7 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
 
             // Build goal message for gripper trajectory
             gripper_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
-                gripper_trajectory, Eigen::VectorXd::Zero(1), gripper_joint_names_, gripper_traj_time_step);
+                gripper_trajectory, Eigen::VectorXd::Zero(1), gripper_joint_names_, time_step.gripper);
         }
     }
     return std::make_tuple(robot_goal, gripper_goal, robot_and_gripper_goal);
