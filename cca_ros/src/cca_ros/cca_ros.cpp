@@ -10,13 +10,13 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       viz_ss_name_("/cca_ros_viz_server") // Name of the MoveIt Plan and Visualization server
 {
     // Extract necessary parameters for ROS setup and robot configuration
-    robot_traj_execution_as_name_ = this->get_parameter("cca_robot_as").as_string();
-    gripper_traj_execution_as_name_ = this->get_parameter_or<std::string>("cca_gripper_as", ""); // optional
+    robot_traj_execution_as_name_ = this->declare_parameter("cca_robot_as", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+    gripper_traj_execution_as_name_ = this->declare_parameter("cca_gripper_as", ""); // optional
     robot_and_gripper_traj_execution_as_name_ =
-        this->get_parameter_or<std::string>("cca_robot_and_gripper_as", ""); // optional
+        this->declare_parameter("cca_robot_and_gripper_as", ""); // optional
 
-    const std::string joint_states_topic = this->get_parameter("cca_joint_states_topic").as_string();
-    const std::string robot_name = this->get_parameter("cca_robot").as_string();
+    const std::string joint_states_topic = this->declare_parameter("cca_joint_states_topic", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+    const std::string robot_name = this->declare_parameter("cca_robot", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
 
     // Get the path for robot configuration file
     const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name);

@@ -51,9 +51,9 @@ class CcaRosVizServer : public rclcpp::Node
 
         // Extract parameters
         // robot_description and robot_description_semantic automatically extracted during runtime
-        planning_group_ = this->get_parameter("planning_group").as_string();
-        rviz_fixed_frame_ = this->get_parameter("rviz_fixed_frame").as_string();
-        joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
+        planning_group_ = this->declare_parameter("planning_group", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+        rviz_fixed_frame_ = this->declare_parameter("rviz_fixed_frame", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+        joint_states_topic_ = this->declare_parameter("joint_states_topic", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<cca_ros_msgs::srv::CcaRosViz>(
@@ -366,7 +366,6 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
-    node_options.automatically_declare_parameters_from_overrides(true);
     auto node = std::make_shared<CcaRosVizServer>(node_options);
     node->initialize();
 
