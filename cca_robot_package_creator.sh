@@ -119,15 +119,65 @@ cat << EOF > $package_name/config/cca_${robot_name}_ros_viz_setup.yaml
 EOF
 
 # Create the task execution launch file
-cat << EOF > $package_name/launch/cca_${robot_name}.launch.py
-import os
-from ament_index_python.packages import get_package_share_directory
+cat << 'EOF' > $package_name/launch/cca_${robot_name}.launch.py
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+import os
+
+from launch.substitutions import Command, PathJoinSubstitution
+from launch_ros.descriptions import ParameterValue            
+from launch_ros.substitutions import FindPackageShare         
+
+def generate_robot_description_content():
+    """
+    Generates robot description utilizing launch args
+
+    Returns:
+        - robot_description_content: The robot description generated from the xacro file.
+        - launch_args: List of DeclareLaunchArgument objects used to configure the xacro.
+
+    """
+    # Launch args needed to build the robot description 
+    launch_args = [
+        # Example (uncomment later if needed):
+        # DeclareLaunchArgument(
+        #     "has_arm",
+        #     default_value="false",
+        #     description="add arm to the robot if true",
+        # ),
+    ]
+
+    # Collect arg names from declared launch args
+    launch_arg_names = [arg.name for arg in launch_args]
+
+    # Pass launch args as xacro parameters
+    xacro_command_args = [
+        elem
+        for arg_name in launch_arg_names
+        for elem in (f"{arg_name}:=", LaunchConfiguration(arg_name))
+    ]
+
+    xacro_path = PathJoinSubstitution([
+    # Uncomment and/or adjust as needed
+    #   FindPackageShare("${robot_name}_description"),
+    #   "urdf",
+    #   "${robot_name}.urdf.xacro",
+    ])
+
+    robot_description_content = ParameterValue(
+        Command(["xacro ", xacro_path, *xacro_command_args]),
+        value_type=str,
+    )
+
+    return robot_description_content, launch_args
 
 def generate_launch_description():
+    """
+    Generate the launch description for the cca_${robot_name} node.
+    """
     ld = LaunchDescription()
 
     ld.add_action(DeclareLaunchArgument(
@@ -155,31 +205,92 @@ def generate_launch_description():
         "'", debug, "' == 'true'"
     ])
 
+    # Get robot description and any associated launch args
+    robot_description_content, robot_description_launch_args = generate_robot_description_content()
+    for arg in robot_description_launch_args:
+        ld.add_action(arg)
+
     # Create a Node instance for the cca_${robot_name} node
-    cc_affordance_planner_ros_node_with_params = Node(
+    cca_${robot_name}_node_with_params = Node(
         package="cca_${robot_name}",
         executable="cca_${robot_name}_node",
-        name="cc_affordance_planner_ros",
+        name="cca_${robot_name}",
         prefix=[node_prefix],
         emulate_tty=emulate_tty,
         output="screen",
-        parameters=[cca_${robot_name}_ros_setup],
+        parameters=[cca_${robot_name}_ros_setup, 
+        {"robot_description": robot_description_content}, # used if robot is built from urdf for CCA
+                    ],
     )
 
-    ld.add_action(cc_affordance_planner_ros_node_with_params)
+    ld.add_action(cca_${robot_name}_node_with_params)
     return ld
 EOF
 
+# In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
+sed -i "s/\${robot_name}/$robot_name/g" \
+    $package_name/launch/cca_${robot_name}.launch.py
+
 # Create the action server launch file
-cat << EOF > $package_name/launch/cca_${robot_name}_action_server.launch.py
-import os
-from ament_index_python.packages import get_package_share_directory
+cat << 'EOF' > $package_name/launch/cca_${robot_name}_action_server.launch.py
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+import os
+
+from launch.substitutions import Command, PathJoinSubstitution
+from launch_ros.descriptions import ParameterValue            
+from launch_ros.substitutions import FindPackageShare         
+
+def generate_robot_description_content():
+    """
+    Generates robot description utilizing launch args
+
+    Returns:
+        - robot_description_content: The robot description generated from the xacro file.
+        - launch_args: List of DeclareLaunchArgument objects used to configure the xacro.
+
+    """
+    # Launch args needed to build the robot description 
+    launch_args = [
+        # Example (uncomment later if needed):
+        # DeclareLaunchArgument(
+        #     "has_arm",
+        #     default_value="false",
+        #     description="add arm to the robot if true",
+        # ),
+    ]
+
+    # Collect arg names from declared launch args
+    launch_arg_names = [arg.name for arg in launch_args]
+
+    # Pass launch args as xacro parameters
+    xacro_command_args = [
+        elem
+        for arg_name in launch_arg_names
+        for elem in (f"{arg_name}:=", LaunchConfiguration(arg_name))
+    ]
+
+    xacro_path = PathJoinSubstitution([
+    # Uncomment and/or adjust as needed
+    #   FindPackageShare("${robot_name}_description"),
+    #   "urdf",
+    #   "${robot_name}.urdf.xacro",
+    ])
+
+    robot_description_content = ParameterValue(
+        Command(["xacro ", xacro_path, *xacro_command_args]),
+        value_type=str,
+    )
+
+    return robot_description_content, launch_args
 
 def generate_launch_description():
+    """
+    Generates the launch description for the cca_ros_action_${robot_name} node.
+    """
     ld = LaunchDescription()
 
     ld.add_action(DeclareLaunchArgument(
@@ -207,20 +318,31 @@ def generate_launch_description():
         "'", debug, "' == 'true'"
     ])
 
-    # Create a Node instance for the cca_${robot_name} node
-    cc_affordance_planner_ros_node_with_params = Node(
+    # Get robot description and any associated launch args
+    robot_description_content, robot_description_launch_args = generate_robot_description_content()
+    for arg in robot_description_launch_args:
+        ld.add_action(arg)
+
+    # Create a Node instance for the cca_ros_action_${robot_name} node
+    cca_ros_action_node_with_params = Node(
         package="cca_ros_action",
         executable="cca_ros_action_node",
-        name="cc_affordance_planner_ros",
+        name="cca_ros_action_${robot_name}",
         prefix=[node_prefix],
         emulate_tty=emulate_tty,
         output="screen",
-        parameters=[cca_${robot_name}_ros_setup],
+        parameters=[cca_${robot_name}_ros_setup, 
+        {"robot_description": robot_description_content}, # used if robot is built from urdf for CCA
+                    ],
     )
 
-    ld.add_action(cc_affordance_planner_ros_node_with_params)
+    ld.add_action(cca_ros_action_node_with_params)
     return ld
 EOF
+
+# In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
+sed -i "s/\${robot_name}/$robot_name/g" \
+    $package_name/launch/cca_${robot_name}_action_server.launch.py
 
 # Create the visualization server/RVIZ plugin launch file
 cat << 'EOF' > $package_name/launch/cca_${robot_name}_viz.launch.py
@@ -254,15 +376,46 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import (Command, FindExecutable, LaunchConfiguration,
                                   PathJoinSubstitution)
 
-
 def generate_robot_description_content():
     """
-    Generates the robot_description_content, which contains the robot's URDF.
+    Generates robot description utilizing launch args
 
     Returns:
         - robot_description_content: The robot description generated from the xacro file.
-        - launch_args: Launch arguments needed to extract the robot description.
+        - launch_args: List of DeclareLaunchArgument objects used to configure the xacro.
+
     """
+    # Launch args needed to build the robot description 
+    launch_args = [
+        # Example (uncomment later if needed):
+        # DeclareLaunchArgument(
+        #     "has_arm",
+        #     default_value="false",
+        #     description="add arm to the robot if true",
+        # ),
+    ]
+
+    # Collect arg names from declared launch args
+    launch_arg_names = [arg.name for arg in launch_args]
+
+    # Pass launch args as xacro parameters
+    xacro_command_args = [
+        elem
+        for arg_name in launch_arg_names
+        for elem in (f"{arg_name}:=", LaunchConfiguration(arg_name))
+    ]
+
+    xacro_path = PathJoinSubstitution([
+    # Uncomment and/or adjust as needed
+    #   FindPackageShare("${robot_name}_description"),
+    #   "urdf",
+    #   "${robot_name}.urdf.xacro",
+    ])
+
+    robot_description_content = ParameterValue(
+        Command(["xacro ", xacro_path, *xacro_command_args]),
+        value_type=str,
+    )
 
     return robot_description_content, launch_args
 
@@ -275,6 +428,20 @@ def generate_robot_description_semantic_content():
     Returns:
         - robot_description_semantic_content: The semantic robot description loaded from the SRDF file.
     """
+    robot_description_semantic_path = os.path.join(
+    # Uncomment and/or adjust as needed
+    #   get_package_share_directory("${robot_name}_moveit_config"),
+    #   "config",
+    #   "${robot_name}.srdf",
+    )
+
+    # Load the SRDF content from the file
+    try:
+        with open(robot_description_semantic_path, "r") as srdf_file:
+            robot_description_semantic_content = srdf_file.read()
+    except FileNotFoundError:
+        raise RuntimeError(f"SRDF file not found: {robot_description_semantic_path}")
+
 
     return robot_description_semantic_content
 
@@ -338,11 +505,11 @@ def generate_launch_description():
                 output="screen",
                 parameters=[robot_description, use_sim_time],
             ),
-            # Launch cca_ros_viz node
+            # Launch cca_ros_viz_${robot_name} node
             launch_ros.actions.Node(
                 package="cca_ros_viz",
                 executable="cca_ros_viz_node",
-                name="cca_ros_viz",
+                name="cca_ros_viz_${robot_name}",
                 output="screen",
                 parameters=[
                     robot_description,
