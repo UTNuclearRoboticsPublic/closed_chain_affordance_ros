@@ -17,25 +17,42 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 
     const std::string joint_states_topic = this->declare_parameter("cca_joint_states_topic", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
     const std::string robot_name = this->declare_parameter("cca_robot", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+    const std::string build_robot_from = this->declare_parameter("cca_build_robot_from", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+
+    if (build_robot_from != "yaml" && build_robot_from != "urdf") {
+    	RCLCPP_ERROR(node_logger_, "Invalid value for the [cca_build_robot_from] parameter: %s. Possible options are yaml or urdf", build_robot_from.c_str());
+    }
 
     // Get the path for robot configuration file
     const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name);
 
+    affordance_util::RobotConfig robotConfig;
+
+
     // Load robot configuration
-    try
-    {
-        const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
-        robot_slist_ = robotConfig.Slist;                         // Robot screw axes
-        M_ = robotConfig.M;                                       // Home configuration matrix
-        ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
-        tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
-        robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
-        gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
+    try{
+
+	if (build_robot_from=="yaml"){
+	    robotConfig = affordance_util::robot_builder(robot_config_file_path);
+	}
+	else { // "urdf"
+	    const affordance_util::RobotConfig &urdfConfig = affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
+	    const std::string robot_description = this->declare_parameter("robot_description", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+	    robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
+	}
+
     }
-    catch (const std::exception &e)
-    {
-        RCLCPP_ERROR(node_logger_, "Exception while building robot configuration: %s", e.what());
+    catch (const std::exception &e){
+	RCLCPP_ERROR(node_logger_, "Exception while building robot configuration: %s", e.what());
     }
+
+    // Extract necessary info from robot config
+    robot_slist_ = robotConfig.Slist;                         // Robot screw axes
+    M_ = robotConfig.M;                                       // Home configuration matrix
+    ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
+    tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
+    robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
+    gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
 
     // Initialize service/action clients and subscribers
     viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
