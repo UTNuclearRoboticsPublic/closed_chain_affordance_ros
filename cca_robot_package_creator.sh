@@ -91,6 +91,9 @@ cat << EOF > $package_name/config/cca_${robot_name}_ros_setup.yaml
 
     # --- Joint states topic ---
     cca_joint_states_topic: # Topic to read joint states from
+
+    # --- How to build the robot ---
+    cca_build_robot_from: # Possible values are "yaml" or "urdf"
 EOF
 
 # Create the ROS Viz setup file
