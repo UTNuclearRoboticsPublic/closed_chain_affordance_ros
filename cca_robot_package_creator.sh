@@ -369,6 +369,10 @@ def generate_launch_description():
     )
 EOF
 
+# In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
+sed -i "s/\${robot_name}/$robot_name/g" \
+    $package_name/launch/cca_${robot_name}_viz.launch.py
+
 # Create the affordance planner src file
 cat << EOF > $package_name/src/cca_${robot_name}_node.cpp
 /*************************************/
@@ -521,21 +525,21 @@ find_package(affordance_util REQUIRED)
 find_package(cc_affordance_planner REQUIRED)
 
 # Specify the node executables
-add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
+add_executable(\${PROJECT_NAME}_node src/\${PROJECT_NAME}_node.cpp)
 
 # Specify ROS dependencies for the target
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp cca_ros)
+ament_target_dependencies(\${PROJECT_NAME}_node rclcpp cca_ros)
 
 # Link Eigen libraries against this project library
-target_link_libraries(${PROJECT_NAME}_node affordance_util::affordance_util cc_affordance_planner::cc_affordance_planner Eigen3::Eigen)
+target_link_libraries(\${PROJECT_NAME}_node affordance_util::affordance_util cc_affordance_planner::cc_affordance_planner Eigen3::Eigen)
 
 install(TARGETS
-  ${PROJECT_NAME}_node
-  DESTINATION lib/${PROJECT_NAME}
+  \${PROJECT_NAME}_node
+  DESTINATION lib/\${PROJECT_NAME}
 )
 
 install(DIRECTORY config launch
-  DESTINATION share/${PROJECT_NAME}
+  DESTINATION share/\${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
