@@ -37,7 +37,15 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 	}
 	else { // "urdf"
 	    const affordance_util::RobotConfig &urdfConfig = affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
-	    const std::string robot_description = this->declare_parameter("robot_description", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+
+	    std::string robot_description;
+	    try{
+	    	robot_description = this->declare_parameter("robot_description", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+	       }
+            catch (const std::exception &e){
+	        RCLCPP_ERROR(node_logger_, "Exception while loading robot_description param: %s", e.what());
+	       }
+
 	    robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
 	}
 
