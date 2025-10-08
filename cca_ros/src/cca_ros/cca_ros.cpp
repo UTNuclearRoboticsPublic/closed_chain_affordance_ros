@@ -178,8 +178,8 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
         const std::vector<Eigen::Matrix4d> se3_screw_path = affordance_util::compute_se3_screw_trajectory(task_description.affordance_info, task_description.goal.affordance, task_description.trajectory_density, fk);
         
         // Generate task descriptions from se3_screw_traj
-        bool parameterize_linearly = true;
-        const std::vector<cc_affordance_planner::TaskDescription> task_descriptions = cc_affordance_planner::get_se3_screw_tasks(se3_screw_path, parameterize_linearly);
+        bool preserve_orientation = true;
+        const std::vector<cc_affordance_planner::TaskDescription> task_descriptions = cc_affordance_planner::get_se3_screw_tasks(se3_screw_path, preserve_orientation);
         
         reqs.task_description = task_descriptions;
         
