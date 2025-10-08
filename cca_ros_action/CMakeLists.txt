@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project(cca_ros_action)
 
-# Set C++ standard to 17
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard to 20
+set(CMAKE_CXX_STANDARD 20)
 
 # Enable stricter warnings for GCC and Clang compilers
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -29,9 +29,12 @@ include_directories(
 )
 
 # Create a library target for this package
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/${PROJECT_NAME}/${PROJECT_NAME}.cpp  # Source file for the library
 )
+
+# Ensure position-independent code for shared library -- Most compilers already do this for shared libraries but it is good practice to specify explicitly
+set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 # Specify ROS dependencies
 ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp rclcpp_action cca_ros cca_ros_util cca_ros_msgs)

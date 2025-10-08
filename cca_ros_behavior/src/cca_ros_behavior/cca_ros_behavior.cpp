@@ -8,16 +8,7 @@ CcaRosAction::CcaRosAction(const std::string &name, const BT::NodeConfig &config
 {
     // Spin this node in a separate thread to handle ROS communication
     node_ = std::make_shared<cca_ros::CcaRos>(name, node_options);
-    spinner_thread_ = std::thread([this]() { rclcpp::spin(node_); });
-}
-
-CcaRosAction::~CcaRosAction()
-{
-    // Cleanup spinner thread
-    if (spinner_thread_.joinable())
-    {
-        spinner_thread_.join();
-    }
+    spinner_thread_ = std::jthread([this]() { rclcpp::spin(node_); });
 }
 
 BT::PortsList CcaRosAction::providedPorts()

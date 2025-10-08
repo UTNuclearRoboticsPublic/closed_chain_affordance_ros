@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project(cca_ros_util)
 
-# Set C++ standard to 17
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard to 20
+set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

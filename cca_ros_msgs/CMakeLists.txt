@@ -26,6 +26,7 @@ set(msg_files
   "msg/UpdateMethod.msg"
   "msg/VirtualScrewOrder.msg"
   "msg/PlanningRequest.msg"
+  "msg/EeOrientationConstraint.msg"
 )
 
 set(srv_files

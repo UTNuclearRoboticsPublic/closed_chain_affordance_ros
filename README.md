@@ -2,14 +2,24 @@
 
 This repository provides robot-agnostic ROS2 packages that interface the [Closed-Chain Affordance(CCA) planner](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git) with robotic systems. The CCA planner offers an intuitive approach to planning joint trajectories for robot manipulation tasks that can be thought of as linear, rotational, or screw motions. Defining a task is as simple as specifying an axis, location, and pitch (if applicable). Additionally, it provides the capability to control the end-effector's orientation along the task path.
 
+# Requirements
+- `C++20`
+- `ROS Humble`
+
 ## Core Dependencies
 
 - `affordance_util` and `cc_affordance_planner` packages from the [Closed-Chain Affordance repository](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
 
-### Optional Dependencies
+### Optional Notable Dependencies
 - `moveit`: For self-collision checking
 - `moveit_visual_tools`: For visualization of joint movement
 - `behaviortree_cpp`: To utilize the CCA Behavior Tree action node
+Install as `sudo apt install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-behaviortree-cpp`
+  
+With ROS sourced, you may install the optional dependencies with:
+ ```bash
+sudo apt install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-behaviortree-cpp
+```
 
 ## Build Instructions
 

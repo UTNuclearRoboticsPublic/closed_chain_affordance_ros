@@ -38,6 +38,7 @@
 #include <affordance_util/affordance_util.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
+#include <cc_affordance_planner/cc_affordance_planner_util.hpp>
 #include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
 #include <cmath>
@@ -79,16 +80,27 @@ enum Status
 };
 
 /**
+ * @brief Struct to hold timesteps for the trajectory
+ */
+struct TrajectoryTimeStep {
+    double robot = 0.3; // seconds
+    double gripper = 0.2; // seconds 
+    double robot_and_gripper = 0.3; // seconds
+};
+
+/**
  * @brief Struct containing planning request for the CCA ROS planner
  */
 struct PlanningRequest
 {
+
     cc_affordance_planner::PlannerConfig planner_config = cc_affordance_planner::PlannerConfig();
     cc_affordance_planner::TaskDescription task_description;
     KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
     bool visualize_trajectory = true;
     bool execute_trajectory = false;
+    TrajectoryTimeStep time_step;
 };
 
 /**
@@ -102,6 +114,7 @@ struct PlanningRequests
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
     bool visualize_trajectory = true;
     bool execute_trajectory = false;
+    TrajectoryTimeStep time_step; //TODO: We may wanna have different time steps per task_description, maybe its better to have this be a member of task description instead
 };
 
 /**
@@ -162,11 +175,6 @@ class CcaRos : public rclcpp::Node
     bool plan_visualize_and_execute(const cca_ros::PlanningRequests &planning_requests);
 
     /**
-     * @brief Joins and cleans up status-checking thread
-     */
-    void cleanup_threads();
-
-    /**
      * @brief Cancels trajectory execution on robot
      */
     void cancel_execution();
@@ -176,7 +184,7 @@ class CcaRos : public rclcpp::Node
     std::shared_ptr<Status> robot_result_status_ = {nullptr}; ///< Current status of robot trajectory execution result
     std::shared_ptr<Status> gripper_result_status_ = {
         nullptr};                      ///< Current status of gripper trajectory execution result
-    std::thread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
+    std::jthread result_status_thread_; ///< Thread to check the status of robot and gripper trajectory results
     std::mutex status_mutex_;          ///< Mutex to protect access to status_
     rclcpp::Logger node_logger_;       ///< Node-specific logger
     std::string viz_ss_name_;          ///< Name of the plan and visualization server
@@ -341,7 +349,7 @@ class CcaRos : public rclcpp::Node
      * together. Robot msg is always returned. Other two are conditional.
      */
     std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
-        const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory);
+        const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step);
 
     /**
      * @brief Given a robot joint trajectory computes the corresponding cartesian trajectory that the robot tool will

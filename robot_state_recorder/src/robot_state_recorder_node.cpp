@@ -51,9 +51,9 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         // Extract robot config info
         const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
         slist_ = robotConfig.Slist;
-        joint_names_ = robotConfig.joint_names;
+        joint_names_ = robotConfig.joint_names.robot;
         M_ = robotConfig.M;
-        tool_name_ = robotConfig.tool_name;
+        tool_name_ = robotConfig.frame_names.tool;
 
         // Concurrently, while writing predicted data, we'll write actual data as
         // well, because while predicted data is being written, action server is

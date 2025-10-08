@@ -51,6 +51,9 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
     // Convert gripper_goal_type enum
     req.task_description.gripper_goal_type = gripper_goal_type_from_msg(msg.task_description.gripper_goal_type.value);
 
+    // Convert ee_orientation_constraint enum
+    req.task_description.ee_orientation_constraint = ee_orientation_constraint_from_msg(msg.task_description.ee_orientation_constraint.value);
+
     // Convert KinematicState (robot and gripper)
     req.start_state.robot = Eigen::VectorXd::Map(msg.start_state.robot.data(), msg.start_state.robot.size());
     req.start_state.gripper = msg.start_state.gripper;
@@ -117,6 +120,9 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
 
     // Convert gripper_goal_type enum
     msg.task_description.gripper_goal_type.value = gripper_goal_type_to_msg(req.task_description.gripper_goal_type);
+
+    // Convert ee_orientation_constraint enum
+    msg.task_description.ee_orientation_constraint.value = ee_orientation_constraint_to_msg(req.task_description.ee_orientation_constraint);
 
     // Convert KinematicState (robot and gripper)
     msg.start_state.robot =
@@ -228,6 +234,18 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
         }
     };
 
+    auto eeOrientationConstraintToString = [](cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint) {
+        switch (ee_orientation_constraint)
+        {
+	case cc_affordance_planner::EeOrientationConstraint::DEFAULT:
+            return "DEFAULT";
+	case cc_affordance_planner::EeOrientationConstraint::PRESERVE:
+            return "PRESERVE";
+        default:
+            return "UNKNOWN";
+        }
+    };
+
     // Planner Config
     log << "Planner Config:\n";
     log << "  Accuracy: " << req.planner_config.accuracy << "\n";
@@ -259,6 +277,7 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "  Motion Type: " << motionTypeToString(req.task_description.motion_type) << "\n";
     log << "  Virtual Screw Order: " << virtualScrewOrderToString(req.task_description.vir_screw_order) << "\n";
     log << "  Gripper Goal Type: " << gripperGoalTypeToString(req.task_description.gripper_goal_type) << "\n";
+    log << "  Ee Orientation Constraint: " << eeOrientationConstraintToString(req.task_description.ee_orientation_constraint) << "\n";
 
     // Start State
     log << "Start State:\n";
@@ -373,6 +392,19 @@ affordance_util::VirtualScrewOrder virtual_screw_order_from_msg(uint8_t virtual_
     }
 }
 
+cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint_from_msg(uint8_t ee_orientation_constraint)
+{
+    switch (ee_orientation_constraint)
+    {
+    case 1:
+        return cc_affordance_planner::EeOrientationConstraint::PRESERVE;
+    case 0:
+        return cc_affordance_planner::EeOrientationConstraint::DEFAULT;
+    default:
+        throw std::invalid_argument("Invalid EeOrientationConstraint enum value for conversion.");
+    }
+}
+
 uint8_t update_method_to_msg(cc_affordance_planner::UpdateMethod update_method)
 {
     switch (update_method)
@@ -468,5 +500,19 @@ uint8_t virtual_screw_order_to_msg(affordance_util::VirtualScrewOrder virtual_sc
         throw std::invalid_argument("Invalid AffordanceUtil VirtualScrewOrder enum value for conversion.");
     }
 }
+
+uint8_t ee_orientation_constraint_to_msg(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint)
+{
+    switch (ee_orientation_constraint)
+    {
+    case cc_affordance_planner::EeOrientationConstraint::PRESERVE:
+        return static_cast<uint8_t>(cca_ros_msgs::msg::EeOrientationConstraint::PRESERVE);
+    case cc_affordance_planner::EeOrientationConstraint::DEFAULT:
+        return static_cast<uint8_t>(cca_ros_msgs::msg::EeOrientationConstraint::DEFAULT);
+    default:
+        throw std::invalid_argument("Invalid EeOrientationConstraint enum value for conversion.");
+    }
+}
+
 
 } // namespace

@@ -38,11 +38,6 @@ class CcaRosAction : public BT::StatefulActionNode
                  const rclcpp::NodeOptions &node_options = rclcpp::NodeOptions());
 
     /**
-     * @brief Destructor for the CcaRosAction class.
-     */
-    ~CcaRosAction();
-
-    /**
      * @brief Returns the list of ports required by this action node.
      *
      * This action node requires one of the following input ports:
@@ -75,7 +70,7 @@ class CcaRosAction : public BT::StatefulActionNode
 
   private:
     std::shared_ptr<cca_ros::CcaRos> node_;                         /**< Node for ROS communication */
-    std::thread spinner_thread_;                                    /**< Thread to spin the node. */
+    std::jthread spinner_thread_;                                    /**< Thread to spin the node. */
     std::shared_ptr<cca_ros::Status> status_{nullptr};              /**< To check the status of the CCA action. */
     std::chrono::time_point<std::chrono::steady_clock> start_time_; /**< To monitor the timeout. */
     static constexpr int timeout_ = 60; /**< Timeout duration for the CCA action (in seconds). */

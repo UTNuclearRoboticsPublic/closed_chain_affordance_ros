@@ -34,91 +34,150 @@ rm -rf $package_name/include
 cat << EOF > $package_name/config/cca_${robot_name}_description.yaml
 # **Description of the ${robot_name} robot
 # Define the reference frame, joint axes, their locations, and the tool's position.
-# Add or remove joint fields as needed to accurately represent the robot
+# Add or remove joint fields as needed to accurately represent the robot.
 ref_frame:
-  - name: # Reference frame name, example: arm0_base_link
+  - name: # Example: arm0_base_link
 
 robot_joints:
-  - name: # Joint name, example: arm0_shoulder_yaw
-    w: # Joint axis, example: [0, 0, 1]
-    q: # Joint location, example: [0, 0, 0]
+  - name: # Example: arm0_shoulder_roll 
+    w: # Example: [0, 0, 1]
+    q: # Example: [0, 0, 0]
 
-  - name:
-    w:
-    q:
+  - name: 
+    w: 
+    q: 
 
-  - name:
-    w:
-    q:
+  - name: 
+    w: 
+    q: 
 
-  - name:
-    w:
-    q:
+  - name: 
+    w: 
+    q: 
 
-  - name:
-    w:
-    q:
+  - name: 
+    w: 
+    q: 
 
-  - name:
-    w:
-    q:
+  - name: 
+    w: 
+    q: 
 
-gripper_joint:
- - name: # name of the gripper joint
+end_effector:
+  - gripper_joint_name: 
+    frame_name: # This will be the parent frame for the tool
+    q: 
 
 tool:
-  - name: # Tool frame name, example: arm0_tool0. This is usually at the center of the palm
-    q: # Tool frame location, example: [0.9383, 0.0005, 0.0664]
+  - name: # This is usually at the center of the palm
+    offset_from_ee_frame: # Tool location from EE frame
 EOF
 
 # Create the ROS setup file
 cat << EOF > $package_name/config/cca_${robot_name}_ros_setup.yaml
 # *** ROS-related attributes pertaining to ${robot_name} *** #
 
-cc_affordance_planner_ros:
+/**:
   ros__parameters:
     # --- Robot Name ---
-    cca_robot: "${robot_name}" # This package must be named cca_<cca_robot>
+    cca_robot: "${robot_name}" # Robot name. This package must be named cca_${robot_name}
 
-    # --- Action Server ---
-    cca_robot_as: "" # Follow joint trajectory action server to execute trajectory on the robot
+    # --- Action Servers - follow_joint_trajectory types---
+    cca_robot_as: # To execute joint trajectory on the robot
 
-    cca_gripper_as: "" # Optionally if available, Follow joint trajectory action server to execute gripper trajectory
+    # cca_gripper_as: # To execute gripper trajectory on the robot. Goal will be sent simultaneously with the robot trajectory but separately. #Optional
 
-    cca_robot_and_gripper_as: "" # Optionally if available, Follow joint trajectory action server to execute robot and gripper trajectory together
+    # cca_robot_and_gripper_as: # To execute robot and gripper trajectory together on the robot. One unified trajectory is sent. #Optional
 
-    # --- Topics ---
-    cca_joint_states_topic: "" # Joint states topic name
+    # --- Joint states topic ---
+    cca_joint_states_topic: # Topic to read joint states from
+
+    # --- How to build the robot ---
+    cca_build_robot_from: # Possible values are "yaml" or "urdf"
 EOF
 
 # Create the ROS Viz setup file
 cat << EOF > $package_name/config/cca_${robot_name}_ros_viz_setup.yaml
-# *** ROS-related attributes pertaining to ${robot_name} for visualization of joint trajectories*** #
+# *** ROS-related attributes pertaining to ${robot_name} for visualization of joint trajectories *** #
 
-/**: # to enable parameter usage across different nodes
+/**:
   ros__parameters:
 
-    joint_states_topic: "" # Joint states topic name
+    joint_states_topic: # Joint states topic name. Example: "robot_driver/joint_states"
 
-    planning_group: "" # MoveIt planning group name
+    planning_group: # MoveIt planning group name
 
-    ref_frame: "" # Default frame where the CCA planning plugin will show the screw interactive marker
+    ref_frame: # Default frame where the CCA planning plugin will show the screw interactive marker
 
-    tool_frame: "" # Frame that follows the screw path for planning purposes
+    ee_frame: # End-effector frame
 
-    rviz_fixed_frame: "" # Base frame from the urdf
+    tool_frame: # Frame that follows the screw path for planning purposes
+
+    ee_to_tool_offset: # Location of the tool in the EE frame. Example: [0.07805, 0.0008, -0.01772] 
+
+    rviz_fixed_frame: # Base frame from the urdf
 EOF
 
 # Create the task execution launch file
-cat << EOF > $package_name/launch/cca_${robot_name}.launch.py
-import os
-from ament_index_python.packages import get_package_share_directory
+cat << 'EOF' > $package_name/launch/cca_${robot_name}.launch.py
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+import os
+
+from launch.substitutions import Command, PathJoinSubstitution
+from launch_ros.descriptions import ParameterValue            
+from launch_ros.substitutions import FindPackageShare         
+
+def generate_robot_description_content():
+    """
+    Generates robot description utilizing launch args
+
+    Returns:
+        - robot_description_content: The robot description generated from the xacro file.
+        - launch_args: List of DeclareLaunchArgument objects used to configure the xacro.
+
+    """
+    # Launch args needed to build the robot description 
+    launch_args = [
+        # Example (uncomment later if needed):
+        # DeclareLaunchArgument(
+        #     "has_arm",
+        #     default_value="false",
+        #     description="add arm to the robot if true",
+        # ),
+    ]
+
+    # Collect arg names from declared launch args
+    launch_arg_names = [arg.name for arg in launch_args]
+
+    # Pass launch args as xacro parameters
+    xacro_command_args = [
+        elem
+        for arg_name in launch_arg_names
+        for elem in (f"{arg_name}:=", LaunchConfiguration(arg_name))
+    ]
+
+    xacro_path = PathJoinSubstitution([
+    # Uncomment and/or adjust as needed
+    #   FindPackageShare("${robot_name}_description"),
+    #   "urdf",
+    #   "${robot_name}.urdf.xacro",
+    ])
+
+    robot_description_content = ParameterValue(
+        Command(["xacro ", xacro_path, *xacro_command_args]),
+        value_type=str,
+    )
+
+    return robot_description_content, launch_args
 
 def generate_launch_description():
+    """
+    Generate the launch description for the cca_${robot_name} node.
+    """
     ld = LaunchDescription()
 
     ld.add_action(DeclareLaunchArgument(
@@ -146,31 +205,92 @@ def generate_launch_description():
         "'", debug, "' == 'true'"
     ])
 
+    # Get robot description and any associated launch args
+    robot_description_content, robot_description_launch_args = generate_robot_description_content()
+    for arg in robot_description_launch_args:
+        ld.add_action(arg)
+
     # Create a Node instance for the cca_${robot_name} node
-    cc_affordance_planner_ros_node_with_params = Node(
+    cca_${robot_name}_node_with_params = Node(
         package="cca_${robot_name}",
         executable="cca_${robot_name}_node",
-        name="cc_affordance_planner_ros",
+        name="cca_${robot_name}",
         prefix=[node_prefix],
         emulate_tty=emulate_tty,
         output="screen",
-        parameters=[cca_${robot_name}_ros_setup],
+        parameters=[cca_${robot_name}_ros_setup, 
+        {"robot_description": robot_description_content}, # used if robot is built from urdf for CCA
+                    ],
     )
 
-    ld.add_action(cc_affordance_planner_ros_node_with_params)
+    ld.add_action(cca_${robot_name}_node_with_params)
     return ld
 EOF
 
+# In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
+sed -i "s/\${robot_name}/$robot_name/g" \
+    $package_name/launch/cca_${robot_name}.launch.py
+
 # Create the action server launch file
-cat << EOF > $package_name/launch/cca_${robot_name}_action_server.launch.py
-import os
-from ament_index_python.packages import get_package_share_directory
+cat << 'EOF' > $package_name/launch/cca_${robot_name}_action_server.launch.py
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+import os
+
+from launch.substitutions import Command, PathJoinSubstitution
+from launch_ros.descriptions import ParameterValue            
+from launch_ros.substitutions import FindPackageShare         
+
+def generate_robot_description_content():
+    """
+    Generates robot description utilizing launch args
+
+    Returns:
+        - robot_description_content: The robot description generated from the xacro file.
+        - launch_args: List of DeclareLaunchArgument objects used to configure the xacro.
+
+    """
+    # Launch args needed to build the robot description 
+    launch_args = [
+        # Example (uncomment later if needed):
+        # DeclareLaunchArgument(
+        #     "has_arm",
+        #     default_value="false",
+        #     description="add arm to the robot if true",
+        # ),
+    ]
+
+    # Collect arg names from declared launch args
+    launch_arg_names = [arg.name for arg in launch_args]
+
+    # Pass launch args as xacro parameters
+    xacro_command_args = [
+        elem
+        for arg_name in launch_arg_names
+        for elem in (f"{arg_name}:=", LaunchConfiguration(arg_name))
+    ]
+
+    xacro_path = PathJoinSubstitution([
+    # Uncomment and/or adjust as needed
+    #   FindPackageShare("${robot_name}_description"),
+    #   "urdf",
+    #   "${robot_name}.urdf.xacro",
+    ])
+
+    robot_description_content = ParameterValue(
+        Command(["xacro ", xacro_path, *xacro_command_args]),
+        value_type=str,
+    )
+
+    return robot_description_content, launch_args
 
 def generate_launch_description():
+    """
+    Generates the launch description for the cca_ros_action_${robot_name} node.
+    """
     ld = LaunchDescription()
 
     ld.add_action(DeclareLaunchArgument(
@@ -198,23 +318,34 @@ def generate_launch_description():
         "'", debug, "' == 'true'"
     ])
 
-    # Create a Node instance for the cca_${robot_name} node
-    cc_affordance_planner_ros_node_with_params = Node(
+    # Get robot description and any associated launch args
+    robot_description_content, robot_description_launch_args = generate_robot_description_content()
+    for arg in robot_description_launch_args:
+        ld.add_action(arg)
+
+    # Create a Node instance for the cca_ros_action_${robot_name} node
+    cca_ros_action_node_with_params = Node(
         package="cca_ros_action",
         executable="cca_ros_action_node",
-        name="cc_affordance_planner_ros",
+        name="cca_ros_action_${robot_name}",
         prefix=[node_prefix],
         emulate_tty=emulate_tty,
         output="screen",
-        parameters=[cca_${robot_name}_ros_setup],
+        parameters=[cca_${robot_name}_ros_setup, 
+        {"robot_description": robot_description_content}, # used if robot is built from urdf for CCA
+                    ],
     )
 
-    ld.add_action(cc_affordance_planner_ros_node_with_params)
+    ld.add_action(cca_ros_action_node_with_params)
     return ld
 EOF
 
+# In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
+sed -i "s/\${robot_name}/$robot_name/g" \
+    $package_name/launch/cca_${robot_name}_action_server.launch.py
+
 # Create the visualization server/RVIZ plugin launch file
-cat << EOF > $package_name/launch/cca_${robot_name}_viz.launch.py
+cat << 'EOF' > $package_name/launch/cca_${robot_name}_viz.launch.py
 """
 Author: Crasun Jans
 
@@ -245,17 +376,47 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import (Command, FindExecutable, LaunchConfiguration,
                                   PathJoinSubstitution)
 
-
 def generate_robot_description_content():
     """
-    Generates the robot_description_content, which contains the robot's URDF.
+    Generates robot description utilizing launch args
 
     Returns:
         - robot_description_content: The robot description generated from the xacro file.
-        - launch_args: Launch arguments needed to extract the robot description.
-    """
+        - launch_args: List of DeclareLaunchArgument objects used to configure the xacro.
 
-    #--COMPLETE THIS FUNCTION--#
+    """
+    # Launch args needed to build the robot description 
+    launch_args = [
+        # Example (uncomment later if needed):
+        # DeclareLaunchArgument(
+        #     "has_arm",
+        #     default_value="false",
+        #     description="add arm to the robot if true",
+        # ),
+    ]
+
+    # Collect arg names from declared launch args
+    launch_arg_names = [arg.name for arg in launch_args]
+
+    # Pass launch args as xacro parameters
+    xacro_command_args = [
+        elem
+        for arg_name in launch_arg_names
+        for elem in (f"{arg_name}:=", LaunchConfiguration(arg_name))
+    ]
+
+    xacro_path = PathJoinSubstitution([
+    # Uncomment and/or adjust as needed
+    #   FindPackageShare("${robot_name}_description"),
+    #   "urdf",
+    #   "${robot_name}.urdf.xacro",
+    ])
+
+    robot_description_content = ParameterValue(
+        Command(["xacro ", xacro_path, *xacro_command_args]),
+        value_type=str,
+    )
+
     return robot_description_content, launch_args
 
 
@@ -267,10 +428,22 @@ def generate_robot_description_semantic_content():
     Returns:
         - robot_description_semantic_content: The semantic robot description loaded from the SRDF file.
     """
+    robot_description_semantic_path = os.path.join(
+    # Uncomment and/or adjust as needed
+    #   get_package_share_directory("${robot_name}_moveit_config"),
+    #   "config",
+    #   "${robot_name}.srdf",
+    )
 
-    #--COMPLETE THIS FUNCTION--#
+    # Load the SRDF content from the file
+    try:
+        with open(robot_description_semantic_path, "r") as srdf_file:
+            robot_description_semantic_content = srdf_file.read()
+    except FileNotFoundError:
+        raise RuntimeError(f"SRDF file not found: {robot_description_semantic_path}")
+
+
     return robot_description_semantic_content
-
 
 def extract_cca_ros_viz_setup_params():
     """
@@ -281,11 +454,12 @@ def extract_cca_ros_viz_setup_params():
     """
 
     cca_ros_viz_setup_params = os.path.join(
-        get_package_share_directory("cca_${robot_name}"), "config", "cca_${robot_name}_ros_viz_setup.yaml"
-    )
+        get_package_share_directory('cca_${robot_name}'),
+        'config',
+        'cca_${robot_name}_ros_viz_setup.yaml'
+        )
 
     return cca_ros_viz_setup_params
-
 
 def generate_launch_description():
     """
@@ -331,11 +505,11 @@ def generate_launch_description():
                 output="screen",
                 parameters=[robot_description, use_sim_time],
             ),
-            # Launch cca_ros_viz node
+            # Launch cca_ros_viz_${robot_name} node
             launch_ros.actions.Node(
                 package="cca_ros_viz",
                 executable="cca_ros_viz_node",
-                name="cca_ros_viz",
+                name="cca_ros_viz_${robot_name}",
                 output="screen",
                 parameters=[
                     robot_description,
@@ -362,8 +536,23 @@ def generate_launch_description():
     )
 EOF
 
+# In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
+sed -i "s/\${robot_name}/$robot_name/g" \
+    $package_name/launch/cca_${robot_name}_viz.launch.py
+
 # Create the affordance planner src file
 cat << EOF > $package_name/src/cca_${robot_name}_node.cpp
+/*************************************/
+// Author: Crasun Jans
+// Description:
+// This node enables users to plan, visualize, and execute robot joint trajectories for specified tasks. The planning
+// process utilizes the Closed-chain Affordance model, as described in the paper:
+// "A closed-chain approach to generating affordance joint trajectories for robotic manipulators."
+//
+// Usage Instructions:
+// 1. The framework requires only two inputs: planner configuration and task description. See repo README.md Task
+// Examples section for task-description examples.
+/*************************************/
 #include "rclcpp/rclcpp.hpp"
 #include <Eigen/Core>
 #include <affordance_util/affordance_util.hpp>
@@ -371,12 +560,12 @@ cat << EOF > $package_name/src/cca_${robot_name}_node.cpp
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros/cca_ros.hpp>
 #include <chrono>
+#include <thread>
 
-
- class CcaRobot: public cca_ros::CcaRos
+class CcaSpot : public cca_ros::CcaRos
 {
   public:
-    explicit CcaRobot(const std::string &node_name, const rclcpp::NodeOptions &node_options)
+    explicit CcaSpot(const std::string &node_name, const rclcpp::NodeOptions &node_options)
         : cca_ros::CcaRos(node_name, node_options)
     {
     }
@@ -432,13 +621,12 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
-    node_options.automatically_declare_parameters_from_overrides(true);
-    auto node = std::make_shared<CcaRobot>("cca_ros", node_options);
+    auto node = std::make_shared<CcaSpot>("cca_ros", node_options);
 
     RCLCPP_INFO(node->get_logger(), "CCA Planner is active");
 
     // Spin the node so joint states can be read
-    std::thread spinner_thread([node]() { rclcpp::spin(node); });
+    std::jthread spinner_thread([node]() { rclcpp::spin(node); });
 
     /// REQUIRED INPUT: Task description. For quick start, the following block provides an example task description to
     /// do a simple linear motion along the z-axis from the current robot configuration. Edit as needed. See this
@@ -473,11 +661,6 @@ int main(int argc, char **argv)
         rclcpp::shutdown();
     }
 
-    if (spinner_thread.joinable())
-    {
-        spinner_thread.join();
-    }
-
     rclcpp::shutdown();
     return 0;
 }
@@ -486,7 +669,12 @@ EOF
 # Create the CMakeLists file
 cat << EOF > $package_name/CMakeLists.txt
 cmake_minimum_required(VERSION 3.8)
+
 project(cca_${robot_name})
+
+# Set C++ standard to 20
+set(CMAKE_CXX_STANDARD 20)
+
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -504,21 +692,21 @@ find_package(affordance_util REQUIRED)
 find_package(cc_affordance_planner REQUIRED)
 
 # Specify the node executables
-add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
+add_executable(\${PROJECT_NAME}_node src/\${PROJECT_NAME}_node.cpp)
 
 # Specify ROS dependencies for the target
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp cca_ros)
+ament_target_dependencies(\${PROJECT_NAME}_node rclcpp cca_ros)
 
 # Link Eigen libraries against this project library
-target_link_libraries(${PROJECT_NAME}_node affordance_util::affordance_util cc_affordance_planner::cc_affordance_planner Eigen3::Eigen)
+target_link_libraries(\${PROJECT_NAME}_node affordance_util::affordance_util cc_affordance_planner::cc_affordance_planner Eigen3::Eigen)
 
 install(TARGETS
-  ${PROJECT_NAME}_node
-  DESTINATION lib/${PROJECT_NAME}
+  \${PROJECT_NAME}_node
+  DESTINATION lib/\${PROJECT_NAME}
 )
 
 install(DIRECTORY config launch
-  DESTINATION share/${PROJECT_NAME}
+  DESTINATION share/\${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
