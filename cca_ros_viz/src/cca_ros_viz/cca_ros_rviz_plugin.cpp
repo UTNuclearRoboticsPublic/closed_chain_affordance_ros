@@ -401,7 +401,6 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
         req.planner_config = advanced_settings_.planner_config;
         req.task_description.trajectory_density = advanced_settings_.task_description.trajectory_density;
         req.task_description.ee_orientation_constraint = advanced_settings_.task_description.ee_orientation_constraint;
-        RCLCPP_INFO(this->get_logger(), "EE orientation constraint applied");
         if (advanced_settings_.task_description.vir_screw_order
                 .has_value()) // Since the default for this is different for different planning types, we
                               // check if the user has specified a value before applying it. For all other settings, the
@@ -410,14 +409,6 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
             req.task_description.vir_screw_order = advanced_settings_.task_description.vir_screw_order.value();
         }
     }
-	if (req.task_description.ee_orientation_constraint==cc_affordance_planner::EeOrientationConstraint::DEFAULT){
-
-        RCLCPP_INFO(this->get_logger(), "Ee Orientation is default");
-	} 
-	else if (req.task_description.ee_orientation_constraint==cc_affordance_planner::EeOrientationConstraint::PRESERVE)
-	{
-        RCLCPP_INFO(this->get_logger(), "Ee Orientation is PRESERVE");
-	}
     return req;
 }
 
