@@ -160,6 +160,35 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
         gripper_start_config = state.gripper;
     }
 
+    // If asked to preserve EE/tool orientation, compute planning requests to do that
+    if (task_description.ee_orientation_constraint == cc_affordance_planner::EeOrientationConstraint::PRESERVE) {
+
+        RCLCPP_INFO_STREAM(node_logger_, "Building planning requests to preserve EE orientation");
+        cca_ros::PlanningRequests reqs;
+        reqs.status = planning_request.status; // Point to the original status pointer
+        
+        // Resize and fill planner_config with one from original req, resize task description
+        const int nof_reqs = task_description.trajectory_density - 1; // One less than the trajectory density since the first point in the trajectory is the current state of the robot
+        reqs.planner_config.assign(nof_reqs, planner_config);
+        reqs.task_description.resize(nof_reqs);
+        
+        // Discretize the screw path
+        // Compute forward kinematics to tool
+        const Eigen::Matrix4d fk = affordance_util::FKinSpace(M_,robot_slist_,robot_start_config);
+        const std::vector<Eigen::Matrix4d> se3_screw_path = affordance_util::compute_se3_screw_trajectory(task_description.affordance_info, task_description.goal.affordance, task_description.trajectory_density, fk);
+        
+        // Generate task descriptions from se3_screw_traj
+        bool parameterize_linearly = true;
+        const std::vector<cc_affordance_planner::TaskDescription> task_descriptions = cc_affordance_planner::get_se3_screw_tasks(se3_screw_path, parameterize_linearly);
+        
+        reqs.task_description = task_descriptions;
+        
+        RCLCPP_INFO_STREAM(node_logger_, "Calling CCA planner with planning requests that preserve EE orientation");
+        
+        // Plan, visualize, and execute the task descriptions to move along the se3_screw_path
+        return(this->plan_visualize_and_execute(reqs));
+    }
+
     // Prepare robot description for planning
     affordance_util::RobotDescription robot_description;
     robot_description.slist = robot_slist_;
