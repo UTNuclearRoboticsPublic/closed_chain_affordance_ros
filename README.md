@@ -14,7 +14,6 @@ This repository provides robot-agnostic ROS2 packages that interface the [Closed
 - `moveit`: For self-collision checking
 - `moveit_visual_tools`: For visualization of joint movement
 - `behaviortree_cpp`: To utilize the CCA Behavior Tree action node
-Install as `sudo apt install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-behaviortree-cpp`
   
 With ROS sourced, you may install the optional dependencies with:
  ```bash
@@ -23,21 +22,21 @@ sudo apt install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools 
 
 ## Build Instructions
 
-1. Clone the packages into your ROS2 workspace's `src` folder:
+1. Clone the packages into your ROS2 workspace's `src` folder, for example:
    ```bash
-   cd ~/<ros_workspace_name>/src
+   mkdir -p ~/ws_cca_ros/src && cd ~/ws_cca_ros/src
    git clone git@github.com:UTNuclearRoboticsPublic/closed_chain_affordance_ros.git
    ```
 
 2. Build and source the workspace:
    ```bash
-   cd ~/<ros_workspace_name>
+   cd ~/ws_cca_ros
    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
    source install/setup.bash
    ```
 ## Readily-Supported Robots
 
-An additional `cca_<robot>` package containing robot-specific information is required to launch the planner for a particular robot. Packages are currently available for the following robots, with links provided below. Creating a package for a new robot is straightforward and largely automated, as discussed in the [Implementing the Framework on a New Robot](#implementing-the-framework-on-a-new-robot) section.
+An additional `cca_<robot>` package containing robot-specific information is required to launch the planner for a particular robot. Packages are currently available for the following robots, with links provided below. Creating a package for a new robot is simple, quick, and largely automated, as discussed in the [Implementing the Framework on a New Robot](#implementing-the-framework-on-a-new-robot) section.
 - [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_spot.git)
 - [Kinova Gen3 7DoF arm](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_kinova_gen3_7dof.git)
 
@@ -51,18 +50,24 @@ A user-friendly Rviz plugin is also available and enables visual trajectory plan
 
 1. Use the package creator script:
    ```bash
-   cd ~/<ros_workspace_name>/src/closed_chain_affordance_ros
+   cd ~/ws_cca_ros/src/closed_chain_affordance_ros
    ./cca_robot_package_creator.sh
    ```
 
 2. Configure the generated package:
-   - Complete `cca_<robot>_description.yaml` and `cca_<robot>_ros_setup.yaml` in the `config` folder
-   - For programmatic trajectory planning and execution, implement task (affordance) details in `cca_<robot>_node.cpp`
+   - Complete the following configuration files in the `config/` folder:
+   
+       - **`cca_<robot>_description.yaml`** – Contains info about the robot kinematic chain.  
+       - **`cca_<robot>_ros_setup.yaml`** – Contains ROS-related info pertaining to the robot.  
+       - **`cca_<robot>_ros_viz_setup.yaml`** – Configures visualization settings for displaying the robot and its planned trajectories in RViz.  
+     Each file contains inline comments with detailed instructions for customization.
+   
+   - For programmatic trajectory planning and execution, implement task (affordance) details in `cca_<robot>_node.cpp`. Alternatively, you may use the [Rviz plugin](#interactive-rviz-plugin-planning) for interactive planning.
 
 3. Build the new package:
    ```bash
    cd ~/<ros_workspace_name>
-   colcon build --packages-select cca_<robot>
+   colcon build --packages-select cca_<robot> --cmake-args -DCMAKE_BUILD_TYPE=Release
    source install/setup.bash
    ```
 
@@ -70,7 +75,8 @@ A user-friendly Rviz plugin is also available and enables visual trajectory plan
 
 #### Prerequisites
 
-- For trajectory execution, ensure a `follow_joint_trajectory` action server is running on the robot
+- For real-robot execution, ensure a `follow_joint_trajectory` action server is active, `joint_states` are being published, and TF data is available.  
+To plan without a physical robot, simply provide `joint_states` and TF data.
 
 #### Programmatic Trajectory Planning
 
