@@ -9,12 +9,16 @@
 #define CCA_ROS_UTIL_H
 
 #include "affordance_util/affordance_util.hpp"
+#include "cc_affordance_planner/cc_affordance_planner.hpp"
+#include "cc_affordance_planner/cc_affordance_planner_interface.hpp"
+#include "cc_affordance_planner/cc_affordance_planner_util.hpp"
 #include "cca_ros/cca_ros.hpp"
 #include "cca_ros_msgs/msg/gripper_goal_type.hpp"
 #include "cca_ros_msgs/msg/motion_type.hpp"
 #include "cca_ros_msgs/msg/planning_request.hpp"
 #include "cca_ros_msgs/msg/update_method.hpp"
 #include "cca_ros_msgs/msg/virtual_screw_order.hpp"
+#include "cca_ros_msgs/msg/ee_orientation_constraint.hpp"
 #include <Eigen/Dense>
 #include <stdexcept>
 #include <unordered_map>
@@ -66,12 +70,14 @@ affordance_util::ScrewLocationMethod screw_location_method_from_msg(uint8_t loca
 affordance_util::GripperGoalType gripper_goal_type_from_msg(uint8_t gripper_goal_type);
 affordance_util::ScrewType screw_type_from_msg(uint8_t screw_type);
 affordance_util::VirtualScrewOrder virtual_screw_order_from_msg(uint8_t virtual_screw_order);
+cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint_from_msg(uint8_t ee_orientation_constraint);
 uint8_t update_method_to_msg(cc_affordance_planner::UpdateMethod update_method);
 uint8_t motion_type_to_msg(cc_affordance_planner::MotionType motion_type);
 uint8_t screw_location_method_to_msg(affordance_util::ScrewLocationMethod location_method);
 uint8_t gripper_goal_type_to_msg(affordance_util::GripperGoalType gripper_goal_type);
 uint8_t screw_type_to_msg(affordance_util::ScrewType screw_type);
 uint8_t virtual_screw_order_to_msg(affordance_util::VirtualScrewOrder virtual_screw_order);
+uint8_t ee_orientation_constraint_to_msg(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint);
 
 } // namespace
 

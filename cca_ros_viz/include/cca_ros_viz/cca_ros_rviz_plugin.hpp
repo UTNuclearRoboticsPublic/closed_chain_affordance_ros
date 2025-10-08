@@ -18,6 +18,7 @@
 
 // CCA headers
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
+#include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros/cca_ros.hpp>
 #include <cca_ros_action/cca_ros_action.hpp>
 
@@ -99,6 +100,7 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
         QLineEdit *trajectory_density;        ///< No. of points in the trajectory
         QComboBox *cca_type;                  ///< Selector for CCA type
         QComboBox *vir_screw_order;           ///< Selector for virtual screw order
+        QComboBox *ee_orientation_constraint; ///< Selector for ee orientation constraint
     };
 
     /**
@@ -113,6 +115,7 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
         {
             int trajectory_density = 10;                                       ///< trajectory density
             std::optional<affordance_util::VirtualScrewOrder> vir_screw_order; ///< virtual screw order
+	    cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint = cc_affordance_planner::EeOrientationConstraint::DEFAULT; ///< ee orientation constraint
         };
 
         cc_affordance_planner::PlannerConfig planner_config; ///< Configuration for the CCA planner
@@ -263,6 +266,10 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
         {QString("Translation"), affordance_util::ScrewType::TRANSLATION},
         {QString("Rotation"), affordance_util::ScrewType::ROTATION},
         {QString("Screw"), affordance_util::ScrewType::SCREW}};
+
+    const std::map<QString, cc_affordance_planner::EeOrientationConstraint> ee_orientation_constraint_map_ = {
+        {QString("DEFAULT"),cc_affordance_planner::EeOrientationConstraint::DEFAULT},
+        {QString("PRESERVE"),cc_affordance_planner::EeOrientationConstraint::PRESERVE}};
 
     // State flags
     bool new_settings_applied_ = false; ///< Flag to track if advanced settings have been applied

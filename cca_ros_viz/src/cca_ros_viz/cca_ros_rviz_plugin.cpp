@@ -1,4 +1,5 @@
 #include "cca_ros_viz/cca_ros_rviz_plugin.hpp"
+#include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 
 namespace cca_ros_rviz_plugin
 {
@@ -85,6 +86,9 @@ QWidget *CcaRosRvizPlugin::create_advanced_settings_tab_()
 
     form_layout->addRow(create_combo_box_layout_("Virtual Screw Order:", advanced_settings_widgets_.vir_screw_order,
                                                  this->get_map_keys_(vir_screw_order_map_, true)));
+
+    form_layout->addRow(create_combo_box_layout_("EE Orientation Constraint:", advanced_settings_widgets_.ee_orientation_constraint,
+                                                 this->get_map_keys_(ee_orientation_constraint_map_, true)));
     form_layout->addRow(
         create_combo_box_layout_("CCA Type:", advanced_settings_widgets_.cca_type, this->get_map_keys_(cca_type_map_)));
 
@@ -323,6 +327,13 @@ void CcaRosRvizPlugin::apply_settings_clicked_()
             vir_screw_order_map_.at(advanced_settings_widgets_.vir_screw_order->currentText());
     }
 
+    // Use the ee_orientation_constraint_combo_ from the struct
+    if (advanced_settings_widgets_.ee_orientation_constraint->currentIndex() != 0)
+    {
+        advanced_settings.task_description.ee_orientation_constraint =
+            ee_orientation_constraint_map_.at(advanced_settings_widgets_.ee_orientation_constraint->currentText());
+    }
+
     // Use the cca_type_combo_ from the struct if needed
     if (advanced_settings_widgets_.cca_type->currentIndex() != 0)
     {
@@ -389,6 +400,8 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
     {
         req.planner_config = advanced_settings_.planner_config;
         req.task_description.trajectory_density = advanced_settings_.task_description.trajectory_density;
+        req.task_description.ee_orientation_constraint = advanced_settings_.task_description.ee_orientation_constraint;
+        RCLCPP_INFO(this->get_logger(), "EE orientation constraint applied");
         if (advanced_settings_.task_description.vir_screw_order
                 .has_value()) // Since the default for this is different for different planning types, we
                               // check if the user has specified a value before applying it. For all other settings, the
@@ -397,6 +410,14 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
             req.task_description.vir_screw_order = advanced_settings_.task_description.vir_screw_order.value();
         }
     }
+	if (req.task_description.ee_orientation_constraint==cc_affordance_planner::EeOrientationConstraint::DEFAULT){
+
+        RCLCPP_INFO(this->get_logger(), "Ee Orientation is default");
+	} 
+	else if (req.task_description.ee_orientation_constraint==cc_affordance_planner::EeOrientationConstraint::PRESERVE)
+	{
+        RCLCPP_INFO(this->get_logger(), "Ee Orientation is PRESERVE");
+	}
     return req;
 }
 
