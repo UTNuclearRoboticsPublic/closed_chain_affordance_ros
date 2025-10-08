@@ -38,6 +38,7 @@
 #include <affordance_util/affordance_util.hpp>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
+#include <cc_affordance_planner/cc_affordance_planner_util.hpp>
 #include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 #include <chrono>
 #include <cmath>
