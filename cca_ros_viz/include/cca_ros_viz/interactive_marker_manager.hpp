@@ -94,6 +94,13 @@ class InteractiveMarkerManager : public rclcpp::Node
     affordance_util::ScrewInfo get_arrow_pose(const std::string &planning_mode, const std::string &axis_mode);
 
     /**
+    * @brief Returns the current pose of the affordance start frame for CCA APPROACH-type planning.
+    *
+    * @return Eigen::Matrix4d 4x4 homogeneous transformation matrix representing the affordance start frame in the CCA (robot) reference frame.
+    */
+    Eigen::Matrix4d get_frame_pose();
+
+    /**
      * @brief Draws the interactive marker for the CCA planning plugin EE Orientation Control mode based on the given
      * axis name.
      *
@@ -102,8 +109,12 @@ class InteractiveMarkerManager : public rclcpp::Node
     void draw_ee_or_control_im(const std::string &axis);
 
   protected:
+    static constexpr const char *marker_namespace_ =
+        "interactive_goals"; ///< Namespace for the markers
     static constexpr const char *arrow_marker_name_ =
-        "arrow_marker"; ///< Name of the interactive marker for the screw arrow
+        "affordance_screw"; ///< Name of the interactive marker for the screw arrow
+    static constexpr const char *frame_marker_name_ =
+        "affordance_start_frame"; ///< Name of the interactive marker for the screw start frame
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
@@ -135,17 +146,34 @@ class InteractiveMarkerManager : public rclcpp::Node
         AXIS_ORIENTATION_MAP; ///< Map containing orientation transformations to align the x-axis with various axes
 
     // Arrow aesthetics -- Color is Cyan
-    static constexpr double ARROW_SCALE = 0.5;
-    static constexpr double ARROW_COLOR_R = 0.251;
-    static constexpr double ARROW_COLOR_G = 0.878;
-    static constexpr double ARROW_COLOR_B = 0.816;
+    static constexpr double ARROW_SCALE_ = 0.5;
+    static constexpr double ARROW_COLOR_R_ = 0.251;
+    static constexpr double ARROW_COLOR_G_ = 0.878;
+    static constexpr double ARROW_COLOR_B_ = 0.816;
+
+    // Variables for capturing the frame pose
+    Eigen::Matrix4d frame_pose_ = Eigen::Matrix4d::Constant(std::numeric_limits<double>::quiet_NaN());
+    static const Eigen::Matrix4d DEFAULT_FRAME_POSE_;
+
+    // Frame geometry
+    static constexpr double FRAME_SCALE_ = 0.5;
+    static constexpr double ARROW_TO_FRAME_OFFSET_X_ = 0.1;
+    static constexpr double ARROW_TO_FRAME_OFFSET_Y_ = 0.1;
+    static constexpr double ARROW_TO_FRAME_OFFSET_Z_ = 0.1;
 
     /**
      * @brief Processes feedback from the arrow interactive marker.
      *
      * @param feedback The feedback from the interactive marker.
      */
-    void process_arrow_feedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
+    void process_arrow_feedback_(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
+
+    /**
+     * @brief Processes feedback from the frame interactive marker.
+     *
+     * @param feedback The feedback from the interactive marker.
+     */
+    void process_frame_feedback_(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
 
     /**
      * @brief Publishes transform between the EE and tool frame
