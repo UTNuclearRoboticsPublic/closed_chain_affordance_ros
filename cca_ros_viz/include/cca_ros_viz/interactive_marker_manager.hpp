@@ -156,7 +156,7 @@ class InteractiveMarkerManager : public rclcpp::Node
     static const Eigen::Matrix4d DEFAULT_FRAME_POSE_;
 
     // Frame geometry
-    static constexpr double FRAME_SCALE_ = 0.5;
+    static constexpr double FRAME_SCALE_ = 0.2;
     static constexpr double ARROW_TO_FRAME_OFFSET_X_ = 0.1;
     static constexpr double ARROW_TO_FRAME_OFFSET_Y_ = 0.1;
     static constexpr double ARROW_TO_FRAME_OFFSET_Z_ = 0.1;

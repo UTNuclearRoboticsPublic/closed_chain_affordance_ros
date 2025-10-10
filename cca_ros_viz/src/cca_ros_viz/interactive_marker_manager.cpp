@@ -204,9 +204,9 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         visualization_msgs::msg::Marker arrow;
         arrow.ns = marker_namespace_;
         arrow.type = visualization_msgs::msg::Marker::ARROW;
-        arrow.scale.x = ARROW_SCALE_;
-        arrow.scale.y = ARROW_SCALE_ / 10.0;
-        arrow.scale.z = ARROW_SCALE_ / 10.0;
+        arrow.scale.x = ARROW_SCALE_; // shaft length
+        arrow.scale.y = ARROW_SCALE_ / 10.0; // shaft diameter
+        arrow.scale.z = ARROW_SCALE_ / 10.0; // head diameter
         arrow.color.r = ARROW_COLOR_R_;
         arrow.color.g = ARROW_COLOR_G_;
         arrow.color.b = ARROW_COLOR_B_;
@@ -229,9 +229,9 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         visualization_msgs::msg::Marker x_axis; 
         x_axis.ns = marker_namespace_;
         x_axis.type = visualization_msgs::msg::Marker::ARROW; // Default orientation is already along x-axis for arrows
-        x_axis.scale.x = FRAME_SCALE_;
-        x_axis.scale.y = FRAME_SCALE_;
-        x_axis.scale.z = FRAME_SCALE_;
+        x_axis.scale.x = FRAME_SCALE_; // shaft length
+        x_axis.scale.y = FRAME_SCALE_ / 10.0; // shaft diameter
+        x_axis.scale.z = FRAME_SCALE_ / 10.0; // head diameter
         x_axis.color.r = 1.0;  // red
         x_axis.color.a = 1.0;  // opaque
         
