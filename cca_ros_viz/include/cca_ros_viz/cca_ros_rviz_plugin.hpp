@@ -260,6 +260,7 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
 
     const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
         {QString("Affordance"), cc_affordance_planner::PlanningType::AFFORDANCE},
+        {QString("Approach"), cc_affordance_planner::PlanningType::APPROACH},
         {QString("EE Orientation Only"), cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY}};
 
     const std::map<QString, affordance_util::ScrewType> motion_type_map_ = {
