@@ -173,8 +173,8 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         int_marker.pose.position.z = aff_htm.translation().z();
         if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
         {
-            RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Will place interactive marker at %s instead.",
-                         tool_frame_name_.c_str(), ref_frame_name_.c_str());
+            RCLCPP_ERROR(this->get_logger(), "Could not lookup [%s] frame. Will place [%s] interactive marker at [%s] instead.",
+                         tool_frame_name_.c_str(), info.marker_name.c_str(), ref_frame_name_.c_str());
         }
     }
 
