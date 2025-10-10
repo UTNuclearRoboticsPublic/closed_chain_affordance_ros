@@ -221,9 +221,9 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         int_marker.scale = FRAME_SCALE_;
 
 	// Offset to avoid superposition of the arrow and frame
-	int_marker.pose.position.x += ARROW_TO_FRAME_OFFSET_X_;
-        int_marker.pose.position.y += ARROW_TO_FRAME_OFFSET_Y_;
-        int_marker.pose.position.z += ARROW_TO_FRAME_OFFSET_Z_;   
+	int_marker.pose.position.x = ARROW_TO_FRAME_OFFSET_X_;
+        int_marker.pose.position.y = ARROW_TO_FRAME_OFFSET_Y_;
+        int_marker.pose.position.z = ARROW_TO_FRAME_OFFSET_Z_;   
 
         // Axes visualization
         visualization_msgs::msg::Marker x_axis; 
