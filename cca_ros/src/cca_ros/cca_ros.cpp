@@ -24,7 +24,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     }
 
     // Get the path for robot configuration file
-    const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name);
+    const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name, build_robot_from);
 
     affordance_util::RobotConfig robotConfig;
 
@@ -603,11 +603,17 @@ void CcaRos::validate_input_(const std::vector<cc_affordance_planner::PlannerCon
 }
 
 // Helper function to get the full path to the robot description file.
-std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robot_name)
+std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robot_name, const std::string &type)
 {
     const std::string package_name = "cca_" + robot_name;
     const std::string rel_dir = "/config/";
-    const std::string filename = package_name + "_description.yaml";
+    std::string filename;
+    if (type=="yaml"){
+        filename = package_name + "_description.yaml";
+    }
+    else if (type=="urdf"){
+        filename = package_name + "_urdf.yaml";
+    }
     return ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 

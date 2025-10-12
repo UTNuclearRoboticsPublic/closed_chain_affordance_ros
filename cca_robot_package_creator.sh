@@ -32,7 +32,8 @@ rm -rf $package_name/include
 
 # Create the description file
 cat << EOF > $package_name/config/cca_${robot_name}_description.yaml
-# **Description of the ${robot_name} robot
+# **Info for the ${robot_name} robot to build description from this yaml** #
+# If a URDF is available, use cca_${robot_name}_urdf.yaml instead.
 # Define the reference frame, joint axes, their locations, and the tool's position.
 # Add or remove joint fields as needed to accurately represent the robot.
 ref_frame:
@@ -71,6 +72,26 @@ end_effector:
 tool:
   - name: # This is usually at the center of the palm
     offset_from_ee_frame: # Tool location from EE frame
+EOF
+
+# Create the description file
+cat << EOF > $package_name/config/cca_${robot_name}_urdf.yaml
+# **Info for the ${robot_name} robot to build description from URDF** #
+# Provide the reference frame, kinematic chain, end effector and tool info.
+ref_frame:
+  - name: # Example: base_link
+
+kinematic_chain:
+  - base_joint_name: # Example: joint_1
+    end_joint_name: # Example: joint_6
+
+end_effector:
+  - frame_name: # Example: ee_link
+    gripper_joint_name: # Example: joint_6 # Unused but provide one valid joint name
+
+tool: # This does not have to be in the URDF, and is usually located at the center of the palm.
+  - name: # Example: robot_tool 
+    offset_from_ee_frame: # Example: [0.0, 0.0, 0.02] # Tool location in the EE frame
 EOF
 
 # Create the ROS setup file

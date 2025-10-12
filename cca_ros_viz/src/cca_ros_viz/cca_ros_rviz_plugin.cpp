@@ -115,8 +115,9 @@ void CcaRosRvizPlugin::update_ui_state_()
     // Reset the motion type selection
     motion_type_bl_.combo_box->setCurrentText("");
 
-    // Hide the arrow marker
+    // Hide markers
     this->hide_im(this->arrow_marker_name_);
+    this->hide_im(this->frame_marker_name_);
 }
 
 void CcaRosRvizPlugin::connect_signals_()
@@ -139,8 +140,9 @@ void CcaRosRvizPlugin::mode_selected_()
     // Disable all execution buttons
     set_execute_buttons_enabled_(false);
 
-    // Hide the arrow marker
+    // Hide the markers
     this->hide_im(this->arrow_marker_name_);
+    this->hide_im(this->frame_marker_name_);
 
     // Check if a mode is selected
     bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
@@ -154,17 +156,30 @@ void CcaRosRvizPlugin::mode_selected_()
     hide_all_controls_();
 
     // Configure UI based on the selected mode
-    if (selected_mode == "Affordance")
-    {
-        // Show motion type controls
-        set_combo_box_controls_(motion_type_bl_, true);
-        motion_type_bl_.combo_box->setCurrentText("");
-    }
-    else if (selected_mode == "EE Orientation Only")
+    if (selected_mode == "EE Orientation Only")
     {
         // Show axis controls
         set_combo_box_controls_(axis_bl_, true);
         axis_bl_.combo_box->setCurrentText("");
+    }
+    else if (selected_mode == "Cartesian Goal"){ 
+        
+	// We only need the frame marker
+        interactive_marker_manager::ImControlEnableInfo frame_enable_info;
+        frame_enable_info.marker_name = this->frame_marker_name_;
+        frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
+        frame_enable_info.reset = false;
+        this->enable_im_controls(frame_enable_info);
+
+	// Enable buttons for planning, executing, etc.
+        set_execute_buttons_enabled_(true);
+
+    }
+    else { // All other planning types (i.e. Affordance, Approach planning) need motion-type controls
+
+        // Show motion type controls
+        set_combo_box_controls_(motion_type_bl_, true);
+        motion_type_bl_.combo_box->setCurrentText("");
     }
 }
 
@@ -192,10 +207,21 @@ void CcaRosRvizPlugin::motion_type_selected_()
         arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
         arrow_enable_info.reset = false;
         this->enable_im_controls(arrow_enable_info);
+
+	// If approach motion, enable frame marker controls
+	if (mode_bl_.combo_box->currentText() == "Approach"){
+            interactive_marker_manager::ImControlEnableInfo frame_enable_info;
+            frame_enable_info.marker_name = this->frame_marker_name_;
+            frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
+            frame_enable_info.reset = false;
+            this->enable_im_controls(frame_enable_info);
+	}
     }
     else
     {
+	// Hide markers
         this->hide_im(this->arrow_marker_name_);
+        this->hide_im(this->frame_marker_name_);
     }
 
     // Show pitch controls for Screw motion type
@@ -356,8 +382,8 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
     const auto planning_type = planning_type_map_.at(mode_bl_.combo_box->currentText());
     req.task_description = cc_affordance_planner::TaskDescription(planning_type);
 
-    // If affordance, fill out relevant screw-type (and pitch) info
-    if (planning_type == cc_affordance_planner::PlanningType::AFFORDANCE)
+    // If affordance or approach fill out relevant screw-type (and pitch) info
+    if ((planning_type == cc_affordance_planner::PlanningType::AFFORDANCE) || (planning_type == cc_affordance_planner::PlanningType::APPROACH))
     {
         const auto motion_type = motion_type_map_.at(motion_type_bl_.combo_box->currentText());
         req.task_description.affordance_info.type = motion_type;
@@ -386,14 +412,25 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
         }
     }
 
-    // Get affordance goal
-    req.task_description.goal.affordance = get_affordance_goal_();
+    if (planning_type != cc_affordance_planner::PlanningType::CARTESIAN_GOAL){ // We don't need affordance info for Cartesian Goal planning
 
-    // Get affordance pose
-    const auto screw_info = this->get_arrow_pose(mode_bl_.combo_box->currentText().toStdString(),
-                                                 axis_bl_.combo_box->currentText().toStdString());
-    req.task_description.affordance_info.axis = screw_info.axis;
-    req.task_description.affordance_info.location = screw_info.location;
+        // Get affordance goal
+        req.task_description.goal.affordance = get_affordance_goal_();
+
+        // Get affordance pose
+        const auto screw_info = this->get_arrow_pose(mode_bl_.combo_box->currentText().toStdString(),
+                                                     axis_bl_.combo_box->currentText().toStdString());
+        req.task_description.affordance_info.axis = screw_info.axis;
+        req.task_description.affordance_info.location = screw_info.location;
+
+    }
+
+    // If APPROACH or CARTESIAN_GOAL planning type, get the pose of the affordance start frame
+    if ((planning_type == cc_affordance_planner::PlanningType::APPROACH) || (planning_type == cc_affordance_planner::PlanningType::CARTESIAN_GOAL)){
+
+        req.task_description.goal.grasp_pose = this->get_frame_pose();
+
+    }
 
     // Extract task-specific settings from advanced settings
     if (new_settings_applied_)

@@ -12,6 +12,13 @@ const Eigen::Vector3d InteractiveMarkerManager::NEG_Y_AXIS_(0.0, -1.0, 0.0);
 const Eigen::Vector3d InteractiveMarkerManager::NEG_Z_AXIS_(0.0, 0.0, -1.0);
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_AXIS_ = InteractiveMarkerManager::X_AXIS_;
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_LOCATION_(0.0, 0.0, 0.0);
+const Eigen::Matrix4d InteractiveMarkerManager::DEFAULT_FRAME_POSE_ =
+    (Eigen::Matrix4d() <<
+        1.0, 0.0, 0.0, ARROW_TO_FRAME_OFFSET_X_,
+        0.0, 1.0, 0.0, ARROW_TO_FRAME_OFFSET_Y_,
+        0.0, 0.0, 1.0, ARROW_TO_FRAME_OFFSET_Z_,
+        0.0, 0.0, 0.0, 1.0
+    ).finished();
 const std::map<std::string, Eigen::Quaterniond> InteractiveMarkerManager::AXIS_ORIENTATION_MAP = {
     {"x", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, X_AXIS_)},      // No rotation needed
     {"y", Eigen::Quaterniond::FromTwoVectors(X_AXIS_, Y_AXIS_)},      // Rotate X to Y
@@ -38,6 +45,13 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
     arrow_enable_info.enable = ImControlEnable::ALL;
     arrow_enable_info.create = true;
     enable_im_controls(arrow_enable_info);
+
+    // Enable the frame
+    ImControlEnableInfo frame_enable_info;
+    frame_enable_info.marker_name = frame_marker_name_;
+    frame_enable_info.enable = ImControlEnable::ALL;
+    frame_enable_info.create = true;
+    enable_im_controls(frame_enable_info);
 
     try
     {
@@ -68,7 +82,7 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
     RCLCPP_INFO(this->get_logger(), "Interactive marker manager initialized.");
 }
 
-void InteractiveMarkerManager::process_arrow_feedback(
+void InteractiveMarkerManager::process_arrow_feedback_(
     const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback)
 {
     switch (feedback->event_type)
@@ -88,6 +102,38 @@ void InteractiveMarkerManager::process_arrow_feedback(
     }
 }
 
+void InteractiveMarkerManager::process_frame_feedback_(
+    const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback)
+{
+    switch (feedback->event_type)
+    {
+    case visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE:
+
+        // Get orientation
+        Eigen::Quaterniond q(feedback->pose.orientation.w,
+                             feedback->pose.orientation.x,
+                             feedback->pose.orientation.y,
+                             feedback->pose.orientation.z);
+
+        // Get position
+	Eigen::Vector3d p(feedback->pose.position.x,
+		          feedback->pose.position.y,
+		          feedback->pose.position.z);
+
+        // Update the frame pose
+	frame_pose_.setIdentity();
+        frame_pose_.block<3, 3>(0, 0) = q.toRotationMatrix();
+        frame_pose_.block<3, 1>(0, 3) = p;
+
+        // Update marker pose in server
+        server_->setPose(feedback->marker_name, feedback->pose);
+        server_->applyChanges();
+        break;
+
+    }
+}
+
+
 void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &info)
 {
     visualization_msgs::msg::InteractiveMarker int_marker;
@@ -103,15 +149,20 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
     {
         int_marker = visualization_msgs::msg::InteractiveMarker();
 
-        // Reset recorded arrow pose as well
-        arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
-        arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+        // Reset recorded pose as well
+        if (info.marker_name==arrow_marker_name_){
+
+            arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+            arrow_location_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
+
+	} else if (info.marker_name==frame_marker_name_){
+
+	    frame_pose_ = Eigen::Matrix4d::Constant(std::numeric_limits<double>::quiet_NaN());
+	}
     }
 
     int_marker.header.frame_id = ref_frame_name_;
-    int_marker.name = info.marker_name;
     int_marker.description = "";
-    int_marker.scale = ARROW_SCALE;
 
     // Draw in tool frame if asked
     if (info.in_tool_frame)
@@ -122,8 +173,8 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         int_marker.pose.position.z = aff_htm.translation().z();
         if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
         {
-            RCLCPP_ERROR(this->get_logger(), "Could not lookup %s frame. Will place arrow at %s instead.",
-                         tool_frame_name_.c_str(), ref_frame_name_.c_str());
+            RCLCPP_ERROR(this->get_logger(), "Could not lookup [%s] frame. Will place [%s] interactive marker at [%s] instead.",
+                         tool_frame_name_.c_str(), info.marker_name.c_str(), ref_frame_name_.c_str());
         }
     }
 
@@ -140,22 +191,78 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
         int_marker.controls.push_back(control);
     };
 
-    // Create and add arrow marker
-    visualization_msgs::msg::Marker arrow;
-    arrow.ns = "interactive_goals";
-    arrow.type = visualization_msgs::msg::Marker::ARROW;
-    arrow.scale.x = ARROW_SCALE;
-    arrow.scale.y = ARROW_SCALE / 10.0;
-    arrow.scale.z = ARROW_SCALE / 10.0;
-    arrow.color.r = ARROW_COLOR_R;
-    arrow.color.g = ARROW_COLOR_G;
-    arrow.color.b = ARROW_COLOR_B;
-    arrow.color.a = 1.0;
+    // Declare control and make it always visible
+    visualization_msgs::msg::InteractiveMarkerControl im_control;
+    im_control.always_visible = true;
 
-    visualization_msgs::msg::InteractiveMarkerControl arrow_control;
-    arrow_control.always_visible = true;
-    arrow_control.markers.push_back(arrow);
-    int_marker.controls.push_back(arrow_control);
+    if (info.marker_name==arrow_marker_name_){
+
+    	int_marker.name = arrow_marker_name_;
+    	int_marker.scale = ARROW_SCALE_;
+
+        // Arrow visualization
+        visualization_msgs::msg::Marker arrow;
+        arrow.ns = marker_namespace_;
+        arrow.type = visualization_msgs::msg::Marker::ARROW;
+        arrow.scale.x = ARROW_SCALE_; // shaft length
+        arrow.scale.y = ARROW_SCALE_ / 10.0; // shaft diameter
+        arrow.scale.z = ARROW_SCALE_ / 10.0; // head diameter
+        arrow.color.r = ARROW_COLOR_R_;
+        arrow.color.g = ARROW_COLOR_G_;
+        arrow.color.b = ARROW_COLOR_B_;
+        arrow.color.a = 1.0;
+
+	// Add the marker to im control
+        im_control.markers.push_back(arrow);
+	}
+    else if (info.marker_name==frame_marker_name_){
+
+        int_marker.name = frame_marker_name_;
+        int_marker.scale = FRAME_SCALE_;
+
+	// Offset to avoid superposition of the arrow and frame
+	int_marker.pose.position.x = ARROW_TO_FRAME_OFFSET_X_;
+        int_marker.pose.position.y = ARROW_TO_FRAME_OFFSET_Y_;
+        int_marker.pose.position.z = ARROW_TO_FRAME_OFFSET_Z_;   
+
+        // Axes visualization
+        visualization_msgs::msg::Marker x_axis; 
+        x_axis.ns = marker_namespace_;
+        x_axis.type = visualization_msgs::msg::Marker::ARROW; // Default orientation is already along x-axis for arrows
+        x_axis.scale.x = FRAME_SCALE_; // shaft length
+        x_axis.scale.y = FRAME_SCALE_ / 10.0; // shaft diameter
+        x_axis.scale.z = FRAME_SCALE_ / 10.0; // head diameter
+        x_axis.color.r = 1.0;  // red
+        x_axis.color.a = 1.0;  // opaque
+        
+        visualization_msgs::msg::Marker y_axis;
+        y_axis = x_axis;
+        y_axis.color.r = 0.0;
+        y_axis.color.g = 1.0; // green
+	// Helper to set orientation
+        auto set_orientation = [](auto &pose, const Eigen::Quaterniond &q) {
+            pose.orientation.x = q.x();
+            pose.orientation.y = q.y();
+            pose.orientation.z = q.z();
+            pose.orientation.w = q.w();
+        };
+	set_orientation(y_axis.pose, Eigen::Quaterniond(Eigen::AngleAxisd(M_PI_2, Eigen::Vector3d::UnitZ())));
+        
+        visualization_msgs::msg::Marker z_axis;
+        z_axis = x_axis;
+        z_axis.color.b = 1.0; // blue
+        z_axis.color.r = 0.0;
+	set_orientation(z_axis.pose, Eigen::Quaterniond(Eigen::AngleAxisd(-M_PI_2, Eigen::Vector3d::UnitY())));
+
+	// Add the markers to im control
+        im_control.markers.push_back(x_axis);
+        im_control.markers.push_back(y_axis);
+        im_control.markers.push_back(z_axis);
+
+    }
+
+    // Add the control to the interactive marker
+    int_marker.controls.push_back(im_control);
 
     // Helper to add rotation and translation controls
     auto addRotationControls = [&]() {
@@ -191,8 +298,15 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
     // Insert and apply changes
     if (info.create)
     { // Insert with callback if it does not exist
+        if (info.marker_name==arrow_marker_name_){
         server_->insert(int_marker,
-                        std::bind(&InteractiveMarkerManager::process_arrow_feedback, this, std::placeholders::_1));
+                        std::bind(&InteractiveMarkerManager::process_arrow_feedback_, this, std::placeholders::_1));
+	}
+	else if (info.marker_name==frame_marker_name_){
+        server_->insert(int_marker,
+                        std::bind(&InteractiveMarkerManager::process_frame_feedback_, this, std::placeholders::_1));
+	}
+	
     }
     else
     {
@@ -204,10 +318,10 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
 void InteractiveMarkerManager::hide_im(const std::string &marker_name)
 {
     // Disable interactive marker controls
-    ImControlEnableInfo arrow_enable_info;
-    arrow_enable_info.marker_name = marker_name;
-    arrow_enable_info.enable = ImControlEnable::NONE;
-    enable_im_controls(arrow_enable_info);
+    ImControlEnableInfo enable_info;
+    enable_info.marker_name = marker_name;
+    enable_info.enable = ImControlEnable::NONE;
+    enable_im_controls(enable_info);
 
     // Get the interactive marker object
     visualization_msgs::msg::InteractiveMarker int_marker;
@@ -303,6 +417,23 @@ affordance_util::ScrewInfo InteractiveMarkerManager::get_arrow_pose(const std::s
     }
     return screw_info;
 }
+
+Eigen::Matrix4d InteractiveMarkerManager::get_frame_pose()
+{
+    Eigen::Matrix4d frame_pose;
+
+    // Go with default location if the frame hasn't moved
+    if (frame_pose_.hasNaN())
+    {
+	frame_pose = DEFAULT_FRAME_POSE_;
+    }
+    else
+    {
+	frame_pose = frame_pose_;
+    }
+    return frame_pose;
+}
+
 void InteractiveMarkerManager::publish_transform_()
 {
     // Create the transform message
