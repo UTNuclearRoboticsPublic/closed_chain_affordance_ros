@@ -22,7 +22,7 @@ namespace cca_ros_behavior
  *
  * This class serves as a base for Behavior Tree nodes that transform an enum value
  * (input port "enum") into an output value of type OutputType (output port "value").
- * Derived classes must override the pure virtual `getEnumMap()` to provide the
+ * Derived classes must override the pure virtual `toOutput()` to provide the
  * logic for this conversion.
  *
  * Output values are managed through std::shared_ptr to enable safe shared ownership.
@@ -54,7 +54,7 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
      * @param enum_value The input enum value.
      * @return Shared pointer to the mapped output instance.
      */
-    virtual std::shared_ptr<OutputType> getEnumMap(const EnumType &enum_value) = 0;
+    virtual std::shared_ptr<OutputType> toOutput(const EnumType &enum_value) = 0;
 
     /**
      * @brief Declares input and output ports used by the node.
@@ -75,7 +75,7 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
     /**
      * @brief Execution function called when the node is ticked.
      *
-     * Reads the enum input, calls `getEnumMap()` to get the output,
+     * Reads the enum input, calls `toOutput()` to get the output,
      * and sets the output port value.
      *
      * @return BT::NodeStatus::SUCCESS on successful tick.
@@ -90,7 +90,7 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
         }
 
         EnumType enum_value = result.value();
-        auto value = getEnumMap(enum_value);
+        auto value = toOutput(enum_value);
 
         setOutput("value", value);
 
@@ -102,7 +102,7 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
  * @brief Template for nodes converting an enum to a single PlanningRequest.
  *
  * Specializes EnumToType with OutputType as cca_ros::PlanningRequest.
- * Must implement `getEnumMap()` in subclasses.
+ * Must implement `toOutput()` in subclasses.
  *
  * @tparam EnumType Enum input type.
  */
@@ -113,7 +113,7 @@ template <typename EnumType> class EnumToReq : public EnumToType<EnumType, cca_r
  * @brief Template for nodes converting an enum to multiple PlanningRequests.
  *
  * Specializes EnumToType with OutputType as cca_ros::PlanningRequests.
- * Must implement `getEnumMap()` in subclasses.
+ * Must implement `toOutput()` in subclasses.
  *
  * @tparam EnumType Enum input type.
  */
