@@ -67,7 +67,7 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
     inline static BT::PortsList providedPorts()
     {
         return {
-            BT::InputPort<EnumType>("enum"),
+            BT::InputPort<EnumType>("enum_name"),
             BT::OutputPort<std::shared_ptr<OutputType>>("value")
         };
     }
@@ -83,14 +83,14 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
      */
     inline BT::NodeStatus tick() override
     {
-        auto result = getInput<EnumType>("enum");
+        auto result = getInput<EnumType>("enum_name");
         if (!result)
         {
             throw BT::RuntimeError("Missing required input [enum]: ", result.error());
         }
 
-        EnumType enum_value = result.value();
-        auto value = toOutput(enum_value);
+        EnumType enum_name = result.value();
+        auto value = toOutput(enum_name);
 
         setOutput("value", value);
 
@@ -107,7 +107,18 @@ template <typename EnumType, typename OutputType> class EnumToType : public BT::
  * @tparam EnumType Enum input type.
  */
 template <typename EnumType> class EnumToReq : public EnumToType<EnumType, cca_ros::PlanningRequest>
-{};
+{
+  public:
+
+    /**
+     * @brief Constructs the node with a name and configuration.
+     *
+     * @param name The node's unique name in the Behavior Tree.
+     * @param config Node configuration including ports.
+     */
+    inline EnumToReq(const std::string &name, const BT::NodeConfig &config) : EnumToType<EnumType, cca_ros::PlanningRequest>(name, config){}
+
+};
 
 /**
  * @brief Template for nodes converting an enum to multiple PlanningRequests.
@@ -118,7 +129,18 @@ template <typename EnumType> class EnumToReq : public EnumToType<EnumType, cca_r
  * @tparam EnumType Enum input type.
  */
 template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, cca_ros::PlanningRequests>
-{};
+{
+  public:
+
+    /**
+     * @brief Constructs the node with a name and configuration.
+     *
+     * @param name The node's unique name in the Behavior Tree.
+     * @param config Node configuration including ports.
+     */
+    inline EnumToReqs(const std::string &name, const BT::NodeConfig &config) : EnumToType<EnumType, cca_ros::PlanningRequests>(name, config){}
+
+};
 
 } // namespace cca_ros_behavior
 
