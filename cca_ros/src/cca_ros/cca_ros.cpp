@@ -1,3 +1,4 @@
+#include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cca_ros/cca_ros.hpp>
 
 namespace cca_ros
@@ -77,6 +78,136 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 CcaRos::~CcaRos()
 {
     rclcpp::shutdown();
+}
+
+cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest &planning_request){
+    status_ = planning_request.status;
+    *status_ = Status::PROCESSING;
+
+    // Create const references for readability
+    const cc_affordance_planner::PlannerConfig &planner_config = planning_request.planner_config;
+    const cca_ros::KinematicState &start_state = planning_request.start_state;
+    const TrajectoryTimeStep& time_step = planning_request.time_step;
+
+    // Validate input
+    try
+    {
+        this->validate_input_(planning_request.task_description);
+    }
+    catch (const std::invalid_argument &e)
+    {
+        RCLCPP_ERROR(node_logger_, "Error in input validation: %s", e.what());
+        *status_ = Status::FAILED;
+        return cc_affordance_planner::PlannerResult();
+    }
+
+    // Copy task description and start config for potential modifications
+    cc_affordance_planner::TaskDescription task_description = planning_request.task_description;
+    Eigen::VectorXd robot_start_config = start_state.robot;
+    double gripper_start_config = start_state.gripper;
+    const bool includes_gripper_trajectory = !std::isnan(task_description.goal.gripper);
+
+    // Lookup affordance location if the tag frame is specified
+    if (!task_description.affordance_info.location_frame.empty())
+    {
+        const Eigen::Isometry3d aff_htm =
+            ros_cpp_util::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
+        if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
+        {
+            RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
+                         task_description.affordance_info.location_frame.c_str());
+            *status_ = Status::FAILED;
+            return cc_affordance_planner::PlannerResult();
+        }
+        task_description.affordance_info.location = aff_htm.translation();
+    }
+
+    // Get joint states if start configuration is empty
+    if (robot_start_config.size() == 0)
+    {
+        KinematicState state;
+
+        try
+        {
+            state = read_joint_states_();
+        }
+        catch (const std::runtime_error &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
+            *status_ = Status::FAILED;
+            return cc_affordance_planner::PlannerResult();
+        }
+
+        robot_start_config = state.robot;
+    }
+
+    if (includes_gripper_trajectory && std::isnan(gripper_start_config))
+    {
+        KinematicState state;
+
+        try
+        {
+            state = read_joint_states_();
+        }
+        catch (const std::runtime_error &e)
+        {
+            RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
+            *status_ = Status::FAILED;
+            return cc_affordance_planner::PlannerResult();
+        }
+
+        gripper_start_config = state.gripper;
+    }
+
+    // If asked to preserve EE/tool orientation, compute planning requests to do that
+    if (task_description.ee_orientation_constraint == cc_affordance_planner::EeOrientationConstraint::PRESERVE) {
+
+        RCLCPP_INFO_STREAM(node_logger_, "Building planning requests to preserve EE orientation");
+        cca_ros::PlanningRequests reqs;
+        reqs.status = planning_request.status; // Point to the original status pointer
+        
+        // Resize and fill planner_config with one from original req, resize task description
+        const int nof_reqs = task_description.trajectory_density - 1; // One less than the trajectory density since the first point in the trajectory is the current state of the robot
+        reqs.planner_config.assign(nof_reqs, planner_config);
+        reqs.task_description.resize(nof_reqs);
+        
+        // Discretize the screw path
+        // Compute forward kinematics to tool
+        const Eigen::Matrix4d fk = affordance_util::FKinSpace(M_,robot_slist_,robot_start_config);
+        const std::vector<Eigen::Matrix4d> se3_screw_path = affordance_util::compute_se3_screw_trajectory(task_description.affordance_info, task_description.goal.affordance, task_description.trajectory_density, fk);
+        
+        // Generate task descriptions from se3_screw_traj
+        bool preserve_orientation = true;
+        const std::vector<cc_affordance_planner::TaskDescription> task_descriptions = cc_affordance_planner::get_se3_screw_tasks(se3_screw_path, preserve_orientation);
+        
+        reqs.task_description = task_descriptions;
+        
+        RCLCPP_INFO_STREAM(node_logger_, "Calling CCA planner with planning requests that preserve EE orientation");
+        
+        // Plan, visualize, and execute the task descriptions to move along the se3_screw_path
+        return(this->plan_visualize_and_execute(reqs));
+    }
+
+    // Prepare robot description for planning
+    affordance_util::RobotDescription robot_description;
+    robot_description.slist = robot_slist_;
+    robot_description.M = M_;
+    robot_description.joint_states = robot_start_config;
+    robot_description.gripper_state = gripper_start_config;
+
+    // Create and run the planner interface
+    cc_affordance_planner::CcAffordancePlannerInterface ccAffordancePlannerInterface(planner_config);
+    try
+    {
+        const cc_affordance_planner::PlannerResult plannerResult = ccAffordancePlannerInterface.generate_joint_trajectory(robot_description, task_description);
+	return plannerResult;
+    }
+    catch (const std::invalid_argument &e)
+    {
+        RCLCPP_ERROR(node_logger_, "Planner returned exception: %s", e.what());
+        return cc_affordance_planner::PlannerResult();
+    }
+
 }
 
 // Runs the affordance planner for a single task and config.
