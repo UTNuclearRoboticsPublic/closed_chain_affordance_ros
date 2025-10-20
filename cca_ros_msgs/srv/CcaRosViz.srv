@@ -8,3 +8,4 @@ geometry_msgs/Pose aff_ref_pose # Reference pose for approach motion, correspond
 ---
 # Result
 bool success # whether planning and visualization was successful
+int64 validation_time_usecs # amount of microseconds taken to validate self-collision and joint limits

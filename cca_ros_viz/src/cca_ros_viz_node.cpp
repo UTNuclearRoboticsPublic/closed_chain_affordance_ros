@@ -259,7 +259,7 @@ class CcaRosVizServer : public rclcpp::Node
 	// (Re)order trajectory to match MoveIt planning group order
 	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_model_group_->getVariableNames());
 
-	long total_viol_check_duration = 0; // for joint limits and collision checking
+        std::chrono::microseconds total_viol_check_duration{0}; // for joint limits and collision checking
 
         for (const auto &point : ordered_group_traj.points)
         {
@@ -293,7 +293,7 @@ class CcaRosVizServer : public rclcpp::Node
 
 		// Capture how long it took to check for violations
 		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
-		long point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+		auto point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 		total_viol_check_duration += point_duration;
 
 		// Log violation
@@ -357,8 +357,9 @@ class CcaRosVizServer : public rclcpp::Node
 	rviz_visual_tools_->trigger();  // only once after batching
 
         RCLCPP_INFO(node_logger_, "Successfully visualized requested joint trajectory");
-	// RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration); For experiment purposes
+	RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration.count());
         serv_res->success = true;
+        serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
     }
 };
 
