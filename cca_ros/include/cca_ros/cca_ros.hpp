@@ -97,8 +97,6 @@ struct PlanningRequest
     cc_affordance_planner::PlannerConfig planner_config = cc_affordance_planner::PlannerConfig();
     cc_affordance_planner::TaskDescription task_description;
     KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
-    std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
-    bool visualize_trajectory = true;
     bool execute_trajectory = false;
     TrajectoryTimeStep time_step;
 };
@@ -106,15 +104,16 @@ struct PlanningRequest
 /**
  * @brief Struct containing planning requests for the CCA ROS planner
  */
-struct PlanningRequests
+struct PlanningResponse
 {
-    std::vector<cc_affordance_planner::PlannerConfig> planner_config;
-    std::vector<cc_affordance_planner::TaskDescription> task_description;
-    KinematicState start_state = KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()};
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
-    bool visualize_trajectory = true;
-    bool execute_trajectory = false;
-    TrajectoryTimeStep time_step; //TODO: We may wanna have different time steps per task_description, maybe its better to have this be a member of task description instead
+    cc_affordance_planner::PlannerResult result;
+};
+
+struct GoalMsg{
+    FollowJointTrajectoryGoal robot;
+    FollowJointTrajectoryGoal gripper;
+    FollowJointTrajectoryGoal robot_and_gripper;
 };
 
 /**
@@ -156,7 +155,7 @@ class CcaRos : public rclcpp::Node
      *
      * @return bool True if the planning and execution are successful; false otherwise.
      */
-    bool plan_visualize_and_execute(const cca_ros::PlanningRequest &planning_request);
+     cca_ros::PlanningResponse plan(const cca_ros::PlanningRequest &planning_request, bool multitask_planning = false);
 
     /**
      * @brief Runs the CCA planner for multiple tasks, producing a single joint trajectory.
@@ -172,7 +171,7 @@ class CcaRos : public rclcpp::Node
      * @return bool `true` if all tasks were successfully planned and executed, `false` otherwise.
      */
 
-    bool plan_visualize_and_execute(const cca_ros::PlanningRequests &planning_requests);
+     cca_ros::PlanningResponse plan(const std::vector<cca_ros::PlanningRequest> &planning_requests, bool singletask_planning = false);
 
     /**
      * @brief Cancels trajectory execution on robot
@@ -241,8 +240,7 @@ class CcaRos : public rclcpp::Node
      * @param task_descriptions The vector of task descriptions to validate.
      * @throws std::invalid_argument If the task descriptions have issues.
      */
-    void validate_input_(const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
-                         const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions);
+    void validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs);
 
     /**
      * @brief Returns the path to the CC Affordance robot description YAML file.
@@ -275,11 +273,9 @@ class CcaRos : public rclcpp::Node
      * @param q_aff Affordance location.
      * @return True if successful, false otherwise.
      */
-    bool visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
-                               const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
-                               const Eigen::VectorXd &w_aff, const Eigen::VectorXd &q_aff,
-                               const std::optional<geometry_msgs::msg::Pose> &aff_ref_pose = std::nullopt);
+     cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const cc_affordance_planner::TaskDescription& task_description);
 
+bool execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory);
     /**
      * @brief Executes the given trajectory on the robot.
      *
@@ -290,7 +286,7 @@ class CcaRos : public rclcpp::Node
      * @param goal_handle_future follow_joint_trajectory-type action goal handle
      * @return True if successful, false otherwise. Also, returns the goal handle by reference
      */
-    bool execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
+    bool send_execution_goal_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                              rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
                              const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
                              std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> &goal_handle_future);
@@ -349,8 +345,7 @@ class CcaRos : public rclcpp::Node
      * @return Tuple or ROS follow_joint_trajectory goal messages for the robot, gripper, and robot and gripper
      * together. Robot msg is always returned. Other two are conditional.
      */
-    std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> create_goal_msg_(
-        const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step);
+    GoalMsg create_goal_msg_(const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step);
 
     /**
      * @brief Given a robot joint trajectory computes the corresponding cartesian trajectory that the robot tool will
@@ -366,6 +361,8 @@ class CcaRos : public rclcpp::Node
      * @brief Initializes proper action clients in the constructor
      */
     void initialize_action_clients_();
+
+trajectory_msgs::JointTrajectory stitch_trajectories_(const std::vector<trajectory_msgs::JointTrajectory>& trajectories);
 };
 
 } // namespace cca_ros

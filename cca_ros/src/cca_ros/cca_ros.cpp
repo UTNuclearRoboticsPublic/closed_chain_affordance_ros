@@ -1,5 +1,10 @@
+#include <algorithm>
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
+#include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros/cca_ros.hpp>
+#include <cca_ros_msgs/srv/detail/cca_ros_viz__struct.hpp>
+#include <chrono>
+#include <trajectory_msgs/msg/detail/joint_trajectory__struct.hpp>
 
 namespace cca_ros
 {
@@ -80,8 +85,11 @@ CcaRos::~CcaRos()
     rclcpp::shutdown();
 }
 
-cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest &planning_request){
-    status_ = planning_request.status;
+cca_ros::PlanningResponse CcaRos::plan(const cca_ros::PlanningRequest &planning_request, bool multitask_planning){
+
+    // Function output
+    cca_ros::PlanningResponse planning_response;
+    status_ = planning_response.status;
     *status_ = Status::PROCESSING;
 
     // Create const references for readability
@@ -98,7 +106,7 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
     {
         RCLCPP_ERROR(node_logger_, "Error in input validation: %s", e.what());
         *status_ = Status::FAILED;
-        return cc_affordance_planner::PlannerResult();
+        return cca_ros::PlanningResponse();
     }
 
     // Copy task description and start config for potential modifications
@@ -117,7 +125,7 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
             RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
                          task_description.affordance_info.location_frame.c_str());
             *status_ = Status::FAILED;
-            return cc_affordance_planner::PlannerResult();
+            return cca_ros::PlanningResponse();
         }
         task_description.affordance_info.location = aff_htm.translation();
     }
@@ -135,7 +143,7 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
         {
             RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
             *status_ = Status::FAILED;
-            return cc_affordance_planner::PlannerResult();
+            return cca_ros::PlanningResponse();
         }
 
         robot_start_config = state.robot;
@@ -153,7 +161,7 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
         {
             RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
             *status_ = Status::FAILED;
-            return cc_affordance_planner::PlannerResult();
+            return cca_ros::PlanningResponse();
         }
 
         gripper_start_config = state.gripper;
@@ -162,15 +170,6 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
     // If asked to preserve EE/tool orientation, compute planning requests to do that
     if (task_description.ee_orientation_constraint == cc_affordance_planner::EeOrientationConstraint::PRESERVE) {
 
-        RCLCPP_INFO_STREAM(node_logger_, "Building planning requests to preserve EE orientation");
-        cca_ros::PlanningRequests reqs;
-        reqs.status = planning_request.status; // Point to the original status pointer
-        
-        // Resize and fill planner_config with one from original req, resize task description
-        const int nof_reqs = task_description.trajectory_density - 1; // One less than the trajectory density since the first point in the trajectory is the current state of the robot
-        reqs.planner_config.assign(nof_reqs, planner_config);
-        reqs.task_description.resize(nof_reqs);
-        
         // Discretize the screw path
         // Compute forward kinematics to tool
         const Eigen::Matrix4d fk = affordance_util::FKinSpace(M_,robot_slist_,robot_start_config);
@@ -180,12 +179,20 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
         bool preserve_orientation = true;
         const std::vector<cc_affordance_planner::TaskDescription> task_descriptions = cc_affordance_planner::get_se3_screw_tasks(se3_screw_path, preserve_orientation);
         
-        reqs.task_description = task_descriptions;
+	// Build a vector of planning requests
+	std::vector<cca_ros::PlanningRequest> reqs;
+	for (const auto& td: task_descriptions){
+		cca_ros::PlanningRequest req;
+		req.status = planning_request.status; // Point to the motion status pointer from the original req
+		req.planner_config = planner_config; // Same as the original config
+		req.task_description = td; // From se3 path that preserves EE orientation
+		reqs.push_back(req);
+	}
         
         RCLCPP_INFO_STREAM(node_logger_, "Calling CCA planner with planning requests that preserve EE orientation");
         
         // Plan, visualize, and execute the task descriptions to move along the se3_screw_path
-        return(this->plan_visualize_and_execute(reqs));
+        return(this->plan(reqs));
     }
 
     // Prepare robot description for planning
@@ -197,146 +204,17 @@ cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequest
 
     // Create and run the planner interface
     cc_affordance_planner::CcAffordancePlannerInterface ccAffordancePlannerInterface(planner_config);
-    try
-    {
-        const cc_affordance_planner::PlannerResult plannerResult = ccAffordancePlannerInterface.generate_joint_trajectory(robot_description, task_description);
-	return plannerResult;
-    }
-    catch (const std::invalid_argument &e)
-    {
-        RCLCPP_ERROR(node_logger_, "Planner returned exception: %s", e.what());
-        return cc_affordance_planner::PlannerResult();
-    }
-
-}
-
-// Runs the affordance planner for a single task and config.
-bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning_request)
-{
-    status_ = planning_request.status;
-    *status_ = Status::PROCESSING;
-
-    // Create const references for readability
-    const cc_affordance_planner::PlannerConfig &planner_config = planning_request.planner_config;
-    const cca_ros::KinematicState &start_state = planning_request.start_state;
-    const TrajectoryTimeStep& time_step = planning_request.time_step;
-
-    // Validate input
-    try
-    {
-        this->validate_input_(planning_request.task_description);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        RCLCPP_ERROR(node_logger_, "Error in input validation: %s", e.what());
-        *status_ = Status::FAILED;
-        return false;
-    }
-
-    // Copy task description and start config for potential modifications
-    cc_affordance_planner::TaskDescription task_description = planning_request.task_description;
-    Eigen::VectorXd robot_start_config = start_state.robot;
-    double gripper_start_config = start_state.gripper;
-    const bool includes_gripper_trajectory = !std::isnan(task_description.goal.gripper);
-
-    // Lookup affordance location if the tag frame is specified
-    if (!task_description.affordance_info.location_frame.empty())
-    {
-        const Eigen::Isometry3d aff_htm =
-            ros_cpp_util::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
-        if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
-        {
-            RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
-                         task_description.affordance_info.location_frame.c_str());
-            *status_ = Status::FAILED;
-            return false;
-        }
-        task_description.affordance_info.location = aff_htm.translation();
-    }
-
-    // Get joint states if start configuration is empty
-    if (robot_start_config.size() == 0)
-    {
-        KinematicState state;
-
-        try
-        {
-            state = read_joint_states_();
-        }
-        catch (const std::runtime_error &e)
-        {
-            RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
-            *status_ = Status::FAILED;
-            return false;
-        }
-
-        robot_start_config = state.robot;
-    }
-
-    if (includes_gripper_trajectory && std::isnan(gripper_start_config))
-    {
-        KinematicState state;
-
-        try
-        {
-            state = read_joint_states_();
-        }
-        catch (const std::runtime_error &e)
-        {
-            RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
-            *status_ = Status::FAILED;
-            return false;
-        }
-
-        gripper_start_config = state.gripper;
-    }
-
-    // If asked to preserve EE/tool orientation, compute planning requests to do that
-    if (task_description.ee_orientation_constraint == cc_affordance_planner::EeOrientationConstraint::PRESERVE) {
-
-        RCLCPP_INFO_STREAM(node_logger_, "Building planning requests to preserve EE orientation");
-        cca_ros::PlanningRequests reqs;
-        reqs.status = planning_request.status; // Point to the original status pointer
-        
-        // Resize and fill planner_config with one from original req, resize task description
-        const int nof_reqs = task_description.trajectory_density - 1; // One less than the trajectory density since the first point in the trajectory is the current state of the robot
-        reqs.planner_config.assign(nof_reqs, planner_config);
-        reqs.task_description.resize(nof_reqs);
-        
-        // Discretize the screw path
-        // Compute forward kinematics to tool
-        const Eigen::Matrix4d fk = affordance_util::FKinSpace(M_,robot_slist_,robot_start_config);
-        const std::vector<Eigen::Matrix4d> se3_screw_path = affordance_util::compute_se3_screw_trajectory(task_description.affordance_info, task_description.goal.affordance, task_description.trajectory_density, fk);
-        
-        // Generate task descriptions from se3_screw_traj
-        bool preserve_orientation = true;
-        const std::vector<cc_affordance_planner::TaskDescription> task_descriptions = cc_affordance_planner::get_se3_screw_tasks(se3_screw_path, preserve_orientation);
-        
-        reqs.task_description = task_descriptions;
-        
-        RCLCPP_INFO_STREAM(node_logger_, "Calling CCA planner with planning requests that preserve EE orientation");
-        
-        // Plan, visualize, and execute the task descriptions to move along the se3_screw_path
-        return(this->plan_visualize_and_execute(reqs));
-    }
-
-    // Prepare robot description for planning
-    affordance_util::RobotDescription robot_description;
-    robot_description.slist = robot_slist_;
-    robot_description.M = M_;
-    robot_description.joint_states = robot_start_config;
-    robot_description.gripper_state = gripper_start_config;
-
-    // Create and run the planner interface
-    cc_affordance_planner::CcAffordancePlannerInterface ccAffordancePlannerInterface(planner_config);
-    cc_affordance_planner::PlannerResult plannerResult;
+    cc_affordance_planner::PlannerResult& plannerResult = planning_response.result;
     try
     {
         plannerResult = ccAffordancePlannerInterface.generate_joint_trajectory(robot_description, task_description);
+	if (multitask_planning) {return planning_response;}
     }
     catch (const std::invalid_argument &e)
     {
         RCLCPP_ERROR(node_logger_, "Planner returned exception: %s", e.what());
+        *status_ = Status::FAILED;
+        return cca_ros::PlanningResponse();
     }
 
     // Handle planner result
@@ -366,7 +244,7 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
                     "readjusting the task to this limit.",
                     std::copysign(plannerResult.joint_trajectory.back().tail(1)(0), task_description.goal.affordance));
                 *status_ = Status::FAILED;
-                return false;
+                return cca_ros::PlanningResponse();
             }
         }
     }
@@ -374,206 +252,104 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequest &planning
     {
         RCLCPP_WARN(node_logger_, "Planner did not find a solution");
         *status_ = Status::FAILED;
-        return false;
+        return cca_ros::PlanningResponse();
     }
 
     // Convert the trajectory to ROS msg for visualization and/or execution
-    const auto [robot_goal_msg, gripper_goal_msg, robot_and_gripper_goal_msg] =
-        create_goal_msg_(plannerResult.joint_trajectory, includes_gripper_trajectory, time_step);
+    const cca_ros::GoalMsg goal_msg =
+        this->create_goal_msg_(plannerResult.joint_trajectory, includes_gripper_trajectory, time_step);
 
-    // Visualize the trajectory
-    if (planning_request.visualize_trajectory)
+    // Compute cartesian trajectory for the tool
+    const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory = this->compute_cartesian_trajectory_(plannerResult.joint_trajectory);
+
+    // Validate and visualize the trajectory
+    auto response = this->validate_and_visualize_(goal_msg.robot, cartesian_trajectory, task_description);
+    
+    // Check if the visualization succeeded
+    if (response->success)
     {
-        // Compute cartesian trajectory
-        const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory =
-            this->compute_cartesian_trajectory_(plannerResult.joint_trajectory);
-
-        // Fill out the affordance reference pose
-        geometry_msgs::msg::Pose aff_ref_pose;
-        if (task_description.motion_type == cc_affordance_planner::MotionType::APPROACH)
-        {
-            Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.grasp_pose.block<3, 3>(0, 0));
-            aff_ref_pose_quat.normalize(); // Ensures it's a valid unit quaternion
-            aff_ref_pose.position.x = task_description.goal.grasp_pose(0, 3);
-            aff_ref_pose.position.y = task_description.goal.grasp_pose(1, 3);
-            aff_ref_pose.position.z = task_description.goal.grasp_pose(2, 3);
-            aff_ref_pose.orientation.w = aff_ref_pose_quat.w();
-            aff_ref_pose.orientation.x = aff_ref_pose_quat.x();
-            aff_ref_pose.orientation.y = aff_ref_pose_quat.y();
-            aff_ref_pose.orientation.z = aff_ref_pose_quat.z();
-        }
-
-        if (!visualize_trajectory_(robot_goal_msg, cartesian_trajectory, task_description.affordance_info.axis,
-                                   task_description.affordance_info.location, aff_ref_pose))
-        {
-            return false;
-        }
+        RCLCPP_INFO(node_logger_, " %s validation service succeeded", viz_ss_name_.c_str());
+        plannerResult.planning_time += std::cast<std::chrono::microseconds>(response->validation_time_usecs); // Add the time it took to check for joint-limit violation and self collision
+    }
+    else
+    {
+        RCLCPP_ERROR(node_logger_, "%s validation service failed. Trajectory likely violates self-collision or joint limit constraints. Check server for more info.", viz_ss_name_.c_str());
+        *status_ = Status::FAILED;
+        return cca_ros::PlanningResponse();
     }
 
     // Execute the trajectory
-    if (planning_request.execute_trajectory)
+    if (planning_request.execute_trajectory && !(this->execute_(goal_msg, includes_gripper_trajectory)))
     {
-        // Setup goal options for sending trajectory goals
-        auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-        robot_send_goal_options.goal_response_callback =
-            std::bind(&CcaRos::robot_traj_execution_goal_response_callback_, this, std::placeholders::_1);
-        robot_send_goal_options.result_callback =
-            std::bind(&CcaRos::robot_traj_execution_result_callback_, this, std::placeholders::_1);
-
-        // Check if both robot and gripper trajectories should be included
-        if (includes_gripper_trajectory)
-        {
-            if (unified_executor_available_)
-            {
-                // Set result status and execute unified trajectory
-                robot_result_status_ = status_;
-                return execute_trajectory_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
-                                           robot_and_gripper_traj_execution_as_name_, robot_and_gripper_goal_msg,
-                                           unified_gh_future_);
-            }
-            else
-            {
-                // Setup goal options for gripper trajectory
-                auto gripper_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-                gripper_send_goal_options.goal_response_callback =
-                    std::bind(&CcaRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
-                gripper_send_goal_options.result_callback =
-                    std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
-
-                // Start a thread to check result status
-                result_status_thread_ = std::jthread(&CcaRos::check_robot_and_gripper_result_status_, this);
-
-                // Execute trajectories for both robot and gripper
-                return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                            robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_)) &&
-                       (execute_trajectory_(gripper_traj_execution_client_, gripper_send_goal_options,
-                                            gripper_traj_execution_as_name_, gripper_goal_msg, gripper_gh_future_));
-            }
-        }
-        else
-        {
-            // Set result status and execute trajectory for robot only
-            robot_result_status_ = status_;
-            return execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                       robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_);
-        }
+    *status_ = cca_ros::Status::FAILED;
+    RCLCPP_ERROR(node_logger_, "Validated trajectory execution failed. See robot server side for more info.");
+    return cca_ros::PlanningResponse();
     }
 
     *status_ = cca_ros::Status::SUCCEEDED;
-    return true;
+    return planning_response;
+
 }
 
 // Runs the affordance planner for multiple tasks and configurations.
-bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &planning_requests)
+// cc_affordance_planner::PlannerResult CcaRos::plan(const cca_ros::PlanningRequests &planning_requests)
+cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningRequest> &planning_requests, bool singletask_planning)
 
 {
-    status_ = planning_requests.status;
+    // Function output
+    cca_ros::PlanningResponse planning_response;
+    status_ = planning_response.status;
     *status_ = Status::PROCESSING;
-
-    // Create const references for readability
-    const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions = planning_requests.task_description;
-    const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs = planning_requests.planner_config;
-    const cca_ros::KinematicState &start_state = planning_requests.start_state;
-    const TrajectoryTimeStep& time_step = planning_requests.time_step;
 
     // Validate input
     try
     {
-        this->validate_input_(planner_configs, task_descriptions);
+        this->validate_input_(planning_requests);
     }
     catch (const std::invalid_argument &e)
     {
         RCLCPP_ERROR(node_logger_, "Error in input validation: %s", e.what());
         *status_ = Status::FAILED;
-        return false;
+        return cca_ros::PlanningResponse();
     }
-
-    const bool includes_gripper_trajectory = !std::isnan(task_descriptions.front().goal.gripper);
-    Eigen::VectorXd robot_start_config = start_state.robot;
-    double gripper_start_config = start_state.gripper;
-
-    // Get joint states if start configuration is empty
-    if (robot_start_config.size() == 0)
-    {
-        KinematicState state;
-
-        try
-        {
-            state = read_joint_states_();
-        }
-        catch (const std::runtime_error &e)
-        {
-            RCLCPP_ERROR(node_logger_, "Robot start config not available: %s", e.what());
-            *status_ = Status::FAILED;
-            return false;
-        }
-
-        robot_start_config = state.robot;
-    }
-
-    if (includes_gripper_trajectory && std::isnan(gripper_start_config))
-    {
-        KinematicState state;
-
-        try
-        {
-            state = read_joint_states_();
-        }
-        catch (const std::runtime_error &e)
-        {
-            RCLCPP_ERROR(node_logger_, "Gripper start config not available: %s", e.what());
-            *status_ = Status::FAILED;
-            return false;
-        }
-
-        gripper_start_config = state.gripper;
-    }
-    // Prepare robot description
-    affordance_util::RobotDescription robot_description;
-    robot_description.slist = robot_slist_;
-    robot_description.M = M_;
-    robot_description.joint_states = robot_start_config;
-    robot_description.gripper_state = gripper_start_config;
+    const bool includes_gripper_trajectory = !std::isnan(planning_requests.front().task_description.goal.gripper);
 
     std::vector<Eigen::VectorXd> solution;
 
+
+    cc_affordance_planner::PlannerResult& plannerResultFinal = planning_response.result; // Except for joint trajectory and planning time, which we wanna aggregate, fill everything else from last task result.
+    using namespace std::chrono_literals;
+    plannerResultFinal.planning_time = std::chrono::microseconds{0};
+    size_t i = 0;
+    std::vector<cca_ros::PlanningRequest> reqs = planning_requests; // Copy because we will modify start state
+    struct TrajMsg {std::vector<trajectory_msgs::msg::JointTrajectory> robot;
+std::vector<trajectory_msgs::msg::JointTrajectory> gripper;
+std::vector<trajectory_msgs::msg::JointTrajectory> robot_and_gripper;
+	};
+    TrajMsg traj_msg;
+cca_ros::GoalMsg goal_msg;
     // Iterate through all planner configurations
-    for (size_t i = 0; i < planner_configs.size(); ++i)
+    for (const auto& planning_request: reqs)
     {
-        cc_affordance_planner::TaskDescription task_description = task_descriptions[i];
 
-        // Lookup affordance location if specified
-        if (!task_description.affordance_info.location_frame.empty())
-        {
-            const Eigen::Isometry3d aff_htm =
-                ros_cpp_util::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
-            if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
-            {
-                RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
-                             task_description.affordance_info.location_frame.c_str());
-                *status_ = Status::FAILED;
-                return false;
-            }
-            task_description.affordance_info.location = aff_htm.translation();
-        }
+	cc_affordance_planner::PlannerResult plannerResult;
 
-        // Create planner and run
-        cc_affordance_planner::CcAffordancePlannerInterface ccAffordancePlannerInterface(planner_configs[i]);
-        cc_affordance_planner::PlannerResult plannerResult;
         try
         {
-            plannerResult = ccAffordancePlannerInterface.generate_joint_trajectory(robot_description, task_description);
+            plannerResult = this->plan(planning_request, /*multitask_planning=*/true);
         }
         catch (const std::invalid_argument &e)
         {
-            RCLCPP_ERROR(node_logger_, "Planner returned exception: %s", e.what());
+            RCLCPP_ERROR(node_logger_, "Planner returned exception for task %zu: %s", i, e.what());
+            *status_ = Status::FAILED;
+            return cca_ros::PlanningResponse();
         }
 
-        // Handle planner result
+        // Return on failure or first task with partial trajectory
         if (plannerResult.success)
         {
             if ((plannerResult.trajectory_description == cc_affordance_planner::TrajectoryDescription::PARTIAL) &&
-                ((task_description.trajectory_density - plannerResult.joint_trajectory.size()) > 2))
+                ((planning_request.task_description.trajectory_density - plannerResult.joint_trajectory.size()) > 2))
 
             {
                 RCLCPP_ERROR(
@@ -581,92 +357,79 @@ bool CcaRos::plan_visualize_and_execute(const cca_ros::PlanningRequests &plannin
                     "Partial solution at task %zu. Could be due to affordance reaching limit at %f. Try "
                     "readjusting the task to this limit.",
                     i,
-                    std::copysign(plannerResult.joint_trajectory.back().tail(1)(0), task_description.goal.affordance));
+                    std::copysign(plannerResult.joint_trajectory.back().tail(1)(0), planning_request.task_description.goal.affordance));
                 *status_ = Status::FAILED;
-                return false;
+                return cca_ros::PlanningResponse();
             }
         }
         else
         {
             RCLCPP_WARN(node_logger_, "Planner did not find a solution for task %zu", i);
             *status_ = Status::FAILED;
-            return false;
+            return cca_ros::PlanningResponse();
         }
 
         // Append joint trajectory to solution
-        solution.insert(solution.end(), plannerResult.joint_trajectory.begin(), plannerResult.joint_trajectory.end());
+        plannerResultFinal.joint_trajectory.insert(plannerResultFinal.joint_trajectory.end(), plannerResult.joint_trajectory.begin(), plannerResult.joint_trajectory.end());
 
-        // Update robot description with the end point of the current trajectory
-        robot_description.joint_states = plannerResult.joint_trajectory.back().head(robot_start_config.size());
-        robot_description.gripper_state = plannerResult.joint_trajectory.back()[robot_joint_names_.size()];
+	// Collect trajectories so we can stitch them into one goal msg. Need to do this to account for different time steps in planning requests
+        goal_msg =
+            this->create_goal_msg_(plannerResult.joint_trajectory, includes_gripper_trajectory, planning_request.time_step);
+	traj_msg.robot.push_back(goal_msg.robot.trajectory);
+	traj_msg.gripper.push_back(goal_msg.gripper.trajectory);
+	traj_msg.robot_and_gripper.push_back(goal_msg.robot_and_gripper.trajectory);
+        
+        
+	// Gather planning time
+        plannerResultFinal.planning_time += plannerResult.planning_time;
+
+        // Update state with the end point of the current trajectory
+        planning_request.start_state.robot = plannerResult.joint_trajectory.back().head(robot_joint_names_.size());
+        if (includes_gripper_trajectory){planning_request.start_state.gripper = plannerResult.joint_trajectory.back()[gripper_joint_names_.size()];}
+        
+	// Increment task counter
+        ++i;
     }
 
-    // Convert the trajectory to ROS msg for visualization and/or execution
-    const auto [robot_goal_msg, gripper_goal_msg, robot_and_gripper_goal_msg] =
-        create_goal_msg_(solution, includes_gripper_trajectory, time_step);
+    // If singletask planning don't visualize or execute, this is done in the single task function
+    if (singletask_planning) {return planning_response;}
+    
+    // Stitch trajectories together
+    goal_msg.robot.trajectory = this->stitch_trajectories_(traj_msg.robot);
+    goal_msg.gripper.trajectory = this->stitch_trajectories_(traj_msg.gripper);
+    goal_msg.robot_and_gripper.trajectory = this->stitch_trajectories_(traj_msg.robot_and_gripper);
 
-    // Visualize the trajectory
-    if (planning_requests.visualize_trajectory)
+    // Compute cartesian trajectory for the tool
+    const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory = this->compute_cartesian_trajectory_(plannerResultFinal.joint_trajectory);
+
+    // Validate and visualize the trajectory
+    auto task_description = planning_requests.back().task_description; //TODO: Visualize all task descriptions instead of just the last one
+    auto response = this->validate_and_visualize_(goal_msg.robot, cartesian_trajectory, task_description);
+    
+    // Check if the visualization succeeded
+    if (response->success)
     {
-        const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory =
-            this->compute_cartesian_trajectory_(solution);
-        if (!visualize_trajectory_(robot_goal_msg, cartesian_trajectory, task_descriptions.back().affordance_info.axis,
-                                   task_descriptions.back().affordance_info.location))
-        {
-            return false;
-        }
+        RCLCPP_INFO(node_logger_, " %s validation service succeeded", viz_ss_name_.c_str());
+        plannerResultFinal.planning_time += std::cast<std::chrono::microseconds>(response->validation_time_usecs); // Add the time it took to check for joint-limit violation and self collision
+    }
+    else
+    {
+        RCLCPP_ERROR(node_logger_, "%s validation service failed. Trajectory likely violates self-collision or joint limit constraints. Check server for more info.", viz_ss_name_.c_str());
+        *status_ = Status::FAILED;
+        return cca_ros::PlanningResponse();
     }
 
     // Execute the trajectory
-    if (planning_requests.execute_trajectory)
+    if (planning_requests.front().execute_trajectory && !(this->execute_(goal_msg, includes_gripper_trajectory)))
     {
-        // Setup goal options for sending trajectory goals
-        auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-        robot_send_goal_options.goal_response_callback =
-            std::bind(&CcaRos::robot_traj_execution_goal_response_callback_, this, std::placeholders::_1);
-        robot_send_goal_options.result_callback =
-            std::bind(&CcaRos::robot_traj_execution_result_callback_, this, std::placeholders::_1);
-
-        // Check if both robot and gripper trajectories should be included
-        if (includes_gripper_trajectory)
-        {
-            if (unified_executor_available_)
-            {
-                // Set result status and execute unified trajectory
-                robot_result_status_ = status_;
-                return execute_trajectory_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
-                                           robot_and_gripper_traj_execution_as_name_, robot_and_gripper_goal_msg,
-                                           unified_gh_future_);
-            }
-            else
-            {
-                // Setup goal options for gripper trajectory
-                auto gripper_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
-                gripper_send_goal_options.goal_response_callback =
-                    std::bind(&CcaRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
-                gripper_send_goal_options.result_callback =
-                    std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
-
-                // Start a thread to check result status
-                result_status_thread_ = std::jthread(&CcaRos::check_robot_and_gripper_result_status_, this);
-
-                // Execute trajectories for both robot and gripper
-                return (execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                            robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_)) &&
-                       (execute_trajectory_(gripper_traj_execution_client_, gripper_send_goal_options,
-                                            gripper_traj_execution_as_name_, gripper_goal_msg, gripper_gh_future_));
-            }
-        }
-        else
-        {
-            // Set result status and execute trajectory for robot only
-            robot_result_status_ = status_;
-            return execute_trajectory_(robot_traj_execution_client_, robot_send_goal_options,
-                                       robot_traj_execution_as_name_, robot_goal_msg, robot_gh_future_);
-        }
+    *status_ = cca_ros::Status::FAILED;
+    RCLCPP_ERROR(node_logger_, "Validated trajectory execution failed. See robot server side for more info.");
+    return cca_ros::PlanningResponse();
     }
+
     *status_ = cca_ros::Status::SUCCEEDED;
-    return true;
+
+    return planning_response;
 }
 
 void CcaRos::initialize_action_clients_()
@@ -706,23 +469,17 @@ void CcaRos::validate_input_(const cc_affordance_planner::TaskDescription &task_
 }
 
 // Helper function to validate input
-void CcaRos::validate_input_(const std::vector<cc_affordance_planner::PlannerConfig> &planner_configs,
-                             const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions)
+void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest> reqs)
 {
-    // Ensure planner configs and task descriptions are of the same size
-    if (planner_configs.size() != task_descriptions.size() || planner_configs.empty())
-    {
-        throw std::invalid_argument("Planner configs and task descriptions: Must be of the same size and non-empty.");
-    }
 
     // Ensure gripper goals are consistent across all tasks
-    bool first_gripper_goal_status = !std::isnan(task_descriptions.front().goal.gripper);
-    this->validate_input_(task_descriptions.front()); // At the moment, we're just validating gripper info so, just
+    bool first_gripper_goal_status = !std::isnan(reqs.front().task_description.goal.gripper);
+    this->validate_input_(reqs.front().task_description); // At the moment, we're just validating gripper info so, just
                                                       // check the first one.
 
-    for (const auto &task_description : task_descriptions)
+    for (const auto &req: reqs)
     {
-        bool gripper_goal_status = !std::isnan(task_description.goal.gripper);
+        bool gripper_goal_status = !std::isnan(req.task_description.goal.gripper);
 
         if (gripper_goal_status != first_gripper_goal_status)
         { // Check for logical inequivalence
@@ -819,16 +576,14 @@ std::vector<geometry_msgs::msg::Pose> CcaRos::compute_cartesian_trajectory_(
 }
 
 // Function to create goal messages for robot and optionally for gripper
-std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTrajectoryGoal> CcaRos::create_goal_msg_(
+CcaRos::GoalMsg CcaRos::create_goal_msg_(
     const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step)
 {
     // Initialize goal messages
-    FollowJointTrajectoryGoal gripper_goal;
-    FollowJointTrajectoryGoal robot_goal;
-    FollowJointTrajectoryGoal robot_and_gripper_goal;
+    cca_ros::GoalMsg goal_msg;
 
     // Always create the robot goal message
-    robot_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
+    goal_msg.robot = ros_cpp_util::follow_joint_trajectory_msg_builder(
         trajectory, Eigen::VectorXd::Zero(robot_joint_names_.size()), robot_joint_names_, time_step.robot);
 
     if (includes_gripper_trajectory)
@@ -845,7 +600,7 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
                                                  gripper_joint_names_.end());
 
             // Build goal message for combined robot and gripper trajectory
-            robot_and_gripper_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
+            goal_msg.robot_and_gripper = ros_cpp_util::follow_joint_trajectory_msg_builder(
                 trajectory, Eigen::VectorXd::Zero(robot_and_gripper_joint_names.size()), robot_and_gripper_joint_names,
                 time_step.robot_and_gripper);
         }
@@ -863,19 +618,20 @@ std::tuple<FollowJointTrajectoryGoal, FollowJointTrajectoryGoal, FollowJointTraj
             }
 
             // Build goal message for gripper trajectory
-            gripper_goal = ros_cpp_util::follow_joint_trajectory_msg_builder(
+            goal_msg.gripper = ros_cpp_util::follow_joint_trajectory_msg_builder(
                 gripper_trajectory, Eigen::VectorXd::Zero(1), gripper_joint_names_, time_step.gripper);
         }
     }
-    return std::make_tuple(robot_goal, gripper_goal, robot_and_gripper_goal);
+    return goal_msg;
 }
 
-// Visualizes and executes the given trajectory.
-bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
-                                   const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
-                                   const Eigen::VectorXd &w_aff, const Eigen::VectorXd &q_aff,
-                                   const std::optional<geometry_msgs::msg::Pose> &aff_ref_pose)
-{
+// Validates and visualizes a given trajectory
+cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const cc_affordance_planner::TaskDescription& task_description){
+
+    // Extract affordance info
+    const Eigen::Vector3d& w_aff = task_description.affordance_info.axis;
+    const Eigen::Vector3d& q_aff = task_description.affordance_info.location;
+    
     // Create visualization request
     auto viz_serv_req = std::make_shared<CcaRosViz::Request>();
     viz_serv_req->joint_traj = goal.trajectory;
@@ -883,9 +639,22 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
     viz_serv_req->aff_screw_axis = {w_aff[0], w_aff[1], w_aff[2]};
     viz_serv_req->aff_location = {q_aff[0], q_aff[1], q_aff[2]};
     viz_serv_req->ref_frame = ref_frame_;
-    if (aff_ref_pose.has_value())
+
+    // For APPROACH motion, fill out the affordance reference pose
+    if (task_description.motion_type == cc_affordance_planner::MotionType::APPROACH)
     {
-        viz_serv_req->aff_ref_pose = aff_ref_pose.value();
+        // Position
+        viz_serv_req->aff_ref_pose.position.x = task_description.goal.grasp_pose(0, 3);
+        viz_serv_req->aff_ref_pose.position.y = task_description.goal.grasp_pose(1, 3);
+        viz_serv_req->aff_ref_pose.position.z = task_description.goal.grasp_pose(2, 3);
+
+        // Orientation
+        Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.grasp_pose.block<3, 3>(0, 0));
+        aff_ref_pose_quat.normalize(); // Ensures it's a valid unit quaternion
+        viz_serv_req->aff_ref_pose.orientation.w = aff_ref_pose_quat.w();
+        viz_serv_req->aff_ref_pose.orientation.x = aff_ref_pose_quat.x();
+        viz_serv_req->aff_ref_pose.orientation.y = aff_ref_pose_quat.y();
+        viz_serv_req->aff_ref_pose.orientation.z = aff_ref_pose_quat.z();
     }
     else
     {
@@ -906,32 +675,72 @@ bool CcaRos::visualize_trajectory_(const FollowJointTrajectoryGoal &goal,
         {
             RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.", viz_ss_name_.c_str());
             *status_ = Status::FAILED;
-            return false;
+	     auto response = std::make_shared<cca_ros_msgs::srv::CcaRosViz::Response>();
+	     response->success = false;
+	     return response;
         }
         RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", viz_ss_name_.c_str());
     }
 
     // Send the request
     auto result_future = viz_client_->async_send_request(viz_serv_req);
-    RCLCPP_INFO(node_logger_, "Sent visualization request to %s service", viz_ss_name_.c_str());
+    RCLCPP_INFO(node_logger_, "Sent trajectory visualization request to %s service", viz_ss_name_.c_str());
     auto response = result_future.get();
+    return response;
 
-    // Check if the service succeeded
-    if (response->success)
+}
+
+bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory){
+
+    // Setup goal options for sending trajectory goals
+    auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
+    robot_send_goal_options.goal_response_callback =
+        std::bind(&CcaRos::robot_traj_execution_goal_response_callback_, this, std::placeholders::_1);
+    robot_send_goal_options.result_callback =
+        std::bind(&CcaRos::robot_traj_execution_result_callback_, this, std::placeholders::_1);
+    
+    // Check if both robot and gripper trajectories should be included
+    if (includes_gripper_trajectory)
     {
-        RCLCPP_INFO(node_logger_, " %s service succeeded", viz_ss_name_.c_str());
-        return true;
+        if (unified_executor_available_)
+        {
+            // Set result status and execute unified trajectory
+            robot_result_status_ = status_;
+            return this->send_execution_goal_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
+                                       robot_and_gripper_traj_execution_as_name_, goal_msg.robot_and_gripper,
+                                       unified_gh_future_);
+        }
+        else
+        {
+            // Setup goal options for gripper trajectory
+            auto gripper_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
+            gripper_send_goal_options.goal_response_callback =
+                std::bind(&CcaRos::gripper_traj_execution_goal_response_callback_, this, std::placeholders::_1);
+            gripper_send_goal_options.result_callback =
+                std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
+    
+            // Start a thread to check result status
+            result_status_thread_ = std::jthread(&CcaRos::check_robot_and_gripper_result_status_, this);
+    
+            // Execute trajectories for both robot and gripper
+            return (this->send_execution_goal_(robot_traj_execution_client_, robot_send_goal_options,
+                                        robot_traj_execution_as_name_, goal_msg.robot, robot_gh_future_)) &&
+                   (this->send_execution_goal_(gripper_traj_execution_client_, gripper_send_goal_options,
+                                        gripper_traj_execution_as_name_, goal_msg.gripper, gripper_gh_future_));
+        }
     }
     else
     {
-        RCLCPP_ERROR(node_logger_, "%s service call failed", viz_ss_name_.c_str());
-        *status_ = Status::FAILED;
-        return false;
+        // Set result status and execute trajectory for robot only
+        robot_result_status_ = status_;
+        return this->send_execution_goal_(robot_traj_execution_client_, robot_send_goal_options,
+                                   robot_traj_execution_as_name_, goal_msg.robot, robot_gh_future_);
     }
+    
 }
 
 // Executes the planned trajectory.
-bool CcaRos::execute_trajectory_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
+bool CcaRos::send_execution_goal_(rclcpp_action::Client<FollowJointTrajectory>::SharedPtr &traj_execution_client,
                                  rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions send_goal_options,
                                  const std::string &traj_execution_as_name, const FollowJointTrajectoryGoal &goal,
                                  std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr> &goal_handle_future)
@@ -1148,6 +957,40 @@ void CcaRos::cancel_execution()
             RCLCPP_ERROR(node_logger_, "Failed to cancel goal for action server %s", action_server_name.c_str());
         }
     }
+}
+
+trajectory_msgs::JointTrajectory CcaRos::stitch_trajectories_(const std::vector<trajectory_msgs::JointTrajectory>& trajectories)
+{
+    trajectory_msgs::JointTrajectory result;
+    if (trajectories.empty())
+        return result;
+
+    result.joint_names = trajectories[0].joint_names;
+    ros::Duration time_offset(0.0);
+
+    for (size_t i = 0; i < trajectories.size(); ++i)
+    {
+        const auto& traj = trajectories[i];
+
+        // Optional: ensure joint names match
+	if (traj.joint_names != result.joint_names) {
+            throw std::runtime_error("Joint names mismatch in trajectory " + std::to_string(i));
+        }
+
+        // Adjust the timing of each point
+        for (const auto& p : traj.points)
+        {
+            trajectory_msgs::JointTrajectoryPoint new_pt = p;
+            new_pt.time_from_start += time_offset;
+            result.points.push_back(new_pt);
+        }
+
+        // Update total time offset to the last point of this trajectory
+        if (!traj.points.empty())
+            time_offset = result.points.back().time_from_start;
+    }
+
+    return result;
 }
 
 } // namespace cca_ros
