@@ -888,38 +888,50 @@ void CcaRos::cancel_execution()
     }
 }
 
-trajectory_msgs::JointTrajectory CcaRos::stitch_trajectories_(const std::vector<trajectory_msgs::JointTrajectory>& trajectories)
+trajectory_msgs::msg::JointTrajectory CcaRos::stitch_trajectories_(
+    const std::vector<trajectory_msgs::msg::JointTrajectory> &trajectories)
 {
-    trajectory_msgs::JointTrajectory result;
+    trajectory_msgs::msg::JointTrajectory result;
+
+    // Return early if input is empty
     if (trajectories.empty())
         return result;
 
-    result.joint_names = trajectories[0].joint_names;
-    ros::Duration time_offset(0.0);
+    // Copy joint names from the first trajectory
+    result.joint_names = trajectories.front().joint_names;
+
+    // Time offset to consider timing may be different for different trajectories
+    rclcpp::Duration time_offset = rclcpp::Duration::from_seconds(0.0);
 
     for (size_t i = 0; i < trajectories.size(); ++i)
     {
-        const auto& traj = trajectories[i];
+        const auto &traj = trajectories[i];
 
-        // Optional: ensure joint names match
-	if (traj.joint_names != result.joint_names) {
+        // Check joint name consistency across all trajectories
+        if (traj.joint_names != result.joint_names)
+        {
             throw std::runtime_error("Joint names mismatch in trajectory " + std::to_string(i));
         }
 
-        // Adjust the timing of each point
-        for (const auto& p : traj.points)
+        // Offset time_from_start for each point and add to result
+        for (const auto &p : traj.points)
         {
-            trajectory_msgs::JointTrajectoryPoint new_pt = p;
-            new_pt.time_from_start += time_offset;
-            result.points.push_back(new_pt);
+            trajectory_msgs::msg::JointTrajectoryPoint shifted_pt = p;
+            rclcpp::Duration original_time(p.time_from_start);
+            shifted_pt.time_from_start = (original_time + time_offset).to_builtin();
+            result.points.push_back(std::move(shifted_pt));
         }
 
-        // Update total time offset to the last point of this trajectory
+        // Update time offset using last point of this segment
         if (!traj.points.empty())
-            time_offset = result.points.back().time_from_start;
+        {
+            time_offset = rclcpp::Duration(traj.points.back().time_from_start);
+            time_offset = time_offset + rclcpp::Duration::from_seconds(0.0);  // enforce normalized duration
+        }
     }
 
     return result;
 }
+
 
 } // namespace cca_ros

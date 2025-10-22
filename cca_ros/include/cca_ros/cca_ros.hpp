@@ -355,7 +355,7 @@ bool execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory
      */
     void initialize_action_clients_();
 
-trajectory_msgs::JointTrajectory stitch_trajectories_(const std::vector<trajectory_msgs::JointTrajectory>& trajectories);
+trajectory_msgs::msg::JointTrajectory stitch_trajectories_(const std::vector<trajectory_msgs::msg::JointTrajectory>& trajectories);
 };
 
 } // namespace cca_ros
