@@ -168,11 +168,12 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     // Some helper variables
     // See if we have a single planning request
     const bool single_planning_request = planning_requests.size() == 1;
-    bool is_partial; // To track if solved trajectories are partial
+    bool is_partial = true; // To track if solved trajectories are partial
 
     // Process each planning request
     for (size_t task_idx = 0; task_idx < working_requests.size(); ++task_idx) {
         const size_t org_task_idx = working_requests[task_idx].org_index;
+        const std::string index_log = single_planning_request ? "" : " for task " + std::to_string(org_task_idx);
         auto& request = working_requests[task_idx].request;
         auto& task_description = request.task_description;
         auto& start_state = request.start_state;
@@ -182,17 +183,33 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
         // Lookup affordance location if tag frame is specified
         if (!task_description.affordance_info.location_frame.empty()) {
-            const Eigen::Isometry3d aff_htm = 
-                ros_cpp_util::get_htm(ref_frame_, task_description.affordance_info.location_frame, *tf_buffer_);
-            
-            if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity())) {
-                RCLCPP_ERROR(node_logger_, "Could not lookup %s frame. Shutting down.",
-                    task_description.affordance_info.location_frame.c_str());
+            try {
+                // Lookup transform from ref_frame_ to the affordance location frame
+                geometry_msgs::msg::TransformStamped transform_stamped = 
+                    tf_buffer_->lookupTransform(
+                        ref_frame_, 
+                        task_description.affordance_info.location_frame,
+                        tf2::TimePointZero);  // Get latest available transform
+                
+                // Extract translation from the transform
+                task_description.affordance_info.location << 
+                    transform_stamped.transform.translation.x,
+                    transform_stamped.transform.translation.y,
+                    transform_stamped.transform.translation.z;
+                
+                // Clear the frame name since it has served its purpose -- We don't wanna spam look-up for subtasks created from this task for EeOrientationConstraint::PRESERVE
+                task_description.affordance_info.location_frame.clear();
+                
+            } catch (const tf2::TransformException &ex) {
+                RCLCPP_ERROR(node_logger_, 
+                    "Could not lookup transform from %s to %s to fill in affordance location%s: %s", 
+                    ref_frame_.c_str(),
+                    task_description.affordance_info.location_frame.c_str(),
+		    index_log.c_str(),
+                    ex.what());
                 *status_ = Status::FAILED;
                 return cca_ros::PlanningResponse();
             }
-            task_description.affordance_info.location = aff_htm.translation();
-            task_description.affordance_info.location_frame.clear(); // Clear since it has served its purpose and if we have to create subrequests below for EeOrientationConstraint::PRESERVE, we don't wanna spam-lookup TF again.
         }
 
         // Check if this task requires EE orientation preservation
@@ -251,14 +268,14 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         try {
             task_result = planner.generate_joint_trajectory(robot_description, task_description);
         } catch (const std::invalid_argument &e) {
-            RCLCPP_ERROR(node_logger_, "Planner returned exception for task %zu: %s", org_task_idx, e.what());
+            RCLCPP_ERROR(node_logger_, "Planner returned exception%s: %s", index_log.c_str(), e.what());
             *status_ = Status::FAILED;
             return cca_ros::PlanningResponse();
         }
 
         // Check if planning succeeded
         if (!task_result.success) {
-            RCLCPP_WARN(node_logger_, "Planner did not find a solution for task %zu", org_task_idx);
+            RCLCPP_WARN(node_logger_, "Planner did not find a solution%s", index_log.c_str());
             *status_ = Status::FAILED;
             return cca_ros::PlanningResponse();
         }
@@ -269,8 +286,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
                 const double affordance_limit = 
                     std::copysign(task_result.joint_trajectory.back().tail(1)(0), task_description.goal.affordance);
                 RCLCPP_ERROR(node_logger_,
-                    "Partial solution at task %zu. Could be due to affordance reaching limit at %f. Try "
-                    "readjusting the task to this limit.", org_task_idx, affordance_limit);
+                    "Partial solution%s. Could be due to affordance reaching limit at %f. Try "
+                    "readjusting the task to this limit.", index_log.c_str(), affordance_limit);
                 *status_ = Status::FAILED;
                 return cca_ros::PlanningResponse();
         }
