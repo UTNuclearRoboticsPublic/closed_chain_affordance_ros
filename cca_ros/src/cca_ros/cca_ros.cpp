@@ -392,7 +392,7 @@ void CcaRos::initialize_action_clients_()
 }
 
 // Helper function to validate input
-void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest> reqs)
+void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 {
 
     // Here, we are just validating gripper info. Most other things are validated inside the CCA planner.
@@ -505,7 +505,7 @@ std::vector<geometry_msgs::msg::Pose> CcaRos::compute_cartesian_trajectory_(
 }
 
 // Function to create goal messages for robot and optionally for gripper
-CcaRos::GoalMsg CcaRos::create_goal_msg_(
+cca_ros::GoalMsg CcaRos::create_goal_msg_(
     const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step)
 {
     // Initialize goal messages
@@ -893,45 +893,48 @@ trajectory_msgs::msg::JointTrajectory CcaRos::stitch_trajectories_(
 {
     trajectory_msgs::msg::JointTrajectory result;
 
-    // Return early if input is empty
     if (trajectories.empty())
         return result;
 
-    // Copy joint names from the first trajectory
+    // Copy joint names from first trajectory
     result.joint_names = trajectories.front().joint_names;
 
-    // Time offset to consider timing may be different for different trajectories
+    // Time offset for the first trajectory is 0
     rclcpp::Duration time_offset = rclcpp::Duration::from_seconds(0.0);
 
-    for (size_t i = 0; i < trajectories.size(); ++i)
+    for (const auto& traj: trajectories)
     {
-        const auto &traj = trajectories[i];
 
-        // Check joint name consistency across all trajectories
+        // Ensure joint names match
         if (traj.joint_names != result.joint_names)
         {
-            throw std::runtime_error("Joint names mismatch in trajectory " + std::to_string(i));
+            throw std::runtime_error("Joint names mismatch during trajectory stitching");
         }
 
-        // Offset time_from_start for each point and add to result
+	// Ensure trajectories have points
+        if (!traj.points.empty())
+        {
+            throw std::runtime_error("Asked to stitch trajectories together but one of them has no points.");
+            continue;
+        }
+
         for (const auto &p : traj.points)
         {
             trajectory_msgs::msg::JointTrajectoryPoint shifted_pt = p;
+
+            // Stitch joint trajectories with continuous timing
             rclcpp::Duration original_time(p.time_from_start);
-            shifted_pt.time_from_start = (original_time + time_offset).to_builtin();
+            shifted_pt.time_from_start = rclcpp::Duration(original_time + time_offset);
             result.points.push_back(std::move(shifted_pt));
         }
 
-        // Update time offset using last point of this segment
-        if (!traj.points.empty())
-        {
-            time_offset = rclcpp::Duration(traj.points.back().time_from_start);
-            time_offset = time_offset + rclcpp::Duration::from_seconds(0.0);  // enforce normalized duration
-        }
+        // Update time offset for the next trajectory
+        time_offset = rclcpp::Duration(traj.points.back().time_from_start);
     }
 
     return result;
 }
+
 
 
 } // namespace cca_ros

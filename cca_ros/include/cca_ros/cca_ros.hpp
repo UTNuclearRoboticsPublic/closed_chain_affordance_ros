@@ -156,7 +156,7 @@ class CcaRos : public rclcpp::Node
      *
      * @return bool True if the planning and execution are successful; false otherwise.
      */
-     cca_ros::PlanningResponse plan(const cca_ros::PlanningRequest &planning_request, bool multitask_planning = false);
+     cca_ros::PlanningResponse plan(const cca_ros::PlanningRequest &planning_request);
 
     /**
      * @brief Runs the CCA planner for multiple tasks, producing a single joint trajectory.
@@ -172,7 +172,7 @@ class CcaRos : public rclcpp::Node
      * @return bool `true` if all tasks were successfully planned and executed, `false` otherwise.
      */
 
-     cca_ros::PlanningResponse plan(const std::vector<cca_ros::PlanningRequest> &planning_requests, bool singletask_planning = false);
+     cca_ros::PlanningResponse plan(const std::vector<cca_ros::PlanningRequest> &planning_requests);
 
     /**
      * @brief Cancels trajectory execution on robot
@@ -338,7 +338,7 @@ bool execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory
      * @return Tuple or ROS follow_joint_trajectory goal messages for the robot, gripper, and robot and gripper
      * together. Robot msg is always returned. Other two are conditional.
      */
-    GoalMsg create_goal_msg_(const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step);
+    cca_ros::GoalMsg create_goal_msg_(const std::vector<Eigen::VectorXd> &trajectory, bool includes_gripper_trajectory, const TrajectoryTimeStep& time_step);
 
     /**
      * @brief Given a robot joint trajectory computes the corresponding cartesian trajectory that the robot tool will
