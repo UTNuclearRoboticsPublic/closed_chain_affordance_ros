@@ -53,6 +53,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <thread>
+#include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 namespace cca_ros
 {
@@ -224,14 +225,6 @@ class CcaRos : public rclcpp::Node
         robot_gh_future_; ///< Goal handle future for the robot trajectory executor
     std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
         gripper_gh_future_; /// Goal handle future for the gripper trajectory executor
-
-    /**
-     * @brief Validates a single task description for the CC Affordance Planner ROS node.
-     *
-     * @param task_description The task description to validate.
-     * @throws std::invalid_argument If the task description has issues.
-     */
-    void validate_input_(const cc_affordance_planner::TaskDescription &task_description);
 
     /**
      * @brief Validates multiple task descriptions and planner configurations for the CC Affordance Planner ROS node.
