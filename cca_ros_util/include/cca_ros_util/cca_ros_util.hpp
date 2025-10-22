@@ -78,6 +78,14 @@ uint8_t gripper_goal_type_to_msg(affordance_util::GripperGoalType gripper_goal_t
 uint8_t screw_type_to_msg(affordance_util::ScrewType screw_type);
 uint8_t virtual_screw_order_to_msg(affordance_util::VirtualScrewOrder virtual_screw_order);
 uint8_t ee_orientation_constraint_to_msg(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint);
+std::string update_method_to_string(const cc_affordance_planner::UpdateMethod& method); 
+std::string motion_type_to_string(const cc_affordance_planner::MotionType& type); 
+std::string screw_location_method_to_string(const affordance_util::ScrewLocationMethod& method); 
+std::string gripper_goal_type_to_string(const affordance_util::GripperGoalType& type); 
+std::string screw_type_to_string(const affordance_util::ScrewType& type); 
+std::string virtual_screw_order_to_string(const affordance_util::VirtualScrewOrder& order); 
+std::string ee_orientation_constraint_to_string(const cc_affordance_planner::EeOrientationConstraint& ee_orientation_constraint); 
+std::string trajectory_description_to_string(const cc_affordance_planner::TrajectoryDescription& trajectory_description); 
 
 } // namespace
 

@@ -1,4 +1,5 @@
 #include "cca_ros_util/cca_ros_util.hpp"
+#include <cc_affordance_planner/cc_affordance_planner.hpp>
 
 namespace cca_ros_util
 {
@@ -141,108 +142,6 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "CcaRos Planning Request:\n";
     log << "-------------------------\n";
 
-    // Inline helper functions for enum-to-string conversions
-    auto updateMethodToString = [](cc_affordance_planner::UpdateMethod method) {
-        switch (method)
-        {
-        case cc_affordance_planner::UpdateMethod::INVERSE:
-            return "INVERSE";
-        case cc_affordance_planner::UpdateMethod::TRANSPOSE:
-            return "TRANSPOSE";
-        case cc_affordance_planner::UpdateMethod::BEST:
-            return "BEST";
-        default:
-            return "UNKNOWN";
-        }
-    };
-
-    auto motionTypeToString = [](cc_affordance_planner::MotionType type) {
-        switch (type)
-        {
-        case cc_affordance_planner::MotionType::APPROACH:
-            return "APPROACH";
-        case cc_affordance_planner::MotionType::AFFORDANCE:
-            return "AFFORDANCE";
-        default:
-            return "UNKNOWN";
-        }
-    };
-
-    auto screwLocationMethodToString = [](affordance_util::ScrewLocationMethod method) {
-        switch (method)
-        {
-        case affordance_util::ScrewLocationMethod::FROM_FK:
-            return "FROM_FK";
-        case affordance_util::ScrewLocationMethod::FROM_FRAME_NAME:
-            return "FROM_FRAME_NAME";
-        case affordance_util::ScrewLocationMethod::PROVIDED:
-            return "PROVIDED";
-        default:
-            return "UNKNOWN";
-        }
-    };
-
-    auto gripperGoalTypeToString = [](affordance_util::GripperGoalType type) {
-        switch (type)
-        {
-        case affordance_util::GripperGoalType::CONTINUOUS:
-            return "CONTINUOUS";
-        case affordance_util::GripperGoalType::CONSTANT:
-            return "CONSTANT";
-        default:
-            return "UNKNOWN";
-        }
-    };
-
-    auto screwTypeToString = [](affordance_util::ScrewType type) {
-        switch (type)
-        {
-        case affordance_util::ScrewType::ROTATION:
-            return "ROTATION";
-        case affordance_util::ScrewType::TRANSLATION:
-            return "TRANSLATION";
-        case affordance_util::ScrewType::SCREW:
-            return "SCREW";
-        case affordance_util::ScrewType::UNSET:
-            return "UNSET";
-        default:
-            return "UNKNOWN";
-        }
-    };
-
-    auto virtualScrewOrderToString = [](affordance_util::VirtualScrewOrder order) {
-        switch (order)
-        {
-        case affordance_util::VirtualScrewOrder::XYZ:
-            return "XYZ";
-        case affordance_util::VirtualScrewOrder::YZX:
-            return "YZX";
-        case affordance_util::VirtualScrewOrder::ZXY:
-            return "ZXY";
-        case affordance_util::VirtualScrewOrder::XY:
-            return "XY";
-        case affordance_util::VirtualScrewOrder::YZ:
-            return "YZ";
-        case affordance_util::VirtualScrewOrder::ZX:
-            return "ZX";
-        case affordance_util::VirtualScrewOrder::NONE:
-            return "NONE";
-        default:
-            return "UNKNOWN";
-        }
-    };
-
-    auto eeOrientationConstraintToString = [](cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint) {
-        switch (ee_orientation_constraint)
-        {
-	case cc_affordance_planner::EeOrientationConstraint::DEFAULT:
-            return "DEFAULT";
-	case cc_affordance_planner::EeOrientationConstraint::PRESERVE:
-            return "PRESERVE";
-        default:
-            return "UNKNOWN";
-        }
-    };
 
     // Planner Config
     log << "Planner Config:\n";
@@ -250,17 +149,17 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "  Closure error threshold (angular): " << req.planner_config.closure_err_threshold_ang << "\n";
     log << "  Closure error threshold (linear): " << req.planner_config.closure_err_threshold_lin << "\n";
     log << "  IK max iterations: " << req.planner_config.ik_max_itr << "\n";
-    log << "  Update method: " << updateMethodToString(req.planner_config.update_method) << "\n";
+    log << "  Update method: " << update_method_to_string(req.planner_config.update_method) << "\n";
 
     // Task Description - Affordance Info
     log << "Task Description - Affordance Info:\n";
-    log << "  Type: " << screwTypeToString(req.task_description.affordance_info.type) << "\n";
+    log << "  Type: " << screw_type_to_string(req.task_description.affordance_info.type) << "\n";
     log << "  Axis: " << req.task_description.affordance_info.axis.transpose() << "\n";
     log << "  Location: " << req.task_description.affordance_info.location.transpose() << "\n";
     log << "  Screw: " << req.task_description.affordance_info.screw.transpose() << "\n";
     log << "  Location Frame: " << req.task_description.affordance_info.location_frame << "\n";
     log << "  Pitch: " << req.task_description.affordance_info.pitch << "\n";
-    log << "  Location Method: " << screwLocationMethodToString(req.task_description.affordance_info.location_method)
+    log << "  Location Method: " << screw_location_method_to_string(req.task_description.affordance_info.location_method)
         << "\n";
 
     // Task Description - Goal
@@ -272,10 +171,10 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
 
     // Task Description - Other Fields
     log << "  Trajectory Density: " << req.task_description.trajectory_density << "\n";
-    log << "  Motion Type: " << motionTypeToString(req.task_description.motion_type) << "\n";
-    log << "  Virtual Screw Order: " << virtualScrewOrderToString(req.task_description.vir_screw_order) << "\n";
-    log << "  Gripper Goal Type: " << gripperGoalTypeToString(req.task_description.gripper_goal_type) << "\n";
-    log << "  Ee Orientation Constraint: " << eeOrientationConstraintToString(req.task_description.ee_orientation_constraint) << "\n";
+    log << "  Motion Type: " << motion_type_to_string(req.task_description.motion_type) << "\n";
+    log << "  Virtual Screw Order: " << virtual_screw_order_to_string(req.task_description.vir_screw_order) << "\n";
+    log << "  Gripper Goal Type: " << gripper_goal_type_to_string(req.task_description.gripper_goal_type) << "\n";
+    log << "  Ee Orientation Constraint: " << ee_orientation_constraint_to_string(req.task_description.ee_orientation_constraint) << "\n";
 
     // Start State
     log << "Start State:\n";
@@ -287,6 +186,42 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "  Execute Trajectory: " << std::boolalpha << req.execute_trajectory << "\n";
     log << "-------------------------\n";
 
+    return log;
+}
+
+std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerResult& res)
+{
+    std::stringstream log;
+    log << "Planning result:\n";
+    
+    // Success status
+    log << "  Success: " << (res.success ? "true" : "false") << "\n";
+    
+    // Trajectory description
+    log << "  Trajectory description: " << trajectory_description_to_string(res.trajectory_description) << "\n";
+    
+    // Joint trajectory
+    log << "  Closed-Chain joint trajectory:\n";
+    log << "    Number of points: " << res.joint_trajectory.size() << "\n";
+    log << "    Position trajectory:\n";
+    for (const Eigen::VectorXd& point: res.joint_trajectory) {
+        log << "      " << point.transpose() << "\n";
+    }
+    
+    // Whether gripper trajectory is included
+    log << "  Includes gripper trajectory: " << (res.includes_gripper_trajectory ? "true" : "false") << "\n";
+    
+    // Update method
+    log << "  Update method: " << update_method_to_string(res.update_method) << "\n";
+    
+    // Planning time
+    log << "  Planning time: " << res.planning_time.count() << " microseconds\n";
+    
+    // Update trail 
+    log << "  Update trail: " << res.update_trail << "\n";
+
+    log << "-------------------------\n";
+    
     return log;
 }
 
@@ -511,5 +446,119 @@ uint8_t ee_orientation_constraint_to_msg(cc_affordance_planner::EeOrientationCon
     }
 }
 
+std::string update_method_to_string(const cc_affordance_planner::UpdateMethod& method) {
+    switch (method)
+    {
+    case cc_affordance_planner::UpdateMethod::INVERSE:
+        return "INVERSE";
+    case cc_affordance_planner::UpdateMethod::TRANSPOSE:
+        return "TRANSPOSE";
+    case cc_affordance_planner::UpdateMethod::BEST:
+        return "BEST";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string motion_type_to_string(const cc_affordance_planner::MotionType& type) {
+    switch (type)
+    {
+    case cc_affordance_planner::MotionType::APPROACH:
+        return "APPROACH";
+    case cc_affordance_planner::MotionType::AFFORDANCE:
+        return "AFFORDANCE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string screw_location_method_to_string(const affordance_util::ScrewLocationMethod& method) {
+    switch (method)
+    {
+    case affordance_util::ScrewLocationMethod::FROM_FK:
+        return "FROM_FK";
+    case affordance_util::ScrewLocationMethod::FROM_FRAME_NAME:
+        return "FROM_FRAME_NAME";
+    case affordance_util::ScrewLocationMethod::PROVIDED:
+        return "PROVIDED";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string gripper_goal_type_to_string(const affordance_util::GripperGoalType& type) {
+    switch (type)
+    {
+    case affordance_util::GripperGoalType::CONTINUOUS:
+        return "CONTINUOUS";
+    case affordance_util::GripperGoalType::CONSTANT:
+        return "CONSTANT";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string screw_type_to_string(const affordance_util::ScrewType& type) {
+    switch (type)
+    {
+    case affordance_util::ScrewType::ROTATION:
+        return "ROTATION";
+    case affordance_util::ScrewType::TRANSLATION:
+        return "TRANSLATION";
+    case affordance_util::ScrewType::SCREW:
+        return "SCREW";
+    case affordance_util::ScrewType::UNSET:
+        return "UNSET";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string virtual_screw_order_to_string(const affordance_util::VirtualScrewOrder& order) {
+    switch (order)
+    {
+    case affordance_util::VirtualScrewOrder::XYZ:
+        return "XYZ";
+    case affordance_util::VirtualScrewOrder::YZX:
+        return "YZX";
+    case affordance_util::VirtualScrewOrder::ZXY:
+        return "ZXY";
+    case affordance_util::VirtualScrewOrder::XY:
+        return "XY";
+    case affordance_util::VirtualScrewOrder::YZ:
+        return "YZ";
+    case affordance_util::VirtualScrewOrder::ZX:
+        return "ZX";
+    case affordance_util::VirtualScrewOrder::NONE:
+        return "NONE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string ee_orientation_constraint_to_string(const cc_affordance_planner::EeOrientationConstraint& ee_orientation_constraint) {
+    switch (ee_orientation_constraint)
+    {
+    case cc_affordance_planner::EeOrientationConstraint::DEFAULT:
+        return "DEFAULT";
+    case cc_affordance_planner::EeOrientationConstraint::PRESERVE:
+        return "PRESERVE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string trajectory_description_to_string(const cc_affordance_planner::TrajectoryDescription& trajectory_description) {
+    switch (trajectory_description) {
+        case cc_affordance_planner::TrajectoryDescription::FULL:
+            return "FULL";
+        case cc_affordance_planner::TrajectoryDescription::PARTIAL:
+            return "PARTIAL";
+        case cc_affordance_planner::TrajectoryDescription::UNSET:
+            return "UNSET";
+        default:
+            return "UNKNOWN";
+    }
+}
 
 } // namespace
