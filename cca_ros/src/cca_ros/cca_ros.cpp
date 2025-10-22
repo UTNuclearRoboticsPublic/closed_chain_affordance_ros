@@ -234,6 +234,10 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             working_requests.erase(working_requests.begin() + task_idx);
             working_requests.insert(working_requests.begin() + task_idx, 
                                    subtask_requests.begin(), subtask_requests.end());
+
+            // Skip the stale task and continue on from the next iteration	
+            --task_idx; 
+            continue;    
         }
 
 	// Add joint states to robot description for planning
@@ -911,25 +915,21 @@ trajectory_msgs::msg::JointTrajectory CcaRos::stitch_trajectories_(
             throw std::runtime_error("Joint names mismatch during trajectory stitching");
         }
 
-	// Ensure trajectories have points
-        if (!traj.points.empty())
-        {
-            throw std::runtime_error("Asked to stitch trajectories together but one of them has no points.");
-            continue;
-        }
-
+        // Stitch joint trajectories with continuous timing
         for (const auto &p : traj.points)
         {
             trajectory_msgs::msg::JointTrajectoryPoint shifted_pt = p;
 
-            // Stitch joint trajectories with continuous timing
             rclcpp::Duration original_time(p.time_from_start);
             shifted_pt.time_from_start = rclcpp::Duration(original_time + time_offset);
             result.points.push_back(std::move(shifted_pt));
         }
 
         // Update time offset for the next trajectory
+        if (!traj.points.empty())
+        {
         time_offset = rclcpp::Duration(traj.points.back().time_from_start);
+	}
     }
 
     return result;
