@@ -58,8 +58,7 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
     req.start_state.robot = Eigen::VectorXd::Map(msg.start_state.robot.data(), msg.start_state.robot.size());
     req.start_state.gripper = msg.start_state.gripper;
 
-    // Copy visualize_trajectory and execute_trajectory (booleans)
-    req.visualize_trajectory = msg.visualize_trajectory;
+    // Copy execute_trajectory (boolean)
     req.execute_trajectory = msg.execute_trajectory;
 
     return req;
@@ -129,8 +128,7 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
         std::vector<double>(req.start_state.robot.data(), req.start_state.robot.data() + req.start_state.robot.size());
     msg.start_state.gripper = req.start_state.gripper;
 
-    // Copy visualize_trajectory and execute_trajectory (booleans)
-    msg.visualize_trajectory = req.visualize_trajectory;
+    // Copy execute_trajectory (boolean)
     msg.execute_trajectory = req.execute_trajectory;
 
     return msg;
@@ -286,7 +284,6 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
 
     // Execution Options
     log << "Execution Options:\n";
-    log << "  Visualize Trajectory: " << std::boolalpha << req.visualize_trajectory << "\n";
     log << "  Execute Trajectory: " << std::boolalpha << req.execute_trajectory << "\n";
     log << "-------------------------\n";
 

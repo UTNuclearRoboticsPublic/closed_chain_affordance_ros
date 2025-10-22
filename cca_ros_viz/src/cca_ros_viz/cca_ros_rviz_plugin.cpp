@@ -282,7 +282,6 @@ void CcaRosRvizPlugin::plan_button_clicked_()
 
     // Fill out planning request and send it to the server
     auto req = build_planning_request_();
-    req.visualize_trajectory = true;
     req.execute_trajectory = false;
     ccaRosActionClient->send_goal(req);
 }
@@ -294,7 +293,6 @@ void CcaRosRvizPlugin::plan_exe_button_clicked_()
 
     // Fill out planning request and send it to the server
     auto req = build_planning_request_();
-    req.visualize_trajectory = true;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
 }
@@ -306,7 +304,6 @@ void CcaRosRvizPlugin::exe_button_clicked_()
 
     // Fill out planning request and send it to the server
     auto req = build_planning_request_();
-    req.visualize_trajectory = false;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
 }

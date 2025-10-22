@@ -1,4 +1,5 @@
 #include "cca_ros_behavior/cca_ros_behavior.hpp"
+#include <cca_ros/cca_ros.hpp>
 
 namespace cca_ros_behavior
 {
@@ -15,14 +16,14 @@ BT::PortsList CcaRosAction::providedPorts()
 {
     // Define the ports required by this action node
     return {BT::InputPort<std::shared_ptr<cca_ros::PlanningRequest>>("cca_planning_request"),
-            BT::InputPort<std::shared_ptr<cca_ros::PlanningRequests>>("cca_planning_requests")};
+            BT::InputPort<std::shared_ptr<std::vector<cca_ros::PlanningRequest>>>("cca_planning_requests")};
 }
 
 BT::NodeStatus CcaRosAction::onStart()
 {
     // Define type aliases for readability
     using PlanningRequestPtr = std::shared_ptr<cca_ros::PlanningRequest>;
-    using PlanningRequestsPtr = std::shared_ptr<cca_ros::PlanningRequests>;
+    using PlanningRequestsPtr = std::shared_ptr<std::vector<cca_ros::PlanningRequest>>;
 
     // Attempt to get inputs from the ports
     BT::Expected<PlanningRequestPtr> req = getInput<PlanningRequestPtr>("cca_planning_request");
@@ -43,11 +44,11 @@ BT::NodeStatus CcaRosAction::onStart()
 
     // Lambda to process the requests
     auto process_request = [this](const auto &cca_req) -> BT::NodeStatus {
-        // Point to the motion status from the request and use it to monitor this action
-        status_ = cca_req->status;
 
-        // Run the CCA planner using the extracted request data
-        if (!node_->plan_visualize_and_execute(*cca_req))
+        // Run the CCA planner and retrieve response
+	cca_ros::PlanningResponse response = node_->plan(*cca_req);
+        status_ = response.status;
+        if (!response.result.success)
         {
             return BT::NodeStatus::FAILURE; // Return failure if planning fails
         }

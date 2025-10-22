@@ -1,4 +1,5 @@
 #include "cca_ros_action/cca_ros_action.hpp"
+#include <cca_ros/cca_ros.hpp>
 namespace cca_ros_action
 {
 CcaRosActionServer::CcaRosActionServer(const std::string &node_name, const rclcpp::NodeOptions &node_options)
@@ -54,8 +55,9 @@ void CcaRosActionServer::execute_action(const std::shared_ptr<GoalHandleCcaRosAc
     // Print the log
     const std::stringstream req_log = cca_ros_util::log_cca_planning_request(req);
     RCLCPP_INFO(this->get_logger(), "%s", req_log.str().c_str());
-
-    if (!this->plan_visualize_and_execute(req))
+    
+    const cca_ros::PlanningResponse response = this->plan(req);
+    if (!response.result.success)
     {
         RCLCPP_ERROR(this->get_logger(), "Execution failed on action server '%s'.", CCA_ROS_AS_NAME);
         goal_handle->abort(std::make_shared<CcaRosAction::Result>());
@@ -75,13 +77,13 @@ void CcaRosActionServer::execute_action(const std::shared_ptr<GoalHandleCcaRosAc
             return;
         }
 
-        if (*req.status == cca_ros::Status::SUCCEEDED)
+        if (*response.status == cca_ros::Status::SUCCEEDED)
         {
             RCLCPP_INFO(this->get_logger(), "Action successfully completed on server '%s'.", CCA_ROS_AS_NAME);
             goal_handle->succeed(std::make_shared<CcaRosAction::Result>());
             return;
         }
-        else if (*req.status == cca_ros::Status::UNKNOWN)
+        else if (*response.status == cca_ros::Status::UNKNOWN)
         {
             RCLCPP_ERROR(this->get_logger(), "Action was interrupted mid-execution on server '%s'.", CCA_ROS_AS_NAME);
             goal_handle->abort(std::make_shared<CcaRosAction::Result>());
