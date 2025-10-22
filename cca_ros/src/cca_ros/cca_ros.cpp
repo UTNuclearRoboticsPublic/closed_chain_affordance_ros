@@ -7,7 +7,7 @@ namespace cca_ros
 CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
     : Node(node_name, node_options),
       node_logger_(this->get_logger()),   // Logger for the node
-      viz_ss_name_("/cca_ros_viz_server") // Name of the MoveIt Plan and Visualization server
+      viz_ss_name_("/cca_ros_viz_server") // Name of the service to validate and visualize result
 {
     // Extract necessary parameters for ROS setup and robot configuration
     robot_traj_execution_as_name_ = this->declare_parameter("cca_robot_as", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
@@ -181,8 +181,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         // Set start state from current state (first task or previous task end state)
         start_state = current_state;
 
-        // Lookup affordance location if tag frame is specified
-        if (!task_description.affordance_info.location_frame.empty()) {
+        // Lookup affordance location if frame is specified
+        if (task_description.affordance_info.location_method==affordance_util::ScrewLocationMethod::FROM_FRAME_NAME) {
             try {
                 // Lookup transform from ref_frame_ to the affordance location frame
                 geometry_msgs::msg::TransformStamped transform_stamped = 
@@ -195,10 +195,9 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
                 task_description.affordance_info.location << 
                     transform_stamped.transform.translation.x,
                     transform_stamped.transform.translation.y,
-                    transform_stamped.transform.translation.z;
-                
-                // Clear the frame name since it has served its purpose -- We don't wanna spam look-up for subtasks created from this task for EeOrientationConstraint::PRESERVE
-                task_description.affordance_info.location_frame.clear();
+                    transform_stamped.transform.translation.z; 
+
+                task_description.affordance_info.location_method = affordance_util::ScrewLocationMethod::PROVIDED; // Now, it has been provided
                 
             } catch (const tf2::TransformException &ex) {
                 RCLCPP_ERROR(node_logger_, 
@@ -415,9 +414,10 @@ void CcaRos::initialize_action_clients_()
 // Helper function to validate input
 void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 {
-
-    // Here, we are just validating gripper info. Most other things are validated inside the CCA planner.
+    const bool single_planning_request = reqs.size() == 1;
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
+    
+    // Gripper executor availability check
     if (gripper_goal_specified && gripper_traj_execution_as_name_.empty() && !unified_executor_available_)
     {
         throw std::invalid_argument("Task description: `goal.gripper` is specified, but `cca_gripper_as` or "
@@ -425,17 +425,26 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
                                     " not set up in the `cca_<robot>_ros_setup.yaml` file. Need one of them to be able "
                                     "to execute gripper trajectories");
     }
-
-    // Ensure gripper goals are consistent across all tasks
-    for (const auto &req: reqs)
+    
+    for (size_t task_index = 0; task_index < reqs.size(); ++task_index)
     {
-        bool gripper_goal_status = !std::isnan(req.task_description.goal.gripper);
-
-        if (gripper_goal_status != gripper_goal_specified)
-        { // Check for logical inequivalence
+        const auto &req = reqs[task_index];
+        const std::string index_log = single_planning_request ? "" : "Task " + std::to_string(task_index) + ": ";
+        
+        // Ensure gripper goals are consistent (compare against first task)
+        if (task_index > 0) {
+            bool gripper_goal_status = !std::isnan(req.task_description.goal.gripper);
+            if (gripper_goal_status != gripper_goal_specified) {
+                throw std::invalid_argument(
+                    index_log + "Inconsistent gripper goal specification. All tasks must either specify a gripper goal or leave it unspecified (NaN).");
+            }
+        }
+        
+        // Validate location_frame is supplied if asked to lookup location from frame name
+        if ((req.task_description.affordance_info.location_method == affordance_util::ScrewLocationMethod::FROM_FRAME_NAME) && 
+            (req.task_description.affordance_info.location_frame.empty())) {
             throw std::invalid_argument(
-                "Task description: Inconsistent gripper goal across tasks. If one task considers the gripper goal, "
-                "then all tasks must have the gripper goal set.");
+                index_log + "task_description.affordance_info: location_method FROM_FRAME_NAME requires location_frame, but is empty");
         }
     }
 }
