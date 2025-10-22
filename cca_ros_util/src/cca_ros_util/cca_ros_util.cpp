@@ -446,7 +446,7 @@ uint8_t ee_orientation_constraint_to_msg(cc_affordance_planner::EeOrientationCon
     }
 }
 
-std::string update_method_to_string(const cc_affordance_planner::UpdateMethod& method) {
+std::string update_method_to_string(cc_affordance_planner::UpdateMethod method) {
     switch (method)
     {
     case cc_affordance_planner::UpdateMethod::INVERSE:
@@ -460,7 +460,7 @@ std::string update_method_to_string(const cc_affordance_planner::UpdateMethod& m
     }
 }
 
-std::string motion_type_to_string(const cc_affordance_planner::MotionType& type) {
+std::string motion_type_to_string(cc_affordance_planner::MotionType type) {
     switch (type)
     {
     case cc_affordance_planner::MotionType::APPROACH:
@@ -472,7 +472,7 @@ std::string motion_type_to_string(const cc_affordance_planner::MotionType& type)
     }
 }
 
-std::string screw_location_method_to_string(const affordance_util::ScrewLocationMethod& method) {
+std::string screw_location_method_to_string(affordance_util::ScrewLocationMethod method) {
     switch (method)
     {
     case affordance_util::ScrewLocationMethod::FROM_FK:
@@ -486,7 +486,7 @@ std::string screw_location_method_to_string(const affordance_util::ScrewLocation
     }
 }
 
-std::string gripper_goal_type_to_string(const affordance_util::GripperGoalType& type) {
+std::string gripper_goal_type_to_string(affordance_util::GripperGoalType type) {
     switch (type)
     {
     case affordance_util::GripperGoalType::CONTINUOUS:
@@ -498,7 +498,7 @@ std::string gripper_goal_type_to_string(const affordance_util::GripperGoalType& 
     }
 }
 
-std::string screw_type_to_string(const affordance_util::ScrewType& type) {
+std::string screw_type_to_string(affordance_util::ScrewType type) {
     switch (type)
     {
     case affordance_util::ScrewType::ROTATION:
@@ -514,7 +514,7 @@ std::string screw_type_to_string(const affordance_util::ScrewType& type) {
     }
 }
 
-std::string virtual_screw_order_to_string(const affordance_util::VirtualScrewOrder& order) {
+std::string virtual_screw_order_to_string(affordance_util::VirtualScrewOrder order) {
     switch (order)
     {
     case affordance_util::VirtualScrewOrder::XYZ:
@@ -536,7 +536,7 @@ std::string virtual_screw_order_to_string(const affordance_util::VirtualScrewOrd
     }
 }
 
-std::string ee_orientation_constraint_to_string(const cc_affordance_planner::EeOrientationConstraint& ee_orientation_constraint) {
+std::string ee_orientation_constraint_to_string(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint) {
     switch (ee_orientation_constraint)
     {
     case cc_affordance_planner::EeOrientationConstraint::DEFAULT:
@@ -548,7 +548,7 @@ std::string ee_orientation_constraint_to_string(const cc_affordance_planner::EeO
     }
 }
 
-std::string trajectory_description_to_string(const cc_affordance_planner::TrajectoryDescription& trajectory_description) {
+std::string trajectory_description_to_string(cc_affordance_planner::TrajectoryDescription trajectory_description) {
     switch (trajectory_description) {
         case cc_affordance_planner::TrajectoryDescription::FULL:
             return "FULL";
