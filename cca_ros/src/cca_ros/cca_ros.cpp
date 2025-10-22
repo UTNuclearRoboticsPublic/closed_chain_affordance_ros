@@ -1,4 +1,5 @@
 #include "cca_ros/cca_ros.hpp"
+#include <affordance_util/affordance_util.hpp>
 
 namespace cca_ros
 {
@@ -182,28 +183,37 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         start_state = current_state;
 
         // Lookup affordance location if frame is specified
-        if (task_description.affordance_info.location_method==affordance_util::ScrewLocationMethod::FROM_FRAME_NAME) {
+        if (task_description.affordance_info.from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
             try {
                 // Lookup transform from ref_frame_ to the affordance location frame
                 geometry_msgs::msg::TransformStamped transform_stamped = 
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
-                        task_description.affordance_info.location_frame,
+                        task_description.affordance_info.from.frame_name,
                         tf2::TimePointZero);  // Get latest available transform
                 
-                // Extract translation from the transform
-                task_description.affordance_info.location << 
-                    transform_stamped.transform.translation.x,
-                    transform_stamped.transform.translation.y,
-                    transform_stamped.transform.translation.z; 
+                // Convert to Eigen type so we could do some math
+		const Eigen::Isometry3d T_ref_to_lookup_frame = tf2::transformToEigen(transform_stamped.transform);
 
-                task_description.affordance_info.location_method = affordance_util::ScrewLocationMethod::PROVIDED; // Now, it has been provided
+		// Apply requested transform -- We now have the transform from the reference frame to the desired affordance frame
+                const Eigen::Isometry3d T_ref_to_aff = T_ref_to_lookup_frame * Eigen::Isometry3d(task_description.affordance_info.from.post_transform);
+
+                // Extract translation from the transform
+	        task_description.affordance_info.location = T_ref_to_aff.translation();	
+
+		// Compute the requested affordance axis in reference frame
+                if (!task_description.affordance_info.from.axis_in_final_pose.hasNaN()){
+		    task_description.affordance_info.axis = T_ref_to_aff.linear() * task_description.affordance_info.from.axis_in_final_pose;
+		}
+
+                // Set affordance_info specification method to PROVIDED since we have everything now
+                task_description.affordance_info.from.method = affordance_util::PoseSpecificationMethod::PROVIDED; 
                 
             } catch (const tf2::TransformException &ex) {
                 RCLCPP_ERROR(node_logger_, 
                     "Could not lookup transform from %s to %s to fill in affordance location%s: %s", 
                     ref_frame_.c_str(),
-                    task_description.affordance_info.location_frame.c_str(),
+                    task_description.affordance_info.from.frame_name.c_str(),
 		    index_log.c_str(),
                     ex.what());
                 *status_ = Status::FAILED;
@@ -436,15 +446,22 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
             bool gripper_goal_status = !std::isnan(req.task_description.goal.gripper);
             if (gripper_goal_status != gripper_goal_specified) {
                 throw std::invalid_argument(
-                    index_log + "Inconsistent gripper goal specification. All tasks must either specify a gripper goal or leave it unspecified (NaN).");
+                    index_log + "Inconsistent gripper goal specification. All tasks must either specify a gripper goal or leave it unspecified");
             }
         }
         
-        // Validate location_frame is supplied if asked to lookup location from frame name
-        if ((req.task_description.affordance_info.location_method == affordance_util::ScrewLocationMethod::FROM_FRAME_NAME) && 
-            (req.task_description.affordance_info.location_frame.empty())) {
+        // Validate frame_name is supplied if asked to lookup screw_info from frame name
+        if ((req.task_description.affordance_info.from.method == affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) && 
+            (req.task_description.affordance_info.from.frame_name.empty())) {
             throw std::invalid_argument(
-                index_log + "task_description.affordance_info: location_method FROM_FRAME_NAME requires location_frame, but is empty");
+                index_log + "task_description.affordance_info: from.method FROM_FRAME_NAME requires from.frame_name, but is empty");
+        }
+
+        // Ensure screw axis is provided when looking up affordance info using the "from" member
+        if (req.task_description.affordance_info.from.axis_in_final_pose.hasNaN() && 
+            req.task_description.affordance_info.axis.hasNaN() && req.task_description.affordance_info.screw.hasNaN()) {
+            throw std::invalid_argument(
+                index_log + "task_description.affordance_info: Either from.axis_in_final_pose or affordance_info.axis or affordance_info.screw must be provided");
         }
     }
 }
@@ -603,12 +620,12 @@ cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr CcaRos::validate_and_visualize
     if (task_description.motion_type == cc_affordance_planner::MotionType::APPROACH)
     {
         // Position
-        viz_serv_req->aff_ref_pose.position.x = task_description.goal.grasp_pose(0, 3);
-        viz_serv_req->aff_ref_pose.position.y = task_description.goal.grasp_pose(1, 3);
-        viz_serv_req->aff_ref_pose.position.z = task_description.goal.grasp_pose(2, 3);
+        viz_serv_req->aff_ref_pose.position.x = task_description.goal.canonical_pose(0, 3);
+        viz_serv_req->aff_ref_pose.position.y = task_description.goal.canonical_pose(1, 3);
+        viz_serv_req->aff_ref_pose.position.z = task_description.goal.canonical_pose(2, 3);
 
         // Orientation
-        Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.grasp_pose.block<3, 3>(0, 0));
+        Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.canonical_pose.block<3, 3>(0, 0));
         aff_ref_pose_quat.normalize(); // Ensures it's a valid unit quaternion
         viz_serv_req->aff_ref_pose.orientation.w = aff_ref_pose_quat.w();
         viz_serv_req->aff_ref_pose.orientation.x = aff_ref_pose_quat.x();

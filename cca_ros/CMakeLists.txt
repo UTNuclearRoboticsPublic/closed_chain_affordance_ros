@@ -23,6 +23,7 @@ find_package(cca_ros_msgs REQUIRED)  # To plan and visualize joint and EE trajec
 find_package(sensor_msgs REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)
 
 # Non-ROS packages
 find_package(Eigen3 REQUIRED)
@@ -45,14 +46,14 @@ add_library(${PROJECT_NAME} SHARED
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC ros_cpp_util PUBLIC cca_ros_msgs PUBLIC rclcpp_action PUBLIC tf2_ros sensor_msgs PUBLIC control_msgs PUBLIC geometry_msgs)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC ros_cpp_util PUBLIC cca_ros_msgs PUBLIC rclcpp_action PUBLIC tf2_ros sensor_msgs PUBLIC control_msgs PUBLIC geometry_msgs PUBLIC tf2_eigen)
 
 # Link the executable against external libraries
 target_link_libraries(${PROJECT_NAME} PUBLIC affordance_util::affordance_util PUBLIC cc_affordance_planner::cc_affordance_planner PUBLIC Eigen3::Eigen
 )
 
 # Export dependencies for downstream ROS packages
-ament_export_dependencies(ros_cpp_util cca_ros_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs affordance_util cc_affordance_planner Eigen3)
+ament_export_dependencies(ros_cpp_util cca_ros_msgs rclcpp_action tf2_ros sensor_msgs control_msgs geometry_msgs affordance_util cc_affordance_planner Eigen3 tf2_eigen)
 
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)

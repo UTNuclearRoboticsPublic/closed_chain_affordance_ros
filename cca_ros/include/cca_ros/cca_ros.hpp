@@ -54,6 +54,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <thread>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
 
 namespace cca_ros
 {
