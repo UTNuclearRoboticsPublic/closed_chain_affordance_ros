@@ -28,21 +28,33 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
         msg.task_description.affordance_info.screw.data(), msg.task_description.affordance_info.screw.size());
 
     // Copy other fields
-    req.task_description.affordance_info.location_frame = msg.task_description.affordance_info.location_frame;
     req.task_description.affordance_info.pitch = msg.task_description.affordance_info.pitch;
 
-    // Convert location method enum
-    req.task_description.affordance_info.location_method =
-        screw_location_method_from_msg(msg.task_description.affordance_info.location_method.value);
+    // Convert affordance_info.from field
+    req.task_description.affordance_info.from.method =
+        pose_specification_method_from_msg(msg.task_description.affordance_info.from.method.value);
+    req.task_description.affordance_info.from.frame_name = msg.task_description.affordance_info.from.frame_name;
+    req.task_description.affordance_info.from.post_transform =
+        Eigen::MatrixXd::Map(msg.task_description.affordance_info.from.post_transform.data(), 4, 4); // 4x4 post-multiplication transform
+    req.task_description.affordance_info.from.axis_in_final_pose = Eigen::VectorXd::Map(msg.task_description.affordance_info.from.axis_in_final_pose.data(),
+                                                                    msg.task_description.affordance_info.from.axis_in_final_pose.size());
 
-    // Copy additional task description fields
+    // Convert canonical_pose_from
+    req.task_description.canonical_pose_from.method =
+        pose_specification_method_from_msg(msg.task_description.canonical_pose_from.method.value);
+    req.task_description.canonical_pose_from.frame_name = msg.task_description.canonical_pose_from.frame_name;
+    req.task_description.canonical_pose_from.post_transform =
+        Eigen::Matrix4d::Map(msg.task_description.canonical_pose_from.post_transform.data(), 4, 4); // 4x4 post-multiplication transform
+
+    // Convert goal
     req.task_description.goal.affordance = msg.task_description.goal.affordance;
     req.task_description.goal.ee_orientation = Eigen::VectorXd::Map(msg.task_description.goal.ee_orientation.data(),
                                                                     msg.task_description.goal.ee_orientation.size());
-    req.task_description.goal.grasp_pose =
-        Eigen::MatrixXd::Map(msg.task_description.goal.grasp_pose.data(), 4, 4); // 4x4 grasp pose
+    req.task_description.goal.canonical_pose =
+        Eigen::MatrixXd::Map(msg.task_description.goal.canonical_pose.data(), 4, 4); // 4x4 canonical pose
     req.task_description.goal.gripper = msg.task_description.goal.gripper;
 
+    // Convert other settings
     req.task_description.trajectory_density = msg.task_description.trajectory_density;
 
     // Convert motion_type and virtual screw order enums
@@ -94,22 +106,36 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
               msg.task_description.affordance_info.screw.begin());
 
     // Copy other fields
-    msg.task_description.affordance_info.location_frame = req.task_description.affordance_info.location_frame;
     msg.task_description.affordance_info.pitch = req.task_description.affordance_info.pitch;
 
-    // Convert location method enum
-    msg.task_description.affordance_info.location_method.value =
-        screw_location_method_to_msg(req.task_description.affordance_info.location_method);
+    // Convert affordance_info.from
+    msg.task_description.affordance_info.from.method.value =
+        pose_specification_method_to_msg(req.task_description.affordance_info.from.method);
+    msg.task_description.affordance_info.from.frame_name = req.task_description.affordance_info.from.frame_name;
+    msg.task_description.affordance_info.from.post_transform =
+        std::vector<double>(req.task_description.affordance_info.from.post_transform.data(),
+                           req.task_description.affordance_info.from.post_transform.data() + req.task_description.affordance_info.from.post_transform.size());
+    msg.task_description.affordance_info.from.axis_in_final_pose =
+        std::vector<double>(req.task_description.affordance_info.from.axis_in_final_pose.data(),
+                           req.task_description.affordance_info.from.axis_in_final_pose.data() + req.task_description.affordance_info.from.axis_in_final_pose.size());
 
-    // Copy additional task description fields
+    // Convert canonical_pose_from field back to message
+    msg.task_description.canonical_pose_from.method.value =
+        pose_specification_method_to_msg(req.task_description.canonical_pose_from.method);
+    msg.task_description.canonical_pose_from.frame_name = req.task_description.canonical_pose_from.frame_name;
+    msg.task_description.canonical_pose_from.post_transform =
+        std::vector<double>(req.task_description.canonical_pose_from.post_transform.data(),
+                           req.task_description.canonical_pose_from.post_transform.data() + req.task_description.canonical_pose_from.post_transform.size());
+
+    // Convert goal
     msg.task_description.goal.affordance = req.task_description.goal.affordance;
     std::copy(req.task_description.goal.ee_orientation.data(),
               req.task_description.goal.ee_orientation.data() + req.task_description.goal.ee_orientation.size(),
               msg.task_description.goal.ee_orientation.begin());
 
-    std::copy(req.task_description.goal.grasp_pose.data(),
-              req.task_description.goal.grasp_pose.data() + 16, // Assuming 4x4 matrix is flattened to 16 elements
-              msg.task_description.goal.grasp_pose.begin());
+    std::copy(req.task_description.goal.canonical_pose.data(),
+              req.task_description.goal.canonical_pose.data() + 16, // Assuming 4x4 matrix is flattened to 16 elements
+              msg.task_description.goal.canonical_pose.begin());
 
     msg.task_description.goal.gripper = req.task_description.goal.gripper;
     msg.task_description.trajectory_density = req.task_description.trajectory_density;
@@ -157,16 +183,25 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "  Axis: " << req.task_description.affordance_info.axis.transpose() << "\n";
     log << "  Location: " << req.task_description.affordance_info.location.transpose() << "\n";
     log << "  Screw: " << req.task_description.affordance_info.screw.transpose() << "\n";
-    log << "  Location Frame: " << req.task_description.affordance_info.location_frame << "\n";
     log << "  Pitch: " << req.task_description.affordance_info.pitch << "\n";
-    log << "  Location Method: " << screw_location_method_to_string(req.task_description.affordance_info.location_method)
-        << "\n";
+
+    // Affordance Info - From
+    log << "  From Method: " << pose_specification_method_to_string(req.task_description.affordance_info.from.method) << "\n";
+    log << "  From Frame Name: " << req.task_description.affordance_info.from.frame_name << "\n";
+    log << "  From Post Transform:\n" << req.task_description.affordance_info.from.post_transform << "\n";
+    log << "  Axis in Final Pose: " << req.task_description.affordance_info.from.axis_in_final_pose.transpose() << "\n";
+
+    // Canonical Pose From
+    log << "Canonical Pose From:\n";
+    log << "  Method: " << pose_specification_method_to_string(req.task_description.canonical_pose_from.method) << "\n";
+    log << "  Frame Name: " << req.task_description.canonical_pose_from.frame_name << "\n";
+    log << "  Post Transform:\n" << req.task_description.canonical_pose_from.post_transform << "\n";
 
     // Task Description - Goal
     log << "Task Description - Goal:\n";
     log << "  Affordance: " << req.task_description.goal.affordance << "\n";
     log << "  EE Orientation: " << req.task_description.goal.ee_orientation.transpose() << "\n";
-    log << "  Grasp Pose:\n" << req.task_description.goal.grasp_pose << "\n";
+    log << "  Grasp Pose:\n" << req.task_description.goal.canonical_pose << "\n";
     log << "  Gripper: " << req.task_description.goal.gripper << "\n";
 
     // Task Description - Other Fields
@@ -258,16 +293,16 @@ cc_affordance_planner::MotionType motion_type_from_msg(uint8_t motion_type)
     }
 }
 
-affordance_util::ScrewLocationMethod screw_location_method_from_msg(uint8_t location_method)
+affordance_util::PoseSpecificationMethod pose_specification_method_from_msg(uint8_t pose_specification_method)
 {
-    switch (location_method)
+    switch (pose_specification_method)
     {
     case 1:
-        return affordance_util::ScrewLocationMethod::FROM_FK;
+        return affordance_util::PoseSpecificationMethod::FROM_FK;
     case 2:
-        return affordance_util::ScrewLocationMethod::FROM_FRAME_NAME;
+        return affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;
     case 0:
-        return affordance_util::ScrewLocationMethod::PROVIDED;
+        return affordance_util::PoseSpecificationMethod::PROVIDED;
     default:
         throw std::invalid_argument("Invalid CCA enum value for conversion.");
     }
@@ -365,15 +400,15 @@ uint8_t motion_type_to_msg(cc_affordance_planner::MotionType motion_type)
     }
 }
 
-uint8_t screw_location_method_to_msg(affordance_util::ScrewLocationMethod location_method)
+uint8_t pose_specification_method_to_msg(affordance_util::PoseSpecificationMethod pose_specification_method)
 {
-    switch (location_method)
+    switch (pose_specification_method)
     {
-    case affordance_util::ScrewLocationMethod::FROM_FK:
+    case affordance_util::PoseSpecificationMethod::FROM_FK:
         return static_cast<uint8_t>(cca_ros_msgs::msg::ScrewLocationMethod::FROM_FK);
-    case affordance_util::ScrewLocationMethod::FROM_FRAME_NAME:
+    case affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME:
         return static_cast<uint8_t>(cca_ros_msgs::msg::ScrewLocationMethod::FROM_FRAME_NAME);
-    case affordance_util::ScrewLocationMethod::PROVIDED:
+    case affordance_util::PoseSpecificationMethod::PROVIDED:
         return static_cast<uint8_t>(cca_ros_msgs::msg::ScrewLocationMethod::PROVIDED);
     default:
         throw std::invalid_argument("Invalid AffordanceUtil ScrewLocationMethod enum value for conversion.");
@@ -472,14 +507,14 @@ std::string motion_type_to_string(cc_affordance_planner::MotionType type) {
     }
 }
 
-std::string screw_location_method_to_string(affordance_util::ScrewLocationMethod method) {
+std::string pose_specification_method_to_string(affordance_util::PoseSpecificationMethod method) {
     switch (method)
     {
-    case affordance_util::ScrewLocationMethod::FROM_FK:
+    case affordance_util::PoseSpecificationMethod::FROM_FK:
         return "FROM_FK";
-    case affordance_util::ScrewLocationMethod::FROM_FRAME_NAME:
+    case affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME:
         return "FROM_FRAME_NAME";
-    case affordance_util::ScrewLocationMethod::PROVIDED:
+    case affordance_util::PoseSpecificationMethod::PROVIDED:
         return "PROVIDED";
     default:
         return "UNKNOWN";
