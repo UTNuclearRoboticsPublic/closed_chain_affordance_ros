@@ -128,7 +128,7 @@ template <typename EnumType> class EnumToReq : public EnumToType<EnumType, cca_r
  *
  * @tparam EnumType Enum input type.
  */
-template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, cca_ros::PlanningRequests>
+template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, std::vector<cca_ros::PlanningRequest>>
 {
   public:
 
@@ -138,7 +138,7 @@ template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, cca_
      * @param name The node's unique name in the Behavior Tree.
      * @param config Node configuration including ports.
      */
-    inline EnumToReqs(const std::string &name, const BT::NodeConfig &config) : EnumToType<EnumType, cca_ros::PlanningRequests>(name, config){}
+    inline EnumToReqs(const std::string &name, const BT::NodeConfig &config) : EnumToType<EnumType, std::vector<cca_ros::PlanningRequest>>(name, config){}
 
 };
 
