@@ -17,7 +17,6 @@ find_package(Eigen3 REQUIRED)  # Linear algebra library
 # ROS packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)  # ROS 2 communication library
-find_package(tf2_ros REQUIRED)  # ROS 2 library for managing coordinate frames
 find_package(control_msgs REQUIRED)  # ROS 2 messages for robot control
 find_package(geometry_msgs REQUIRED)  # ROS 2 messages for geometry
 find_package(sensor_msgs REQUIRED)  # ROS 2 messages for sensor data
@@ -41,10 +40,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 
 # Specify ROS dependencies
-ament_target_dependencies(${PROJECT_NAME} rclcpp tf2_ros control_msgs geometry_msgs sensor_msgs)
+ament_target_dependencies(${PROJECT_NAME} rclcpp control_msgs geometry_msgs sensor_msgs)
 
 # Export ROS dependencies so downstream pkgs that depend on this pkg can trigger find_package() calls to these
-ament_export_dependencies(rclcpp tf2_ros control_msgs geometry_msgs sensor_msgs)
+ament_export_dependencies(rclcpp control_msgs geometry_msgs sensor_msgs)
 
 # Export the library target for visibility to other ROS packages
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)

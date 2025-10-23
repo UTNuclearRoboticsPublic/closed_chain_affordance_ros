@@ -162,42 +162,6 @@ JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::Cons
     return ordered_joint_states;
 }
 
-Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &body_frame, tf2_ros::Buffer &tf_buffer,
-                          double timeout_secs)
-
-{
-
-    auto timeout = std::chrono::duration_cast<tf2::Duration>(std::chrono::duration<float>(timeout_secs));
-
-    Eigen::Isometry3d htm; // Output
-
-    geometry_msgs::msg::TransformStamped transform_stamped; // ROS message to hold transform info
-
-    // Query the latest available transform
-    try
-    {
-        transform_stamped = tf_buffer.lookupTransform(space_frame, body_frame, tf2::TimePointZero, timeout);
-    }
-    catch (tf2::TransformException &ex)
-    {
-        std::cerr << "Failed to lookup transform: " << ex.what() << std::endl;
-    }
-
-    // Convert the message to Eigen::Isometry3d type
-    // Extract translation and rotation from the TransformStamped message
-    Eigen::Vector3d translation(transform_stamped.transform.translation.x, transform_stamped.transform.translation.y,
-                                transform_stamped.transform.translation.z);
-
-    Eigen::Quaterniond rotation(transform_stamped.transform.rotation.w, transform_stamped.transform.rotation.x,
-                                transform_stamped.transform.rotation.y, transform_stamped.transform.rotation.z);
-
-    // Set the translation and rotation components of the HTM
-    htm.translation() = translation;
-    htm.linear() = rotation.toRotationMatrix();
-
-    return htm;
-}
-
 control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_builder(
     const std::vector<Eigen::VectorXd> &bare_trajectory, const Eigen::VectorXd &config_offset,
     const std::vector<std::string> &joint_names, const double &time_step)

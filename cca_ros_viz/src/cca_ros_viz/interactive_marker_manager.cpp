@@ -167,14 +167,26 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
     // Draw in tool frame if asked
     if (info.in_tool_frame)
     {
-        const Eigen::Isometry3d aff_htm = ros_cpp_util::get_htm(ref_frame_name_, tool_frame_name_, *tf_buffer_);
-        int_marker.pose.position.x = aff_htm.translation().x();
-        int_marker.pose.position.y = aff_htm.translation().y();
-        int_marker.pose.position.z = aff_htm.translation().z();
-        if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Could not lookup [%s] frame. Will place [%s] interactive marker at [%s] instead.",
-                         tool_frame_name_.c_str(), info.marker_name.c_str(), ref_frame_name_.c_str());
+        try {
+            // Lookup transform from ref to tool
+            const geometry_msgs::msg::TransformStamped transform_stamped = 
+                tf_buffer_->lookupTransform(
+                    ref_frame_name_, 
+                    tool_frame_name_,
+                    tf2::TimePointZero);  // Get latest available transform
+            int_marker.pose.position.x = transform_stamped.transform.translation.x;
+            int_marker.pose.position.y = transform_stamped.transform.translation.y;
+            int_marker.pose.position.z = transform_stamped.transform.translation.z;
+            
+            
+        } catch (const tf2::TransformException &ex) {
+            RCLCPP_ERROR(this->get_logger(),
+                "Failed to lookup transform from [%s] to [%s]. Placing [%s] interactive marker at [%s] instead. Details: %s",
+                ref_frame_name_.c_str(),
+                tool_frame_name_.c_str(),
+                info.marker_name.c_str(),
+                ref_frame_name_.c_str(),
+                ex.what());
         }
     }
 

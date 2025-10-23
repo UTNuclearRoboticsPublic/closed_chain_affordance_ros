@@ -40,7 +40,6 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <tf2_ros/buffer.h>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <unordered_map>
 
@@ -121,20 +120,6 @@ std::vector<JointTrajPoint> get_ordered_joint_traj(const trajectory_msgs::msg::J
  */
 JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::ConstSharedPtr &joint_states,
                                         const std::vector<std::string> &joint_name_order);
-
-/**
- * @brief Given a space frame name, body frame name, and tf buffer, returns the transformation of the body frame with
- * respect to the space frame.
- *
- * @param space_frame std::string containing space_frame name
- * @param body_frame std::string containing body_frame name
- * @param tf_buffer tf2_ros::Buffer containing an empty buffer
- * @param timeout_secs optional double containing lookup timeout in seconds. Default value is 0.3
- *
- * @return Eigen::Isometry3d containing the transformation of the body frame wrt to space frame
- */
-Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &body_frame, tf2_ros::Buffer &tf_buffer,
-                          double timeout_secs = 0.3);
 
 /**
  * @brief Given a bare differential joint trajectory (i.e. just a vector of differential joint trajectory points from a

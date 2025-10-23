@@ -27,9 +27,6 @@
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
-// Custom ROS utilities
-#include <ros_cpp_util/ros_cpp_util.hpp>
-
 namespace interactive_marker_manager
 {
 /**
