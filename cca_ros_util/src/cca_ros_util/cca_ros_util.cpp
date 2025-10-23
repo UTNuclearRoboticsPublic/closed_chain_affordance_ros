@@ -108,24 +108,24 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
     // Copy other fields
     msg.task_description.affordance_info.pitch = req.task_description.affordance_info.pitch;
 
-    // Convert affordance_info.from
-    msg.task_description.affordance_info.from.method.value =
-        pose_specification_method_to_msg(req.task_description.affordance_info.from.method);
-    msg.task_description.affordance_info.from.frame_name = req.task_description.affordance_info.from.frame_name;
-    msg.task_description.affordance_info.from.post_transform =
-        std::vector<double>(req.task_description.affordance_info.from.post_transform.data(),
-                           req.task_description.affordance_info.from.post_transform.data() + req.task_description.affordance_info.from.post_transform.size());
-    msg.task_description.affordance_info.from.axis_in_final_pose =
-        std::vector<double>(req.task_description.affordance_info.from.axis_in_final_pose.data(),
-                           req.task_description.affordance_info.from.axis_in_final_pose.data() + req.task_description.affordance_info.from.axis_in_final_pose.size());
-
-    // Convert canonical_pose_from field back to message
-    msg.task_description.canonical_pose_from.method.value =
-        pose_specification_method_to_msg(req.task_description.canonical_pose_from.method);
-    msg.task_description.canonical_pose_from.frame_name = req.task_description.canonical_pose_from.frame_name;
-    msg.task_description.canonical_pose_from.post_transform =
-        std::vector<double>(req.task_description.canonical_pose_from.post_transform.data(),
-                           req.task_description.canonical_pose_from.post_transform.data() + req.task_description.canonical_pose_from.post_transform.size());
+   // Convert affordance_info.from
+   msg.task_description.affordance_info.from.method.value =
+       pose_specification_method_to_msg(req.task_description.affordance_info.from.method);
+   msg.task_description.affordance_info.from.frame_name = req.task_description.affordance_info.from.frame_name;
+   std::copy(req.task_description.affordance_info.from.post_transform.data(),
+             req.task_description.affordance_info.from.post_transform.data() + 16, // 4x4 matrix = 16 elements
+             msg.task_description.affordance_info.from.post_transform.begin());
+   msg.task_description.affordance_info.from.axis_in_final_pose =
+       std::vector<double>(req.task_description.affordance_info.from.axis_in_final_pose.data(),
+                          req.task_description.affordance_info.from.axis_in_final_pose.data() + req.task_description.affordance_info.from.axis_in_final_pose.size());
+   
+   // Convert canonical_pose_from field back to message
+   msg.task_description.canonical_pose_from.method.value =
+       pose_specification_method_to_msg(req.task_description.canonical_pose_from.method);
+   msg.task_description.canonical_pose_from.frame_name = req.task_description.canonical_pose_from.frame_name;
+   std::copy(req.task_description.canonical_pose_from.post_transform.data(),
+             req.task_description.canonical_pose_from.post_transform.data() + 16, // 4x4 matrix = 16 elements
+             msg.task_description.canonical_pose_from.post_transform.begin());
 
     // Convert goal
     msg.task_description.goal.affordance = req.task_description.goal.affordance;
@@ -405,13 +405,13 @@ uint8_t pose_specification_method_to_msg(affordance_util::PoseSpecificationMetho
     switch (pose_specification_method)
     {
     case affordance_util::PoseSpecificationMethod::FROM_FK:
-        return static_cast<uint8_t>(cca_ros_msgs::msg::ScrewLocationMethod::FROM_FK);
+        return static_cast<uint8_t>(cca_ros_msgs::msg::PoseSpecificationMethod::FROM_FK);
     case affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME:
-        return static_cast<uint8_t>(cca_ros_msgs::msg::ScrewLocationMethod::FROM_FRAME_NAME);
+        return static_cast<uint8_t>(cca_ros_msgs::msg::PoseSpecificationMethod::FROM_FRAME_NAME);
     case affordance_util::PoseSpecificationMethod::PROVIDED:
-        return static_cast<uint8_t>(cca_ros_msgs::msg::ScrewLocationMethod::PROVIDED);
+        return static_cast<uint8_t>(cca_ros_msgs::msg::PoseSpecificationMethod::PROVIDED);
     default:
-        throw std::invalid_argument("Invalid AffordanceUtil ScrewLocationMethod enum value for conversion.");
+        throw std::invalid_argument("Invalid AffordanceUtil PoseSpecificationMethod enum value for conversion.");
     }
 }
 
