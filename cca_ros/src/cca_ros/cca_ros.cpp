@@ -1,5 +1,6 @@
 #include "cca_ros/cca_ros.hpp"
 #include <affordance_util/affordance_util.hpp>
+#include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 
 namespace cca_ros
 {
@@ -182,11 +183,11 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         // Set start state from current state (first task or previous task end state)
         start_state = current_state;
 
-        // Lookup affordance location if frame is specified
+        // Lookup affordance info if requested
         if (task_description.affordance_info.from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
             try {
                 // Lookup transform from ref_frame_ to the affordance location frame
-                geometry_msgs::msg::TransformStamped transform_stamped = 
+                const geometry_msgs::msg::TransformStamped transform_stamped = 
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
                         task_description.affordance_info.from.frame_name,
@@ -211,9 +212,43 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
                 
             } catch (const tf2::TransformException &ex) {
                 RCLCPP_ERROR(node_logger_, 
-                    "Could not lookup transform from %s to %s to fill in affordance location%s: %s", 
+                    "Could not lookup transform from %s to %s to fill in affordance info%s: %s", 
                     ref_frame_.c_str(),
                     task_description.affordance_info.from.frame_name.c_str(),
+		    index_log.c_str(),
+                    ex.what());
+                *status_ = Status::FAILED;
+                return cca_ros::PlanningResponse();
+            }
+        }
+
+        // Lookup canonical frame info if requested
+        if (task_description.motion_type==cc_affordance_planner::MotionType::APPROACH && task_description.canonical_pose_from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
+            try {
+                // Lookup transform from ref_frame_ to the affordance location frame
+                const geometry_msgs::msg::TransformStamped transform_stamped = 
+                    tf_buffer_->lookupTransform(
+                        ref_frame_, 
+                        task_description.canonical_pose_from.frame_name,
+                        tf2::TimePointZero);  // Get latest available transform
+                
+                // Convert to Eigen type so we could do some math
+		const Eigen::Isometry3d T_ref_to_lookup_frame = tf2::transformToEigen(transform_stamped.transform);
+
+		// Apply requested transform -- We now have the transform from the reference frame to the desired canonical frame
+                const Eigen::Isometry3d T_ref_to_can = T_ref_to_lookup_frame * Eigen::Isometry3d(task_description.canonical_pose_from.post_transform);
+
+                // Extract translation from the transform
+	        task_description.goal.canonical_pose = T_ref_to_can.matrix();	
+
+                // Set canonical_pose specification method to PROVIDED since we have everything now
+                task_description.canonical_pose_from.method = affordance_util::PoseSpecificationMethod::PROVIDED; 
+                
+            } catch (const tf2::TransformException &ex) {
+                RCLCPP_ERROR(node_logger_, 
+                    "Could not lookup transform from %s to %s to fill in canonical pose%s: %s", 
+                    ref_frame_.c_str(),
+                    task_description.canonical_pose_from.frame_name.c_str(),
 		    index_log.c_str(),
                     ex.what());
                 *status_ = Status::FAILED;
@@ -462,6 +497,13 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
             req.task_description.affordance_info.axis.hasNaN() && req.task_description.affordance_info.screw.hasNaN()) {
             throw std::invalid_argument(
                 index_log + "task_description.affordance_info: Either from.axis_in_final_pose or affordance_info.axis or affordance_info.screw must be provided");
+        }
+
+        // Validate canonical frame name is supplied if asked to lookup canonical pose from frame name
+        if ((req.task_description.canonical_pose_from.method == affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) && 
+            (req.task_description.canonical_pose_from.frame_name.empty())) {
+            throw std::invalid_argument(
+                index_log + "task_description.canonical_pose_from: method FROM_FRAME_NAME requires frame_name, but is empty");
         }
     }
 }
