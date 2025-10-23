@@ -131,13 +131,32 @@ JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::Cons
  * @param config_offset Eigen::VectorXd containing reference trajectory point
  * @param joint_names std::vector<std::string> containing joint names. Ensure the order of the joint names matches the
  * order of joint positions
- * @param time_step Optional double containing time step. Default is 0.05
+ * @param time_step Double containing time delta between consecutive points
  *
  * @return control_msgs::FollowJointTrajectoryGoal containing ready-to-use ROS follow_joint_trajectory message
  */
 control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_builder(
     const std::vector<Eigen::VectorXd> &bare_trajectory, const Eigen::VectorXd &config_offset,
-    const std::vector<std::string> &joint_names, const double &time_step = 0.05);
+    const std::vector<std::string> &joint_names, const double &time_step);
+
+/**
+ * @brief Stitches multiple joint trajectories into one continuous trajectory with updated time stamps.
+ *
+ * Given a vector of individual ROS `JointTrajectory` messages (typically generated sequentially),
+ * this function merges them into a single `JointTrajectory`, ensuring that:
+ *   - Joint names match across all input trajectories
+ *   - Time offsets are adjusted to produce a smooth, continuous timeline
+ *
+ * @param trajectories Vector of `trajectory_msgs::msg::JointTrajectory` to be stitched together. 
+ *        Each trajectory must have the same joint name ordering.
+ *
+ * @return A single `trajectory_msgs::msg::JointTrajectory` representing the time-continuous
+ *         stitched result. If input vector is empty, returns an empty trajectory.
+ *
+ * @throws std::runtime_error if joint names do not match across input trajectories.
+ */
+trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<trajectory_msgs::msg::JointTrajectory>& trajectories);
+
 } // namespace ros_cpp_util
 
 #endif // ROS_CPP_UTIL_HPP_

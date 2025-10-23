@@ -233,4 +233,46 @@ control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_bui
 
     return fjtg_msg;
 }
+
+trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<trajectory_msgs::msg::JointTrajectory> &trajectories)
+{
+    trajectory_msgs::msg::JointTrajectory stitched_traj;
+
+    if (trajectories.empty())
+        return stitched_traj;
+
+    // Copy joint names from first trajectory
+    stitched_traj.joint_names = trajectories.front().joint_names;
+
+    // Time offset for the first trajectory is 0
+    rclcpp::Duration time_offset = rclcpp::Duration::from_seconds(0.0);
+
+    for (const auto& traj: trajectories)
+    {
+
+        // Ensure joint names match
+        if (traj.joint_names != stitched_traj.joint_names)
+        {
+            throw std::runtime_error("Joint names mismatch during trajectory stitching");
+        }
+
+        // Stitch joint trajectories with continuous timing
+        for (const auto &p : traj.points)
+        {
+            trajectory_msgs::msg::JointTrajectoryPoint shifted_pt = p;
+
+            rclcpp::Duration original_time(p.time_from_start);
+            shifted_pt.time_from_start = rclcpp::Duration(original_time + time_offset);
+            stitched_traj.points.push_back(std::move(shifted_pt));
+        }
+
+        // Update time offset for the next trajectory
+        if (!traj.points.empty())
+        {
+        time_offset = rclcpp::Duration(traj.points.back().time_from_start);
+	}
+    }
+
+    return stitched_traj;
+}
 } // namespace ros_cpp_util

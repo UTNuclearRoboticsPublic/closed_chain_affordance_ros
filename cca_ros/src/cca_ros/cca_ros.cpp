@@ -366,9 +366,9 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     // Stitch all trajectories together into final goal message
     cca_ros::GoalMsg final_goal_msg;
-    final_goal_msg.robot.trajectory = this->stitch_trajectories_(traj_msg.robot);
-    final_goal_msg.gripper.trajectory = this->stitch_trajectories_(traj_msg.gripper);
-    final_goal_msg.robot_and_gripper.trajectory = this->stitch_trajectories_(traj_msg.robot_and_gripper);
+    final_goal_msg.robot.trajectory = ros_cpp_util::stitch_trajectories(traj_msg.robot);
+    final_goal_msg.gripper.trajectory = ros_cpp_util::stitch_trajectories(traj_msg.gripper);
+    final_goal_msg.robot_and_gripper.trajectory = ros_cpp_util::stitch_trajectories(traj_msg.robot_and_gripper);
 
     // For single original task, check if aggregated trajectory is partial and allow small deviation
     if (single_planning_request && is_partial) {
@@ -976,50 +976,5 @@ void CcaRos::cancel_execution()
         }
     }
 }
-
-trajectory_msgs::msg::JointTrajectory CcaRos::stitch_trajectories_(
-    const std::vector<trajectory_msgs::msg::JointTrajectory> &trajectories)
-{
-    trajectory_msgs::msg::JointTrajectory result;
-
-    if (trajectories.empty())
-        return result;
-
-    // Copy joint names from first trajectory
-    result.joint_names = trajectories.front().joint_names;
-
-    // Time offset for the first trajectory is 0
-    rclcpp::Duration time_offset = rclcpp::Duration::from_seconds(0.0);
-
-    for (const auto& traj: trajectories)
-    {
-
-        // Ensure joint names match
-        if (traj.joint_names != result.joint_names)
-        {
-            throw std::runtime_error("Joint names mismatch during trajectory stitching");
-        }
-
-        // Stitch joint trajectories with continuous timing
-        for (const auto &p : traj.points)
-        {
-            trajectory_msgs::msg::JointTrajectoryPoint shifted_pt = p;
-
-            rclcpp::Duration original_time(p.time_from_start);
-            shifted_pt.time_from_start = rclcpp::Duration(original_time + time_offset);
-            result.points.push_back(std::move(shifted_pt));
-        }
-
-        // Update time offset for the next trajectory
-        if (!traj.points.empty())
-        {
-        time_offset = rclcpp::Duration(traj.points.back().time_from_start);
-	}
-    }
-
-    return result;
-}
-
-
 
 } // namespace cca_ros
