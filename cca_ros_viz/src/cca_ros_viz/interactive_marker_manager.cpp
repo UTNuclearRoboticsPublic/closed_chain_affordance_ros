@@ -4,12 +4,12 @@ namespace interactive_marker_manager
 {
 
 // Initialize Eigen static consts
-const Eigen::Vector3d InteractiveMarkerManager::X_AXIS_(1.0, 0.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::Y_AXIS_(0.0, 1.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::Z_AXIS_(0.0, 0.0, 1.0);
-const Eigen::Vector3d InteractiveMarkerManager::NEG_X_AXIS_(-1.0, 0.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::NEG_Y_AXIS_(0.0, -1.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::NEG_Z_AXIS_(0.0, 0.0, -1.0);
+const Eigen::Vector3d InteractiveMarkerManager::X_AXIS_ = affordance_util::axis_to_vec(affordance_util::Axis::X);
+const Eigen::Vector3d InteractiveMarkerManager::Y_AXIS_ = affordance_util::axis_to_vec(affordance_util::Axis::Y);
+const Eigen::Vector3d InteractiveMarkerManager::Z_AXIS_ = affordance_util::axis_to_vec(affordance_util::Axis::Z);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_X_AXIS_= affordance_util::axis_to_vec(affordance_util::Axis::X_MINUS);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_Y_AXIS_= affordance_util::axis_to_vec(affordance_util::Axis::Y_MINUS);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_Z_AXIS_= affordance_util::axis_to_vec(affordance_util::Axis::Z_MINUS);
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_AXIS_ = InteractiveMarkerManager::X_AXIS_;
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_LOCATION_(0.0, 0.0, 0.0);
 const Eigen::Matrix4d InteractiveMarkerManager::DEFAULT_FRAME_POSE_ =
