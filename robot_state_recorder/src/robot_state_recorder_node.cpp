@@ -25,7 +25,7 @@ Author: Crasun Jans
 static bool g_exit_flag = false; // signal to shutdown ROS on ctrl+c
 
 // Function to handle ctrl+c signal
-static void signal_callback_handler(int signum) { g_exit_flag = true; }
+static void signal_callback_handler([[maybe_unused]] int signum) { g_exit_flag = true; }
 
 /****************** EOF Signal handling ****************************/
 /***** Joint Trajectory and EE TF Recorder class ******************/
@@ -188,7 +188,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
         {
 
             // Joint positions
-            for (size_t i = 0; i < pred_traj_point.positions.size(); ++i)
+	    for (auto i = Eigen::Index{0}; i < pred_traj_point.positions.size(); ++i)
             {
                 csvFile << pred_traj_point.positions[i] << ",";
             }
@@ -273,7 +273,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
                 joint_states_ready_ = false;
             }
             // Write joint_states data to file
-            for (size_t i = 0; i < joint_states_copy.positions.size(); ++i)
+	    for (auto i = Eigen::Index{0}; i < joint_states_copy.positions.size(); ++i)
             {
                 csvFile << joint_states_copy.positions[i] << ",";
             }
