@@ -425,7 +425,7 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
     // If APPROACH or CARTESIAN_GOAL planning type, get the pose of the affordance start frame
     if ((planning_type == cc_affordance_planner::PlanningType::APPROACH) || (planning_type == cc_affordance_planner::PlanningType::CARTESIAN_GOAL)){
 
-        req.task_description.goal.grasp_pose = this->get_frame_pose();
+        req.task_description.goal.canonical_pose = this->get_frame_pose();
 
     }
 
