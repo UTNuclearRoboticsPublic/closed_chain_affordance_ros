@@ -186,7 +186,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         // Lookup affordance info if requested
         if (task_description.affordance_info.from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
             try {
-                // Lookup transform from ref_frame_ to the affordance location frame
+                // Lookup transform from ref_frame_ to the lookup frame
                 const geometry_msgs::msg::TransformStamped transform_stamped = 
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
@@ -225,7 +225,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         // Lookup canonical frame info if requested
         if (task_description.motion_type==cc_affordance_planner::MotionType::APPROACH && task_description.canonical_pose_from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
             try {
-                // Lookup transform from ref_frame_ to the affordance location frame
+                // Lookup transform from ref_frame_ to the lookup frame
                 const geometry_msgs::msg::TransformStamped transform_stamped = 
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
