@@ -413,9 +413,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     }
 
     RCLCPP_INFO(node_logger_, " %s validation service succeeded", viz_ss_name_.c_str());
-    planner_result_final.planning_time += 
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::microseconds(validation_response->validation_time_usecs));
+    planner_result_final.planning_time += std::chrono::microseconds(validation_response->validation_time_usecs);
 
     // Execute trajectory if requested (check first request for execute flag)
     if (planning_requests.front().execute_trajectory) {
