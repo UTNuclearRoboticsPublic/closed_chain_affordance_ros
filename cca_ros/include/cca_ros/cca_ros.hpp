@@ -108,8 +108,14 @@ struct PlanningRequest
  */
 struct PlanningResponse
 {
+    struct PlanningResult{
+        bool success = false; // Whether planning was successful
+        FollowJointTrajectoryGoal joint_trajectory; // Solved joint trajectory msg
+        cc_affordance_planner::PlannerResult cca_result; // Raw result from the CCA planner
+	};
+
     std::shared_ptr<Status> status = std::make_shared<cca_ros::Status>(cca_ros::Status::UNKNOWN);
-    cc_affordance_planner::PlannerResult result;
+    PlanningResult result;
 };
 
 struct GoalMsg{

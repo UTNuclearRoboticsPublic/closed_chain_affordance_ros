@@ -1,6 +1,7 @@
 #include "cca_ros/cca_ros.hpp"
 #include <affordance_util/affordance_util.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
+#include <chrono>
 
 namespace cca_ros
 {
@@ -164,7 +165,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 	}
 
     // Initialize aggregated planner result
-    cc_affordance_planner::PlannerResult& planner_result_final = planning_response.result;
+    cc_affordance_planner::PlannerResult& planner_result_final = planning_response.result.cca_result;
     planner_result_final.planning_time = std::chrono::microseconds{0};
 
     // Some helper variables
@@ -426,6 +427,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     }
 
     *status_ = Status::SUCCEEDED;
+    planning_response.result.success = true;
+    planning_response.result.joint_trajectory = (includes_gripper_trajectory) ? final_goal_msg.robot_and_gripper : final_goal_msg.robot;
     return planning_response;
 }
 
