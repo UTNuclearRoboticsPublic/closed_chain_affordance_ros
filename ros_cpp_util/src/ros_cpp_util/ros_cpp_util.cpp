@@ -237,42 +237,124 @@ control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_bui
 trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<trajectory_msgs::msg::JointTrajectory> &trajectories)
 {
     trajectory_msgs::msg::JointTrajectory stitched_traj;
-
     if (trajectories.empty())
         return stitched_traj;
-
+    
     // Copy joint names from first trajectory
     stitched_traj.joint_names = trajectories.front().joint_names;
-
+    
     // Time offset for the first trajectory is 0
     rclcpp::Duration time_offset = rclcpp::Duration::from_seconds(0.0);
-
-    for (const auto& traj: trajectories)
+    
+    for (size_t traj_idx = 0; traj_idx < trajectories.size(); ++traj_idx)
     {
-
+        const auto& traj = trajectories[traj_idx];
+        
         // Ensure joint names match
         if (traj.joint_names != stitched_traj.joint_names)
         {
             throw std::runtime_error("Joint names mismatch during trajectory stitching");
         }
-
-        // Stitch joint trajectories with continuous timing
-        for (const auto &p : traj.points)
+        
+        // Skip empty trajectories
+        if (traj.points.empty())
+            continue;
+        
+        // For trajectories after the first, validate continuity
+        if (traj_idx > 0)
         {
+            const auto& prev_traj = trajectories[traj_idx - 1];
+            if (!prev_traj.points.empty())
+            {
+                const auto& last_point = prev_traj.points.back();
+                const auto& first_point = traj.points.front();
+                
+                // Check positions match
+                if (last_point.positions.size() != first_point.positions.size())
+                {
+                    throw std::runtime_error("Trajectory stitching failed: position size mismatch at boundary between trajectory " 
+                                           + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx));
+                }
+                
+                constexpr double position_tolerance = 1e-6;
+                for (size_t j = 0; j < last_point.positions.size(); ++j)
+                {
+                    if (std::abs(last_point.positions[j] - first_point.positions[j]) > position_tolerance)
+                    {
+                        throw std::runtime_error("Trajectory stitching failed: position discontinuity at boundary between trajectory " 
+                                               + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx) 
+                                               + " (joint " + std::to_string(j) + ": " 
+                                               + std::to_string(last_point.positions[j]) + " vs " + std::to_string(first_point.positions[j]) + ")");
+                    }
+                }
+                
+                // Check velocities match (if provided)
+                if (!last_point.velocities.empty() && !first_point.velocities.empty())
+                {
+                    if (last_point.velocities.size() != first_point.velocities.size())
+                    {
+                        throw std::runtime_error("Trajectory stitching failed: velocity size mismatch at boundary between trajectory " 
+                                               + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx));
+                    }
+                    
+                    constexpr double velocity_tolerance = 1e-4;
+                    for (size_t j = 0; j < last_point.velocities.size(); ++j)
+                    {
+                        if (std::abs(last_point.velocities[j] - first_point.velocities[j]) > velocity_tolerance)
+                        {
+                            throw std::runtime_error("Trajectory stitching failed: velocity discontinuity at boundary between trajectory " 
+                                                   + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx) 
+                                                   + " (joint " + std::to_string(j) + ": " 
+                                                   + std::to_string(last_point.velocities[j]) + " vs " + std::to_string(first_point.velocities[j]) + ")");
+                        }
+                    }
+                }
+                
+                // Check accelerations match (if provided)
+                if (!last_point.accelerations.empty() && !first_point.accelerations.empty())
+                {
+                    if (last_point.accelerations.size() != first_point.accelerations.size())
+                    {
+                        throw std::runtime_error("Trajectory stitching failed: acceleration size mismatch at boundary between trajectory " 
+                                               + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx));
+                    }
+                    
+                    constexpr double acceleration_tolerance = 1e-3;
+                    for (size_t j = 0; j < last_point.accelerations.size(); ++j)
+                    {
+                        if (std::abs(last_point.accelerations[j] - first_point.accelerations[j]) > acceleration_tolerance)
+                        {
+                            throw std::runtime_error("Trajectory stitching failed: acceleration discontinuity at boundary between trajectory " 
+                                                   + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx) 
+                                                   + " (joint " + std::to_string(j) + ": " 
+                                                   + std::to_string(last_point.accelerations[j]) + " vs " + std::to_string(first_point.accelerations[j]) + ")");
+                        }
+                    }
+                }
+            }
+        }
+        
+        // For trajectories after the first, skip the first point (duplicate of last point from previous trajectory)
+        size_t start_idx = (traj_idx == 0) ? 0 : 1;
+        
+        // Stitch joint trajectories with continuous timing
+        for (size_t i = start_idx; i < traj.points.size(); ++i)
+        {
+            const auto &p = traj.points[i];
             trajectory_msgs::msg::JointTrajectoryPoint shifted_pt = p;
-
             rclcpp::Duration original_time(p.time_from_start);
             shifted_pt.time_from_start = rclcpp::Duration(original_time + time_offset);
             stitched_traj.points.push_back(std::move(shifted_pt));
         }
-
-        // Update time offset for the next trajectory
+        
+        // Update time offset for the next trajectory (CUMULATIVE)
         if (!traj.points.empty())
         {
-        time_offset = rclcpp::Duration(traj.points.back().time_from_start);
-	}
+            rclcpp::Duration last_point_time(traj.points.back().time_from_start);
+            time_offset = rclcpp::Duration(time_offset + last_point_time);
+        }
     }
-
+    
     return stitched_traj;
 }
 } // namespace ros_cpp_util
