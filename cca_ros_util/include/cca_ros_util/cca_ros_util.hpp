@@ -59,6 +59,17 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
  */
 std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req);
 
+/**
+ * @brief Logs the details of a CCA PlannerResult object as a formatted string.
+ *
+ * Generates a detailed, human-readable representation of the provided
+ * cc_affordance_planner::PlannerResult object for debugging and logging purposes.
+ *
+ * @param res The CCA PlannerResult object to log.
+ * @return A std::stringstream containing the formatted log output.
+ */
+std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerResult& res);
+
 } // namespace cca_ros_util
 
 namespace
