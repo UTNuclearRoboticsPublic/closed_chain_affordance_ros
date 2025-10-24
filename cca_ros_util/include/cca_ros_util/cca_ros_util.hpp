@@ -22,6 +22,7 @@
 #include <Eigen/Dense>
 #include <stdexcept>
 #include <unordered_map>
+#include <iomanip>
 
 namespace cca_ros_util
 {

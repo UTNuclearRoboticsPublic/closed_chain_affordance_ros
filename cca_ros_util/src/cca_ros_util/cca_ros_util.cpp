@@ -227,6 +227,10 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
 std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerResult& res)
 {
     std::stringstream log;
+
+    const int traj_position_precision = 4; // Number of decimals for the joint trajectory positions
+    const int traj_position_field_width = 10; // Minimum number of characters to reserve for position printing
+
     log << "Planning result:\n";
     
     // Success status
@@ -238,9 +242,13 @@ std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerRe
     // Joint trajectory
     log << "  Closed-Chain joint trajectory:\n";
     log << "    Number of points: " << res.joint_trajectory.size() << "\n";
-    log << "    Position trajectory:\n";
-    for (const Eigen::VectorXd& point: res.joint_trajectory) {
-        log << "      " << point.transpose() << "\n";
+    log << "    Position trajectory:\n" << std::fixed << std::setprecision(traj_position_precision);
+    for (size_t i = 0; i < res.joint_trajectory.size(); ++i) {
+        log << "       [" << std::setw(2) << i << "]: ";
+        for (int j = 0; j < res.joint_trajectory[i].size(); ++j) {
+            log << std::setw(traj_position_field_width) << res.joint_trajectory[i][j];
+        }
+        log << "\n";
     }
     
     // Whether gripper trajectory is included
