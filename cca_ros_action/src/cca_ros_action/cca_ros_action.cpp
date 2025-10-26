@@ -39,8 +39,11 @@ rclcpp_action::CancelResponse CcaRosActionServer::handle_cancel(
 void CcaRosActionServer::handle_accepted(const std::shared_ptr<GoalHandleCcaRosActionServer> goal_handle)
 {
     RCLCPP_INFO(this->get_logger(), "Accepted goal on action server '%s'.", CCA_ROS_AS_NAME);
-    // Process the goal in a separate thread for execution
-    std::thread{std::bind(&CcaRosActionServer::execute_action, this, std::placeholders::_1), goal_handle}.detach();
+
+    // Safely launch the execution in a background thread
+    std::thread([this, goal_handle]() {
+        this->execute_action(goal_handle);
+    }).detach();
 }
 
 void CcaRosActionServer::execute_action(const std::shared_ptr<GoalHandleCcaRosActionServer> goal_handle)
