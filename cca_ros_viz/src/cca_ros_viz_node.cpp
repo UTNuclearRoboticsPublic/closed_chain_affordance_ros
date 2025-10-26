@@ -30,6 +30,9 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 #include <fmt/core.h>
+#include <iomanip>
+#include <sstream>  
+#include <string>  
 #include <rclcpp/rclcpp.hpp>
 #include <cca_ros_msgs/srv/cca_ros_viz.hpp>
 
@@ -103,6 +106,14 @@ class CcaRosVizServer : public rclcpp::Node
             new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
         rviz_visual_tools_->loadMarkerPub();
         rviz_visual_tools_->enableBatchPublishing();
+
+	// Capture joint names and limits
+        joint_names_ = joint_model_group_->getVariableNames();
+        
+        for (const std::string& joint_name : joint_names_) {
+            joint_limits_[joint_name] = 
+                robot_model->getVariableBounds(joint_name);
+        }
     }
 
   private:
@@ -123,6 +134,40 @@ class CcaRosVizServer : public rclcpp::Node
     std::string planning_group_;
     std::string rviz_fixed_frame_;
     std::string joint_states_topic_;
+    std::vector<std::string> joint_names_;
+    std::map<std::string, moveit::core::VariableBounds> joint_limits_;
+
+    std::string get_joint_limit_violation_log_(const moveit::core::RobotState& state) {
+        const int JOINT_NAME_WIDTH = 30;
+        const int VALUE_WIDTH = 15;
+        const int LIMIT_WIDTH = 15;
+        const int TOTAL_WIDTH = JOINT_NAME_WIDTH + VALUE_WIDTH + LIMIT_WIDTH + LIMIT_WIDTH;
+        
+        std::stringstream error_msg;
+        error_msg << "Offending joints:\n";
+        error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << "Joint name" 
+                  << std::setw(VALUE_WIDTH) << "Value" 
+                  << std::setw(LIMIT_WIDTH) << "Min Limit" 
+                  << std::setw(LIMIT_WIDTH) << "Max Limit" << "\n";
+        error_msg << std::string(TOTAL_WIDTH, '-') << "\n";
+        
+        for (const std::string& joint_name : joint_names_) {
+            const moveit::core::JointModel* joint_model = 
+                state.getRobotModel()->getJointModel(joint_name);
+            
+            if (joint_model && !state.satisfiesBounds(joint_model)) {
+                const double value = state.getVariablePosition(joint_name);
+                const auto& bounds = joint_limits_.at(joint_name);
+                
+                error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << joint_name
+                          << std::setw(VALUE_WIDTH) << value
+                          << std::setw(LIMIT_WIDTH) << bounds.min_position_
+                          << std::setw(LIMIT_WIDTH) << bounds.max_position_ << "\n";
+            }
+        }
+        
+        return error_msg.str();
+    }
 
     // Note, T_w_r is HTM from world frame, usually the root frame of the urdf to the service request reference frame
     Eigen::Isometry3d transform_pose_to_world_frame(const Eigen::Isometry3d &T_w_r,
@@ -324,6 +369,12 @@ class CcaRosVizServer : public rclcpp::Node
 			      RCLCPP_ERROR(node_logger_, "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str());
 			    }
 		    
+		    }
+
+		    // If joint-limit violation occurs, print the offending joints and info
+		    if (joint_limit_violation){	
+                            const std::string jl_err_log = get_joint_limit_violation_log_(goal_state);  
+			    RCLCPP_ERROR(node_logger_, jl_err_log.c_str());
 		    }
 
 		    return;
