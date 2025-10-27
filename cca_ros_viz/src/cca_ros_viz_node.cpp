@@ -306,6 +306,7 @@ class CcaRosVizServer : public rclcpp::Node
 
         std::chrono::microseconds total_viol_check_duration{0}; // for joint limits and collision checking
 
+	size_t pt_index = 0;
         for (const auto &point : ordered_group_traj.points)
         {
             // Copy the joint trajectory point to a std::vector<double> type
@@ -358,8 +359,8 @@ class CcaRosVizServer : public rclcpp::Node
 		        oss << goal_positions[k];
 		    }
 
-		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point: [%s]",
-		    	     violation_type.c_str(), oss.str().c_str());
+		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point[%zu]: [%s]",
+		    	     violation_type.c_str(), pt_index, oss.str().c_str());
 
 		    // If self-collision occurs, print the contacts
 		    if (self_collision_violation){
@@ -381,6 +382,7 @@ class CcaRosVizServer : public rclcpp::Node
 
 		}
             }
+	    ++pt_index;
         }
 
 	// Since no joint‐limit or self‐collision violation, now visualize the trajectory
