@@ -51,6 +51,7 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
     frame_enable_info.marker_name = frame_marker_name_;
     frame_enable_info.enable = ImControlEnable::ALL;
     frame_enable_info.create = true;
+    frame_enable_info.in_tool_frame = true;
     enable_im_controls(frame_enable_info);
 
     try
@@ -161,34 +162,8 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
 	}
     }
 
-    int_marker.header.frame_id = ref_frame_name_;
+    int_marker.header.frame_id = info.in_tool_frame ? tool_frame_name_ : ref_frame_name_;
     int_marker.description = "";
-
-    // Draw in tool frame if asked
-    if (info.in_tool_frame)
-    {
-        try {
-            // Lookup transform from ref to tool
-            const geometry_msgs::msg::TransformStamped transform_stamped = 
-                tf_buffer_->lookupTransform(
-                    ref_frame_name_, 
-                    tool_frame_name_,
-                    tf2::TimePointZero);  // Get latest available transform
-            int_marker.pose.position.x = transform_stamped.transform.translation.x;
-            int_marker.pose.position.y = transform_stamped.transform.translation.y;
-            int_marker.pose.position.z = transform_stamped.transform.translation.z;
-            
-            
-        } catch (const tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(),
-                "Failed to lookup transform from [%s] to [%s]. Placing [%s] interactive marker at [%s] instead. Details: %s",
-                ref_frame_name_.c_str(),
-                tool_frame_name_.c_str(),
-                info.marker_name.c_str(),
-                ref_frame_name_.c_str(),
-                ex.what());
-        }
-    }
 
     // Lambda to add control using static axis vectors
     auto addControl = [&](const std::string &name, const Eigen::Vector3d &axis, bool isRotation) {

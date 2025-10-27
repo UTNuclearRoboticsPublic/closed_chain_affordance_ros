@@ -112,6 +112,7 @@ class InteractiveMarkerManager : public rclcpp::Node
         "affordance_screw"; ///< Name of the interactive marker for the screw arrow
     static constexpr const char *frame_marker_name_ =
         "affordance_start_frame"; ///< Name of the interactive marker for the screw start frame
+    std::string tool_frame_name_;       ///< This is where the arrow will appear in "EE Orientation Only" planning mode
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
@@ -121,7 +122,6 @@ class InteractiveMarkerManager : public rclcpp::Node
     const std::chrono::milliseconds tf_publish_rate_{100};                 ///< TF publish rate
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;        ///< Transform broadcaster
 
-    std::string tool_frame_name_;       ///< This is where the arrow will appear in "EE Orientation Only" planning mode
     std::string ref_frame_name_;        ///< This is where the arrow will appear first in the "Affordance" planning mode
     std::string ee_frame_name_;         ///< Name of the EE frame
     Eigen::Vector3d ee_to_tool_offset_; ///< Location of the tool in the EE frame

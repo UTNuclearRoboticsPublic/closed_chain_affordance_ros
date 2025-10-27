@@ -169,6 +169,7 @@ void CcaRosRvizPlugin::mode_selected_()
         frame_enable_info.marker_name = this->frame_marker_name_;
         frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
         frame_enable_info.reset = false;
+        frame_enable_info.in_tool_frame = true;
         this->enable_im_controls(frame_enable_info);
 
 	// Enable buttons for planning, executing, etc.
@@ -214,6 +215,7 @@ void CcaRosRvizPlugin::motion_type_selected_()
             frame_enable_info.marker_name = this->frame_marker_name_;
             frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
             frame_enable_info.reset = false;
+            frame_enable_info.in_tool_frame = true;
             this->enable_im_controls(frame_enable_info);
 	}
     }
@@ -425,7 +427,9 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
     // If APPROACH or CARTESIAN_GOAL planning type, get the pose of the affordance start frame
     if ((planning_type == cc_affordance_planner::PlanningType::APPROACH) || (planning_type == cc_affordance_planner::PlanningType::CARTESIAN_GOAL)){
 
-        req.task_description.goal.canonical_pose = this->get_frame_pose();
+	req.task_description.canonical_pose_from.method = affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;
+	req.task_description.canonical_pose_from.frame_name = this->tool_frame_name_;
+        req.task_description.canonical_pose_from.post_transform = this->get_frame_pose(); // The frame pose is in the tool frame
 
     }
 
