@@ -1,5 +1,6 @@
 #include "cca_ros_util/cca_ros_util.hpp"
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
+#include <sstream>
 
 namespace cca_ros_util
 {
@@ -188,20 +189,20 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     // Affordance Info - From
     log << "  From Method: " << pose_specification_method_to_string(req.task_description.affordance_info.from.method) << "\n";
     log << "  From Frame Name: " << req.task_description.affordance_info.from.frame_name << "\n";
-    log << "  From Post Transform:\n" << req.task_description.affordance_info.from.post_transform << "\n";
+    log << "  From Post Transform:\n" << format_matrix4d(req.task_description.affordance_info.from.post_transform) << "\n";
     log << "  Axis in Final Pose: " << req.task_description.affordance_info.from.axis_in_final_pose.transpose() << "\n";
 
     // Canonical Pose From
     log << "Canonical Pose From:\n";
     log << "  Method: " << pose_specification_method_to_string(req.task_description.canonical_pose_from.method) << "\n";
     log << "  Frame Name: " << req.task_description.canonical_pose_from.frame_name << "\n";
-    log << "  Post Transform:\n" << req.task_description.canonical_pose_from.post_transform << "\n";
+    log << "  Post Transform:\n" << format_matrix4d(req.task_description.canonical_pose_from.post_transform) << "\n";
 
     // Task Description - Goal
     log << "Task Description - Goal:\n";
     log << "  Affordance: " << req.task_description.goal.affordance << "\n";
     log << "  EE Orientation: " << req.task_description.goal.ee_orientation.transpose() << "\n";
-    log << "  Grasp Pose:\n" << req.task_description.goal.canonical_pose << "\n";
+    log << "  Canonical Pose:\n" << format_matrix4d(req.task_description.goal.canonical_pose) << "\n";
     log << "  Gripper: " << req.task_description.goal.gripper << "\n";
 
     // Task Description - Other Fields
@@ -603,5 +604,18 @@ std::string trajectory_description_to_string(cc_affordance_planner::TrajectoryDe
             return "UNKNOWN";
     }
 }
+
+std::string format_matrix4d(const Eigen::Matrix4d& mat, int precision, int width) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(precision);
+    for (int i = 0; i < 4; ++i) {
+        ss << "  ";  // Indent each row
+        for (int j = 0; j < 4; ++j) {
+            ss << std::setw(width) << mat(i, j);
+        }
+        if (i < 3) ss << "\n";  // No trailing newline on last row
+    }
+    return ss.str();
+};
 
 } // namespace

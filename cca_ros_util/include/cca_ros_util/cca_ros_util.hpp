@@ -98,6 +98,7 @@ std::string screw_type_to_string(affordance_util::ScrewType type);
 std::string virtual_screw_order_to_string(affordance_util::VirtualScrewOrder order); 
 std::string ee_orientation_constraint_to_string(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint); 
 std::string trajectory_description_to_string(cc_affordance_planner::TrajectoryDescription trajectory_description); 
+std::string format_matrix4d(const Eigen::Matrix4d& mat, int precision = 4, int width = 10);
 
 } // namespace
 
