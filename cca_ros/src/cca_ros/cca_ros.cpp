@@ -425,8 +425,11 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             return cca_ros::PlanningResponse();
         }
     }
+    else { // Done since we aren't executing
+        *status_ = Status::SUCCEEDED;
+    }
 
-    *status_ = Status::SUCCEEDED;
+    // Fill out the rest of the planning response
     planning_response.result.success = true;
     planning_response.result.joint_trajectory = (includes_gripper_trajectory) ? final_goal_msg.robot_and_gripper : final_goal_msg.robot;
     return planning_response;
