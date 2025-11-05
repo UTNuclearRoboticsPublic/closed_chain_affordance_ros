@@ -371,6 +371,9 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     final_goal_msg.gripper.trajectory = ros_cpp_util::stitch_trajectories(traj_msg.gripper);
     final_goal_msg.robot_and_gripper.trajectory = ros_cpp_util::stitch_trajectories(traj_msg.robot_and_gripper);
 
+    // Set the appropriate joint trajectory in the planning response
+    planning_response.result.joint_trajectory = (includes_gripper_trajectory) ? final_goal_msg.robot_and_gripper : final_goal_msg.robot;
+
     // For single original task, check if aggregated trajectory is partial and allow small deviation
     if (single_planning_request && is_partial) {
         const int traj_size_difference = 
@@ -380,7 +383,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             std::copysign(planner_result_final.joint_trajectory.back().tail(1)(0), 
                          planning_requests.front().task_description.goal.affordance);
 
-        if (std::abs(traj_size_difference) < 3) {
+        if (std::abs(traj_size_difference) <= partial_traj_failure_threshold_) {
             RCLCPP_WARN(node_logger_,
                 "Trajectory description: PARTIAL with %d points less than FULL. "
                 "Could be due to affordance reaching limit at %f. Try "
@@ -410,7 +413,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             "%s validation service failed. Trajectory likely violates self-collision or joint limit constraints. "
             "Check server for more info.", viz_ss_name_.c_str());
         *status_ = Status::FAILED;
-        return cca_ros::PlanningResponse();
+        return planning_response;
     }
 
     RCLCPP_INFO(node_logger_, " %s validation service succeeded", viz_ss_name_.c_str());
@@ -431,7 +434,6 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     // Fill out the rest of the planning response
     planning_response.result.success = true;
-    planning_response.result.joint_trajectory = (includes_gripper_trajectory) ? final_goal_msg.robot_and_gripper : final_goal_msg.robot;
     return planning_response;
 }
 

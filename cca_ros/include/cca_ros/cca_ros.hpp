@@ -187,6 +187,7 @@ class CcaRos : public rclcpp::Node
     void cancel_execution();
 
   private:
+    constexpr static int partial_traj_failure_threshold_ = 2; ///< Threshold for partial trajectory failure
     std::shared_ptr<Status> status_{nullptr};                 ///< Current status of planning and execution
     std::shared_ptr<Status> robot_result_status_ = {nullptr}; ///< Current status of robot trajectory execution result
     std::shared_ptr<Status> gripper_result_status_ = {
