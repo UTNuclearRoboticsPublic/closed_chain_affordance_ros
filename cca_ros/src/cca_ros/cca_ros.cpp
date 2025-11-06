@@ -12,52 +12,69 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       node_logger_(this->get_logger()),   // Logger for the node
       viz_ss_name_("/cca_ros_viz_server") // Name of the service to validate and visualize result
 {
-    // Extract necessary parameters for ROS setup and robot configuration
-    robot_traj_execution_as_name_ = this->declare_parameter("cca_robot_as", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-    gripper_traj_execution_as_name_ = this->declare_parameter("cca_gripper_as", ""); // optional
-    robot_and_gripper_traj_execution_as_name_ =
-        this->declare_parameter("cca_robot_and_gripper_as", ""); // optional
+    // Helper: fetch a required string param or throw with context
+    auto get_required_str = [this](const char* key) -> std::string {
+      try {
+        // Declares if not declared, enforces type, throws if not set/wrong type
+        return this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+      } catch (const std::exception& e) {
+        std::ostringstream oss;
+        oss << "Required parameter '" << key << "' missing or wrong type: " << e.what();
+        RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+        throw std::runtime_error(oss.str());
+      }
+    };
 
-    const std::string joint_states_topic = this->declare_parameter("cca_joint_states_topic", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-    const std::string robot_name = this->declare_parameter("cca_robot", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-    const std::string build_robot_from = this->declare_parameter("cca_build_robot_from", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+    // --- Required params (throw if absent) ---
+    robot_traj_execution_as_name_        = get_required_str("cca_robot_as");
+    const std::string joint_states_topic = get_required_str("cca_joint_states_topic");
+    const std::string robot_name         = get_required_str("cca_robot");
+    const std::string build_robot_from   = get_required_str("cca_build_robot_from");
 
+    // Optional params
+    gripper_traj_execution_as_name_      = this->declare_parameter("cca_gripper_as", "");
+    robot_and_gripper_traj_execution_as_name_ = this->declare_parameter("cca_robot_and_gripper_as", "");
+
+
+    // Validate build_robot_from param
     if (build_robot_from != "yaml" && build_robot_from != "urdf") {
-    	RCLCPP_ERROR(node_logger_, "Invalid value for the [cca_build_robot_from] parameter: %s. Possible options are yaml or urdf", build_robot_from.c_str());
+      std::ostringstream oss;
+      oss << "Invalid value for 'cca_build_robot_from' param: " << build_robot_from
+          << ". Expected 'yaml' or 'urdf'.";
+      RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+      throw std::invalid_argument(oss.str());
     }
 
     // Get the path for robot configuration file
-    const std::string robot_config_file_path = CcaRos::get_cc_affordance_robot_description_(robot_name, build_robot_from);
+    const std::string robot_config_file_path =
+        CcaRos::get_cc_affordance_robot_description_(robot_name, build_robot_from);
 
     affordance_util::RobotConfig robotConfig;
 
-
     // Load robot configuration
-    try{
+    try {
+      if (build_robot_from == "yaml") {
+        robotConfig = affordance_util::robot_builder(robot_config_file_path);
+      } else { // urdf
+        const auto& urdfConfig =
+            affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
 
-	if (build_robot_from=="yaml"){
-	    robotConfig = affordance_util::robot_builder(robot_config_file_path);
-	}
-	else { // "urdf"
-	    const affordance_util::RobotConfig &urdfConfig = affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
-
-	    std::string robot_description;
-	    try{
-	    	robot_description = this->declare_parameter("robot_description", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-	       }
-            catch (const std::exception &e){
-	        RCLCPP_ERROR(node_logger_, "Exception while loading robot_description param: %s", e.what());
-	       }
-
-	    robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
-	}
-
-    }
-    catch (const std::exception &e){
-	RCLCPP_ERROR(node_logger_, "Exception while building robot configuration: %s", e.what());
+        const std::string robot_description = get_required_str("robot_description");
+        if (robot_description.empty()) {
+          const char* msg = "Parameter 'robot_description' is empty.";
+          RCLCPP_FATAL(node_logger_, "%s", msg);
+          throw std::runtime_error(msg);
+        }
+        robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
+      }
+    } catch (const std::exception& e) {
+      std::ostringstream oss;
+      oss << "Exception while building robot configuration: " << e.what();
+      RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+      throw; // rethrow preserves original exception where possible
     }
 
-    // Extract necessary info from robot config
+    // Set robot config
     robot_slist_ = robotConfig.Slist;                         // Robot screw axes
     M_ = robotConfig.M;                                       // Home configuration matrix
     ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
@@ -69,10 +86,10 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
     this->initialize_action_clients_();
     joint_states_sub_ = this->create_subscription<JointState>(
-        joint_states_topic, 1000, std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
+        joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
-    // Setup TF buffer and listener to lookup affordance location from apriltag
-    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    // Setup TF buffer to task info lookup from TF tree
+    tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
