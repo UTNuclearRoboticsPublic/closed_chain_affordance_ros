@@ -14,15 +14,22 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 {
     // Helper: fetch a required string param or throw with context
     auto get_required_str = [this](const char* key) -> std::string {
-      try {
-        // Declares if not declared, enforces type, throws if not set/wrong type
-        return this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-      } catch (const std::exception& e) {
-        std::ostringstream oss;
-        oss << "Required parameter '" << key << "' missing or wrong type: " << e.what();
-        RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-        throw std::runtime_error(oss.str());
-      }
+     // Declare only if not already declared
+     if (!this->has_parameter(key)) {
+       (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING);
+     }
+
+     // Now retrieve
+     std::string value;
+     const bool got = this->get_parameter(key, value);  
+     if (got && !value.empty()) {
+       return value;
+     }
+     std::ostringstream oss;
+     oss << "Required parameter '" << key << "' is "
+      << (got ? "empty" : "not set or wrong type (expected string)");
+     RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+     throw std::runtime_error(oss.str());
     };
 
     // --- Required params (throw if absent) ---
@@ -60,11 +67,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
             affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
 
         const std::string robot_description = get_required_str("robot_description");
-        if (robot_description.empty()) {
-          const char* msg = "Parameter 'robot_description' is empty.";
-          RCLCPP_FATAL(node_logger_, "%s", msg);
-          throw std::runtime_error(msg);
-        }
         robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
       }
     } catch (const std::exception& e) {
