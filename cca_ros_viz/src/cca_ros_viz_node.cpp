@@ -262,7 +262,7 @@ class CcaRosVizServer : public rclcpp::Node
                                       "Ensure /rviz_visual_tools is "
                                       "specified as topic under MarkerArray in Rviz. ");
         // Clear messages
-        // rviz_visual_tools_->deleteAllMarkers();
+        rviz_visual_tools_->deleteAllMarkers();
 
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
@@ -289,12 +289,12 @@ class CcaRosVizServer : public rclcpp::Node
             aff_screw_pose = T_w_r * aff_screw_pose;
 
             // If affordance ref frame is specified, draw it
-            // if (this->is_pose_specified(serv_req->aff_ref_pose))
-            // {
-            //     Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->aff_ref_pose);
-            //
-            //     rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
-            // }
+            if (this->is_pose_specified(serv_req->aff_ref_pose))
+            {
+                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->aff_ref_pose);
+
+                rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
+            }
 
             // Publish
             rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
@@ -410,7 +410,7 @@ class CcaRosVizServer : public rclcpp::Node
 	rviz_visual_tools_->trigger();  // only once after batching
 
         RCLCPP_INFO(node_logger_, "Successfully visualized requested joint trajectory");
-	RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration.count());
+	// RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration.count());
         serv_res->success = true;
         serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
     }
