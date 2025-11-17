@@ -271,27 +271,39 @@ class CcaRosVizServer : public rclcpp::Node
         // frame
         Eigen::Isometry3d T_w_r = robot_state_->getGlobalLinkTransform(serv_req->ref_frame);
 
-        if (!(serv_req->aff_screw_axis).empty()) // If affordance screw is specified, draw it
-        {
+        // Validate affordance info sizes
+        if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
+	    serv_req->aff_screw_axes.size() != serv_req->aff_ref_poses.size())
+	{
+	    RCLCPP_ERROR(node_logger_,
+			 "Mismatch in the size of affordance screw axes, locations, and reference pose vectors");
+	    return;
+	}
+
+        // Draw affordance screw axes and optionally, aff ref frames
+        for (size_t task_idx = 0; task_idx < serv_req->aff_screw_axes.size(); ++task_idx){
+            const auto aff_screw_axis = serv_req->aff_screw_axes.at(task_idx);
+	    const auto aff_location = serv_req->aff_locations.at(task_idx);
+            const auto aff_ref_pose_msg = serv_req->aff_ref_poses.at(task_idx);
 
             // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance screw
             // axis wrt to the x-axis.
             Eigen::Quaterniond aff_screw_quat;
             aff_screw_quat.setFromTwoVectors(Eigen::Vector3d::UnitX(),
-                                             Eigen::Vector3d((serv_req->aff_screw_axis).data()));
+                                             Eigen::Vector3d(aff_screw_axis.x, aff_screw_axis.y, aff_screw_axis.z));
 
             // Fill out the pose
             Eigen::Isometry3d aff_screw_pose;
             aff_screw_pose.linear() = aff_screw_quat.toRotationMatrix();
-            aff_screw_pose.translation() = Eigen::Vector3d((serv_req->aff_location).data());
+            aff_screw_pose.translation() = Eigen::Vector3d(aff_location.x, aff_location.y, aff_location.z);
 
             // Translate the pose to planning frame
             aff_screw_pose = T_w_r * aff_screw_pose;
 
             // If affordance ref frame is specified, draw it
-            if (this->is_pose_specified(serv_req->aff_ref_pose))
+            if (this->is_pose_specified(aff_ref_pose_msg))
             {
-                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->aff_ref_pose);
+                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, aff_ref_pose_msg);
 
                 rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
             }
@@ -299,7 +311,7 @@ class CcaRosVizServer : public rclcpp::Node
             // Publish
             rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
             rviz_visual_tools_->trigger();
-        }
+	}
 
 	// (Re)order trajectory to match MoveIt planning group order
 	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_model_group_->getVariableNames());

@@ -274,7 +274,7 @@ class CcaRos : public rclcpp::Node
      * @param q_aff Affordance location.
      * @return True if successful, false otherwise.
      */
-     cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const cc_affordance_planner::TaskDescription& task_description);
+     cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions);
 
 bool execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory);
     /**

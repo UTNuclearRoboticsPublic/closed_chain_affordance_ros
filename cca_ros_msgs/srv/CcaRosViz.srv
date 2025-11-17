@@ -1,10 +1,10 @@
 # Request
 trajectory_msgs/JointTrajectory joint_traj # joint trajectory for visualization
 geometry_msgs/Pose[] cartesian_traj # corresponding cartesian trajectory
-float64[3] aff_screw_axis # screw axis unit vector
-float64[3] aff_location # location of the screw axis
+geometry_msgs/Vector3[] aff_screw_axes # vector of screw axes
+geometry_msgs/Point[] aff_locations # locations of the corresponding screw axes
+geometry_msgs/Pose[] aff_ref_poses # Reference poses for approach motion, corresponding to the affordance zero
 string ref_frame # reference frame for EE FK computation
-geometry_msgs/Pose aff_ref_pose # Reference pose for approach motion, corresponding to the affordance zero
 ---
 # Result
 bool success # whether planning and visualization was successful

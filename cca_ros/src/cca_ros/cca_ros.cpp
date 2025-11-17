@@ -127,6 +127,12 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     }
 
+    // Prepare to collect task descriptions for visualization. We don't directly use task descriptions from planning requests since 
+    // sometimes the info is asked to be looked up later using different methods. 
+    // We'll mostly use the planner result from the CCA planner for accurate reflection of what task was planned.
+    std::vector<cc_affordance_planner::TaskDescription> task_descriptions_for_viz;
+    task_descriptions_for_viz.reserve(planning_requests.size());
+
     // Determine if gripper trajectory is included
     const bool includes_gripper_trajectory = !std::isnan(planning_requests.front().task_description.goal.gripper);
 
@@ -279,6 +285,11 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         // Check if this task requires EE orientation preservation
         if (task_description.ee_orientation_constraint == 
             cc_affordance_planner::EeOrientationConstraint::PRESERVE) {
+
+	    // Store the original for visualization 
+	    // Note: the subtask EeOrientationConstraint fields are reset below so we don't enter this block again for this original task
+            // Potential TODO: Maybe in the future we wanna handle this in the cc_affordance_planner library so task info can be gotten FROM_FK
+            task_descriptions_for_viz.push_back(task_description); 
             
             // Compute forward kinematics and discretize screw path
             const Eigen::Matrix4d fk = affordance_util::FKinSpace(M_, robot_slist_, start_state.robot);
@@ -331,6 +342,12 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         
         try {
             task_result = planner.generate_joint_trajectory(robot_description, task_description);
+
+	    // Store for visualization
+            if (planning_requests.at(org_task_idx).task_description.ee_orientation_constraint != 
+		cc_affordance_planner::EeOrientationConstraint::PRESERVE){ // This case is handled above
+                task_descriptions_for_viz.push_back(task_result.task_description);
+            }
         } catch (const std::invalid_argument &e) {
             RCLCPP_ERROR(node_logger_, "Planner returned exception%s: %s", index_log.c_str(), e.what());
             *status_ = Status::FAILED;
@@ -363,12 +380,14 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             task_result.joint_trajectory.end());
         planner_result_final.planning_time += task_result.planning_time;
 
-        // Everything else the same as the last task result
+        // Everything else the same as the last task result -- for a vector of tasks here, we are assumimg we only care about the 
+	// last task's metadata since that's the indicator or overall success or failure
 	planner_result_final.includes_gripper_trajectory = task_result.includes_gripper_trajectory;
 	planner_result_final.trajectory_description = task_result.trajectory_description;
 	planner_result_final.success = task_result.success;
 	planner_result_final.update_method = task_result.update_method;
 	planner_result_final.update_trail = task_result.update_trail;
+	planner_result_final.task_description = task_result.task_description; //TODO: Return a vector of task descriptions?
 
         // Create goal message for this task and collect trajectories -- we'll stitch them together later for validation, visualization, and execution
         cca_ros::GoalMsg goal_msg = 
@@ -421,11 +440,9 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory = 
         this->compute_cartesian_trajectory_(planner_result_final.joint_trajectory);
     
-    // Validate and visualize the complete trajectory (use last task description)
-    // TODO: Visualize all task descriptions instead of just the last one
-    const auto& final_task_description = working_requests.back().request.task_description;
+    // Validate and visualize the complete trajectory
     auto validation_response = this->validate_and_visualize_(
-        final_goal_msg.robot, cartesian_trajectory, final_task_description);
+        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_viz);
     
     if (!validation_response->success) {
         RCLCPP_ERROR(node_logger_, 
@@ -669,46 +686,63 @@ cca_ros::GoalMsg CcaRos::create_goal_msg_(
 }
 
 // Validates and visualizes a given trajectory
-cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const cc_affordance_planner::TaskDescription& task_description){
+cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions){
 
-    // Extract affordance info
-    const Eigen::Vector3d& w_aff = task_description.affordance_info.axis;
-    const Eigen::Vector3d& q_aff = task_description.affordance_info.location;
-    
     // Create visualization request
     auto viz_serv_req = std::make_shared<CcaRosViz::Request>();
     viz_serv_req->joint_traj = goal.trajectory;
     viz_serv_req->cartesian_traj = cartesian_trajectory;
-    viz_serv_req->aff_screw_axis = {w_aff[0], w_aff[1], w_aff[2]};
-    viz_serv_req->aff_location = {q_aff[0], q_aff[1], q_aff[2]};
     viz_serv_req->ref_frame = ref_frame_;
 
-    // For APPROACH motion, fill out the affordance reference pose
-    if (task_description.motion_type == cc_affordance_planner::MotionType::APPROACH)
-    {
-        // Position
-        viz_serv_req->aff_ref_pose.position.x = task_description.goal.canonical_pose(0, 3);
-        viz_serv_req->aff_ref_pose.position.y = task_description.goal.canonical_pose(1, 3);
-        viz_serv_req->aff_ref_pose.position.z = task_description.goal.canonical_pose(2, 3);
+    // Sentinel affordance reference pose (identity)
+    geometry_msgs::msg::Pose aff_ref_pose_sentinel;
+    aff_ref_pose_sentinel.position.x = 0;
+    aff_ref_pose_sentinel.position.y = 0;
+    aff_ref_pose_sentinel.position.z = 0;
+    aff_ref_pose_sentinel.orientation.w = 1;
+    aff_ref_pose_sentinel.orientation.x = 0;
+    aff_ref_pose_sentinel.orientation.y = 0;
+    aff_ref_pose_sentinel.orientation.z = 0;
 
-        // Orientation
-        Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.canonical_pose.block<3, 3>(0, 0));
-        aff_ref_pose_quat.normalize(); // Ensures it's a valid unit quaternion
-        viz_serv_req->aff_ref_pose.orientation.w = aff_ref_pose_quat.w();
-        viz_serv_req->aff_ref_pose.orientation.x = aff_ref_pose_quat.x();
-        viz_serv_req->aff_ref_pose.orientation.y = aff_ref_pose_quat.y();
-        viz_serv_req->aff_ref_pose.orientation.z = aff_ref_pose_quat.z();
-    }
-    else
-    {
-        // provide default sentinel values
-        viz_serv_req->aff_ref_pose.position.x = 0;
-        viz_serv_req->aff_ref_pose.position.y = 0;
-        viz_serv_req->aff_ref_pose.position.z = 0;
-        viz_serv_req->aff_ref_pose.orientation.w = 1;
-        viz_serv_req->aff_ref_pose.orientation.x = 0;
-        viz_serv_req->aff_ref_pose.orientation.y = 0;
-        viz_serv_req->aff_ref_pose.orientation.z = 0;
+    // Extract task info
+    for (const auto& task_description: task_descriptions){
+        // Affordance
+        const Eigen::Vector3d& w_aff = task_description.affordance_info.axis;
+        geometry_msgs::msg::Vector3 aff_screw_axis;
+        aff_screw_axis.x = w_aff[0];
+	aff_screw_axis.y = w_aff[1];
+	aff_screw_axis.z = w_aff[2];
+
+        const Eigen::Vector3d& q_aff = task_description.affordance_info.location;
+        geometry_msgs::msg::Point aff_location;
+	aff_location.x = q_aff[0];
+	aff_location.y = q_aff[1];
+	aff_location.z = q_aff[2];
+
+	// Affordance ref pose (Canonical pose)
+        geometry_msgs::msg::Pose aff_ref_pose = aff_ref_pose_sentinel;
+
+        // For APPROACH motion, fill out the affordance reference pose
+        if (task_description.motion_type == cc_affordance_planner::MotionType::APPROACH)
+        {
+            // Position
+            aff_ref_pose.position.x = task_description.goal.canonical_pose(0, 3);
+            aff_ref_pose.position.y = task_description.goal.canonical_pose(1, 3);
+            aff_ref_pose.position.z = task_description.goal.canonical_pose(2, 3);
+
+            // Orientation
+            Eigen::Quaterniond aff_ref_pose_quat(task_description.goal.canonical_pose.block<3, 3>(0, 0));
+            aff_ref_pose_quat.normalize(); // Ensures it's a valid unit quaternion
+            aff_ref_pose.orientation.w = aff_ref_pose_quat.w();
+            aff_ref_pose.orientation.x = aff_ref_pose_quat.x();
+            aff_ref_pose.orientation.y = aff_ref_pose_quat.y();
+            aff_ref_pose.orientation.z = aff_ref_pose_quat.z();
+        }
+
+        // Append to the request
+        viz_serv_req->aff_screw_axes.push_back(aff_screw_axis);
+        viz_serv_req->aff_locations.push_back(aff_location);
+        viz_serv_req->aff_ref_poses.push_back(aff_ref_pose);
     }
 
     // Wait for visualization service
