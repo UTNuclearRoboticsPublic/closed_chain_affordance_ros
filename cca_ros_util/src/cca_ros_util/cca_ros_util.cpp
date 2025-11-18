@@ -31,14 +31,14 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
     // Copy other fields
     req.task_description.affordance_info.pitch = msg.task_description.affordance_info.pitch;
 
-    // Convert affordance_info.from field
-    req.task_description.affordance_info.from.method =
-        pose_specification_method_from_msg(msg.task_description.affordance_info.from.method.value);
-    req.task_description.affordance_info.from.frame_name = msg.task_description.affordance_info.from.frame_name;
-    req.task_description.affordance_info.from.post_transform =
-        Eigen::MatrixXd::Map(msg.task_description.affordance_info.from.post_transform.data(), 4, 4); // 4x4 post-multiplication transform
-    req.task_description.affordance_info.from.axis_in_final_pose = Eigen::VectorXd::Map(msg.task_description.affordance_info.from.axis_in_final_pose.data(),
-                                                                    msg.task_description.affordance_info.from.axis_in_final_pose.size());
+    // Convert affordance_info_from field
+    req.task_description.affordance_info_from.method =
+        pose_specification_method_from_msg(msg.task_description.affordance_info_from.method.value);
+    req.task_description.affordance_info_from.frame_name = msg.task_description.affordance_info_from.frame_name;
+    req.task_description.affordance_info_from.post_transform =
+        Eigen::MatrixXd::Map(msg.task_description.affordance_info_from.post_transform.data(), 4, 4); // 4x4 post-multiplication transform
+    req.task_description.affordance_info_from.axis_in_final_pose = Eigen::VectorXd::Map(msg.task_description.affordance_info_from.axis_in_final_pose.data(),
+                                                                    msg.task_description.affordance_info_from.axis_in_final_pose.size());
 
     // Convert canonical_pose_from
     req.task_description.canonical_pose_from.method =
@@ -109,16 +109,16 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
     // Copy other fields
     msg.task_description.affordance_info.pitch = req.task_description.affordance_info.pitch;
 
-   // Convert affordance_info.from
-   msg.task_description.affordance_info.from.method.value =
-       pose_specification_method_to_msg(req.task_description.affordance_info.from.method);
-   msg.task_description.affordance_info.from.frame_name = req.task_description.affordance_info.from.frame_name;
-   std::copy(req.task_description.affordance_info.from.post_transform.data(),
-             req.task_description.affordance_info.from.post_transform.data() + 16, // 4x4 matrix = 16 elements
-             msg.task_description.affordance_info.from.post_transform.begin());
-   msg.task_description.affordance_info.from.axis_in_final_pose =
-       std::vector<double>(req.task_description.affordance_info.from.axis_in_final_pose.data(),
-                          req.task_description.affordance_info.from.axis_in_final_pose.data() + req.task_description.affordance_info.from.axis_in_final_pose.size());
+   // Convert affordance_info_from
+   msg.task_description.affordance_info_from.method.value =
+       pose_specification_method_to_msg(req.task_description.affordance_info_from.method);
+   msg.task_description.affordance_info_from.frame_name = req.task_description.affordance_info_from.frame_name;
+   std::copy(req.task_description.affordance_info_from.post_transform.data(),
+             req.task_description.affordance_info_from.post_transform.data() + 16, // 4x4 matrix = 16 elements
+             msg.task_description.affordance_info_from.post_transform.begin());
+   msg.task_description.affordance_info_from.axis_in_final_pose =
+       std::vector<double>(req.task_description.affordance_info_from.axis_in_final_pose.data(),
+                          req.task_description.affordance_info_from.axis_in_final_pose.data() + req.task_description.affordance_info_from.axis_in_final_pose.size());
    
    // Convert canonical_pose_from field back to message
    msg.task_description.canonical_pose_from.method.value =
@@ -187,10 +187,10 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "  Pitch: " << req.task_description.affordance_info.pitch << "\n";
 
     // Affordance Info - From
-    log << "  From Method: " << pose_specification_method_to_string(req.task_description.affordance_info.from.method) << "\n";
-    log << "  From Frame Name: " << req.task_description.affordance_info.from.frame_name << "\n";
-    log << "  From Post Transform:\n" << format_matrix4d(req.task_description.affordance_info.from.post_transform) << "\n";
-    log << "  Axis in Final Pose: " << req.task_description.affordance_info.from.axis_in_final_pose.transpose() << "\n";
+    log << "  From Method: " << pose_specification_method_to_string(req.task_description.affordance_info_from.method) << "\n";
+    log << "  From Frame Name: " << req.task_description.affordance_info_from.frame_name << "\n";
+    log << "  From Post Transform:\n" << format_matrix4d(req.task_description.affordance_info_from.post_transform) << "\n";
+    log << "  Axis in Final Pose: " << req.task_description.affordance_info_from.axis_in_final_pose.transpose() << "\n";
 
     // Canonical Pose From
     log << "Canonical Pose From:\n";
