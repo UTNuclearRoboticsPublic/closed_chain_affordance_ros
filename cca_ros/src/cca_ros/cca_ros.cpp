@@ -210,37 +210,37 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         start_state = current_state;
 
         // Lookup affordance info if requested
-        if (task_description.affordance_info.from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
+        if (task_description.affordance_info_from.method==affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) {
             try {
                 // Lookup transform from ref_frame_ to the lookup frame
                 const geometry_msgs::msg::TransformStamped transform_stamped = 
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
-                        task_description.affordance_info.from.frame_name,
+                        task_description.affordance_info_from.frame_name,
                         tf2::TimePointZero);  // Get latest available transform
                 
                 // Convert to Eigen type so we could do some math
 		const Eigen::Isometry3d T_ref_to_lookup_frame = tf2::transformToEigen(transform_stamped.transform);
 
 		// Apply requested transform -- We now have the transform from the reference frame to the desired affordance frame
-                const Eigen::Isometry3d T_ref_to_aff = T_ref_to_lookup_frame * Eigen::Isometry3d(task_description.affordance_info.from.post_transform);
+                const Eigen::Isometry3d T_ref_to_aff = T_ref_to_lookup_frame * Eigen::Isometry3d(task_description.affordance_info_from.post_transform);
 
                 // Extract translation from the transform
 	        task_description.affordance_info.location = T_ref_to_aff.translation();	
 
 		// Compute the requested affordance axis in reference frame
-                if (!task_description.affordance_info.from.axis_in_final_pose.hasNaN()){
-		    task_description.affordance_info.axis = T_ref_to_aff.linear() * task_description.affordance_info.from.axis_in_final_pose;
+                if (!task_description.affordance_info_from.axis_in_final_pose.hasNaN()){
+		    task_description.affordance_info.axis = T_ref_to_aff.linear() * task_description.affordance_info_from.axis_in_final_pose;
 		}
 
                 // Set affordance_info specification method to PROVIDED since we have everything now
-                task_description.affordance_info.from.method = affordance_util::PoseSpecificationMethod::PROVIDED; 
+                task_description.affordance_info_from.method = affordance_util::PoseSpecificationMethod::PROVIDED; 
                 
             } catch (const tf2::TransformException &ex) {
                 RCLCPP_ERROR(node_logger_, 
                     "Could not lookup transform from %s to %s to fill in affordance info%s: %s", 
                     ref_frame_.c_str(),
-                    task_description.affordance_info.from.frame_name.c_str(),
+                    task_description.affordance_info_from.frame_name.c_str(),
 		    index_log.c_str(),
                     ex.what());
                 *status_ = Status::FAILED;
@@ -528,14 +528,14 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
         }
         
         // Validate frame_name is supplied if asked to lookup screw_info from frame name
-        if ((req.task_description.affordance_info.from.method == affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) && 
-            (req.task_description.affordance_info.from.frame_name.empty())) {
+        if ((req.task_description.affordance_info_from.method == affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME) && 
+            (req.task_description.affordance_info_from.frame_name.empty())) {
             throw std::invalid_argument(
                 index_log + "task_description.affordance_info: from.method FROM_FRAME_NAME requires from.frame_name, but is empty");
         }
 
         // Ensure screw axis is provided when looking up affordance info using the "from" member
-        if (req.task_description.affordance_info.from.axis_in_final_pose.hasNaN() && 
+        if (req.task_description.affordance_info_from.axis_in_final_pose.hasNaN() && 
             req.task_description.affordance_info.axis.hasNaN() && req.task_description.affordance_info.screw.hasNaN()) {
             throw std::invalid_argument(
                 index_log + "task_description.affordance_info: Either from.axis_in_final_pose or affordance_info.axis or affordance_info.screw must be provided");
