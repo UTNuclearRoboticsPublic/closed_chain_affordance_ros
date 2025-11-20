@@ -33,15 +33,23 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     };
 
     // --- Required params (throw if absent) ---
-    robot_traj_execution_as_name_        = get_required_str("cca_robot_as");
     const std::string joint_states_topic = get_required_str("cca_joint_states_topic");
     const std::string robot_name         = get_required_str("cca_robot");
     const std::string build_robot_from   = get_required_str("cca_build_robot_from");
 
     // Optional params
+    robot_traj_execution_as_name_        = this->declare_parameter("cca_robot_as", "");
     gripper_traj_execution_as_name_      = this->declare_parameter("cca_gripper_as", "");
     robot_and_gripper_traj_execution_as_name_ = this->declare_parameter("cca_robot_and_gripper_as", "");
 
+    // Validate that robot traj or robot and gripper traj action server name is provided
+    if (robot_traj_execution_as_name_.empty() && robot_and_gripper_traj_execution_as_name_.empty()) {
+      std::ostringstream oss;
+      oss << "At least one of 'cca_robot_as' or 'cca_robot_and_gripper_as' parameters must be set up in the "
+	     "`cca_<robot>_ros_setup.yaml` file.";
+      RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+      throw std::invalid_argument(oss.str());
+    }
 
     // Validate build_robot_from param
     if (build_robot_from != "yaml" && build_robot_from != "urdf") {
