@@ -258,14 +258,8 @@ class CcaRosVizServer : public rclcpp::Node
 
         serv_res->success = false;// start as false
 
-        bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
-        if (!has_sub)
-            RCLCPP_INFO(node_logger_, "/rviz_visual_tools does not have a subscriber. Visualizations may be lost. "
-                                      "Ensure /rviz_visual_tools is "
-                                      "specified as topic under MarkerArray in Rviz. ");
         // Clear messages
         rviz_visual_tools_->deleteAllMarkers();
-
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
