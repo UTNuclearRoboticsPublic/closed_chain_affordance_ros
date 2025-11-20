@@ -104,8 +104,10 @@ class CcaRosVizServer : public rclcpp::Node
 
         rviz_visual_tools_.reset(
             new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
-        rviz_visual_tools_->loadMarkerPub();
-        rviz_visual_tools_->enableBatchPublishing();
+        rviz_visual_tools_->loadMarkerPub(); 	    // Initialize publisher
+        rviz_visual_tools_->setLifetime(0.0);       // Publish markers with zero timestamp to avoid future extrapolation
+        rviz_visual_tools_->enableFrameLocking();   // Keep markers fixed in the RViz frame to bypass TF transforms
+        rviz_visual_tools_->enableBatchPublishing();// Batch publishing for efficiency
 
 	// Capture joint names and limits
         joint_names_ = joint_model_group_->getVariableNames();
@@ -422,7 +424,6 @@ class CcaRosVizServer : public rclcpp::Node
 	rviz_visual_tools_->trigger();  // only once after batching
 
         RCLCPP_INFO(node_logger_, "Successfully visualized requested joint trajectory");
-	// RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration.count());
         serv_res->success = true;
         serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
     }
