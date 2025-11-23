@@ -225,7 +225,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
                         task_description.affordance_info_from.frame_name,
-                        tf2::TimePointZero);  // Get latest available transform
+                        tf2::TimePointZero,  // Get latest available transform
+                        tf2::durationFromSec(tf_lookup_timeout_));
                 
                 // Convert to Eigen type so we could do some math
 		const Eigen::Isometry3d T_ref_to_lookup_frame = tf2::transformToEigen(transform_stamped.transform);
@@ -264,7 +265,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
                     tf_buffer_->lookupTransform(
                         ref_frame_, 
                         task_description.canonical_pose_from.frame_name,
-                        tf2::TimePointZero);  // Get latest available transform
+                        tf2::TimePointZero,  // Get latest available transform
+                        tf2::durationFromSec(tf_lookup_timeout_));
                 
                 // Convert to Eigen type so we could do some math
 		const Eigen::Isometry3d T_ref_to_lookup_frame = tf2::transformToEigen(transform_stamped.transform);

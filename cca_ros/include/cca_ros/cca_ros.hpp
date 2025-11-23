@@ -237,6 +237,7 @@ class CcaRos : public rclcpp::Node
     void cancel_execution();
 
   private:
+    constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
     constexpr static int partial_traj_failure_threshold_ = 2; /**< Threshold for partial trajectory failure. */
     std::shared_ptr<Status> status_{nullptr};                 /**< Current status of planning and execution. */
     std::shared_ptr<Status> robot_result_status_ = {
