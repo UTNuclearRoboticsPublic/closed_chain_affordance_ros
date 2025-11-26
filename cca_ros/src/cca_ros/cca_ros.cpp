@@ -9,8 +9,7 @@ namespace cca_ros
 // Constructor for CcaRos, initializes the node and sets up required parameters and clients.
 CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
     : Node(node_name, node_options),
-      node_logger_(this->get_logger()),   // Logger for the node
-      viz_ss_name_("/cca_ros_viz_server") // Name of the service to validate and visualize result
+      node_logger_(this->get_logger())   // Logger for the node
 {
     // Helper: fetch a required string param or throw with context
     auto get_required_str = [this](const char* key) -> std::string {
@@ -21,6 +20,46 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 
      // Now retrieve
      std::string value;
+     const bool got = this->get_parameter(key, value);  
+     if (got && !value.empty()) {
+       return value;
+     }
+     std::ostringstream oss;
+     oss << "Required parameter '" << key << "' is "
+      << (got ? "empty" : "not set or wrong type (expected string)");
+     RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+     throw std::runtime_error(oss.str());
+    };
+
+    // Helper: fetch a required string array param or throw with context
+    auto get_required_str_array = [this](const char* key) -> std::vector<std::string> {
+     // Declare only if not already declared
+     if (!this->has_parameter(key)) {
+       (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
+     }
+
+     // Now retrieve
+     std::vector<std::string> value;
+     const bool got = this->get_parameter(key, value);  
+     if (got && !value.empty()) {
+       return value;
+     }
+     std::ostringstream oss;
+     oss << "Required parameter '" << key << "' is "
+      << (got ? "empty" : "not set or wrong type (expected string)");
+     RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+     throw std::runtime_error(oss.str());
+    };
+
+    // Helper: fetch a required double array param or throw with context
+    auto get_required_double_array = [this](const char* key) -> std::vector<double> {
+     // Declare only if not already declared
+     if (!this->has_parameter(key)) {
+       (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
+     }
+
+     // Now retrieve
+     std::vector<double> value;
      const bool got = this->get_parameter(key, value);  
      if (got && !value.empty()) {
        return value;
@@ -76,6 +115,40 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 
         const std::string robot_description = get_required_str("robot_description");
         robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
+
+        // Extract planning group info:
+        const std::string cca_planning_groups = get_required_str("cca_planning_groups");
+
+	const std::string pg_prefix = "cca_planning_group_info.";
+        // Create a map from planning group name to its info
+        for (const auto& pg_name : cca_planning_groups) {
+
+          const std::string param_prefix = pg_prefix + pg_name;
+          
+          // Extract URDF config 
+          affordance_util::RobotConfig urdfConfig;
+          urdfConfig.frame_names.ref = get_required_str(param_prefix + ".ref_frame");
+          urdfConfig.kinematic_chain.base_joint_name = get_required_str(param_prefix + ".kinematic_chain.base_joint");
+          urdfConfig.kinematic_chain.end_joint_name =get_required_str(param_prefix + ".kinematic_chain.end_joint");
+          urdfConfig.frame_names.ee = get_required_str(param_prefix + ".end_effector.frame");
+          urdfConfig.frame_names.tool = get_required_str(param_prefix + ".tool.frame");
+          urdfConfig.ee_to_tool_offset = get_required_double_array(param_prefix + ".tool.offset_from_ee_frame"); 
+          urdfConfig.joint_names.gripper = get_required_str(param_prefix + ".end_effector.gripper_joint_name");
+          
+	  // Get action server names
+          cca_ros::ExecutionActionServerNames ex_as_names;
+          ex_as_names.robot = get_required_str(param_prefix + "_robot_as");
+	  ex_as_names.gripper = get_required_str(param_prefix + "_gripper_as");
+	  ex_as_names.robot_and_gripper = get_required_str(param_prefix + "_robot_and_gripper_as");
+
+          // Create planning group info
+	  PlanningGroupInfo pg_info;
+          pg_info.robot_config = affordance_util::robot_builder(robot_description, urdfConfig);
+          pg_info.ex_as_names = ex_as_names;
+
+	  // Add to map
+	  planning_group_info_map_[pg_name] = pg_info;
+
       }
     } catch (const std::exception& e) {
       std::ostringstream oss;
@@ -93,6 +166,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
 
     // Initialize service/action clients and subscribers
+    viz_ss_name_ = "/" + robot_name + "/cca_ros_viz_server";
     viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
     this->initialize_action_clients_();
     joint_states_sub_ = this->create_subscription<JointState>(
