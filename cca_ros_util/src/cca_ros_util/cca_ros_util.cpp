@@ -10,6 +10,9 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
 {
     cca_ros::PlanningRequest req;
 
+    // Convert planning group
+    req.planning_group = msg.planning_group;
+
     // Convert Planner Config
     req.planner_config.accuracy = msg.planner_config.accuracy;
     req.planner_config.closure_err_threshold_ang = msg.planner_config.closure_err_threshold_ang;
@@ -82,6 +85,9 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
 cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::PlanningRequest &req)
 {
     cca_ros_msgs::msg::PlanningRequest msg;
+
+    // Convert planning group
+    msg.planning_group = req.planning_group;
 
     // Convert Planner Config
     msg.planner_config.accuracy = req.planner_config.accuracy;
@@ -169,6 +175,8 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "CcaRos Planning Request:\n";
     log << "-------------------------\n";
 
+    // Planning Group
+    log << "Planning Group: " << req.planning_group << "\n";
 
     // Planner Config
     log << "Planner Config:\n";
