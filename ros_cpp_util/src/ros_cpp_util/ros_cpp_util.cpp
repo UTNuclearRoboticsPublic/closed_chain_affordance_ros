@@ -357,4 +357,66 @@ trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<traj
     
     return stitched_traj;
 }
+
+std::string get_required_str_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key)
+{
+     // Declare only if not already declared
+     if (!node->has_parameter(key)) {
+       (void)node->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING);
+     }
+
+     // Now retrieve
+     std::string value;
+     const bool got = node->get_parameter(key, value);  
+     if (got && !value.empty()) {
+       return value;
+     }
+     log_and_throw_param_retrieval_failure(node, key, "string", got);
+}
+
+std::vector<std::string> get_required_str_array_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key)
+{
+     // Declare only if not already declared
+     if (!node->has_parameter(key)) {
+       (void)node->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
+     }
+
+     // Now retrieve
+     std::vector<std::string> value;
+     const bool got = node->get_parameter(key, value);  
+     if (got && !value.empty()) {
+       return value;
+     }
+     log_and_throw_param_retrieval_failure(node, key, "string array", got);
+}
+
+std::vector<double> get_required_double_array_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key)
+{
+     // Declare only if not already declared
+     if (!node->has_parameter(key)) {
+       (void)node->declare_parameter(key, rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
+     }
+
+     // Now retrieve
+     std::vector<double> value;
+     const bool got = node->get_parameter(key, value);  
+     if (got && !value.empty()) {
+       return value;
+     }
+     log_and_throw_param_retrieval_failure(node, key, "double array", got);
+}
+
 } // namespace ros_cpp_util
+
+namespace {
+
+void log_and_throw_param_retrieval_failure(const std::shared_ptr<rclcpp::Node>& node, const std::string& key, const std::string& expected_type, bool got) {
+    std::ostringstream oss;
+    oss << "Required parameter '" << key << "' is "
+     << (got ? "empty" : "not set or wrong type (expected " + expected_type + ")");
+    RCLCPP_FATAL(node->get_logger(), "%s", oss.str().c_str());
+    throw std::runtime_error(oss.str());
+}
+
+}
+

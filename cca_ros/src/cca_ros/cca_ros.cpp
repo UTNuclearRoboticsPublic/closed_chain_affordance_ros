@@ -11,65 +11,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     : Node(node_name, node_options),
       node_logger_(this->get_logger())   // Logger for the node
 {
-    // Helper: fetch a required string param or throw with context
-    auto get_required_str = [this](const std::string& key) -> std::string {
-     // Declare only if not already declared
-     if (!this->has_parameter(key)) {
-       (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING);
-     }
-
-     // Now retrieve
-     std::string value;
-     const bool got = this->get_parameter(key, value);  
-     if (got && !value.empty()) {
-       return value;
-     }
-     std::ostringstream oss;
-     oss << "Required parameter '" << key << "' is "
-      << (got ? "empty" : "not set or wrong type (expected string)");
-     RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-     throw std::runtime_error(oss.str());
-    };
-
-    // Helper: fetch a required string array param or throw with context
-    auto get_required_str_array = [this](const std::string& key) -> std::vector<std::string> {
-     // Declare only if not already declared
-     if (!this->has_parameter(key)) {
-       (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
-     }
-
-     // Now retrieve
-     std::vector<std::string> value;
-     const bool got = this->get_parameter(key, value);  
-     if (got && !value.empty()) {
-       return value;
-     }
-     std::ostringstream oss;
-     oss << "Required parameter '" << key << "' is "
-      << (got ? "empty" : "not set or wrong type (expected string)");
-     RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-     throw std::runtime_error(oss.str());
-    };
-
-    // Helper: fetch a required double array param or throw with context
-    auto get_required_double_array = [this](const std::string& key) -> std::vector<double> {
-     // Declare only if not already declared
-     if (!this->has_parameter(key)) {
-       (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
-     }
-
-     // Now retrieve
-     std::vector<double> value;
-     const bool got = this->get_parameter(key, value);  
-     if (got && !value.empty()) {
-       return value;
-     }
-     std::ostringstream oss;
-     oss << "Required parameter '" << key << "' is "
-      << (got ? "empty" : "not set or wrong type (expected string)");
-     RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-     throw std::runtime_error(oss.str());
-    };
 
     // --- Required params (throw if absent) ---
     const std::string joint_states_topic = get_required_str("cca_joint_states_topic");
