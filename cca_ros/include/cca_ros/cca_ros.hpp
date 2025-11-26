@@ -60,7 +60,17 @@
 namespace cca_ros
 {
 using namespace std::chrono_literals;
+using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
 using FollowJointTrajectoryGoal = control_msgs::action::FollowJointTrajectory_Goal;
+
+/**
+* @brief Struct containing execution action clients.
+*/
+struct ExecutionActionClients{
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr robot; /**< Client for executing robot trajectory.*/
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr gripper; /**< Client for executing gripper trajectory. */
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr robot_and_gripper;     /**< Client for executing robot and gripper trajectory together. */
+};
 
 /**
 * @brief Struct containing execution action server names.
@@ -166,7 +176,6 @@ class CcaRos : public rclcpp::Node
 {
   public:
     // Type aliases
-    using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
     using CcaRosViz = cca_ros_msgs::srv::CcaRosViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
@@ -268,15 +277,7 @@ class CcaRos : public rclcpp::Node
     std::mutex status_mutex_;           /**< Mutex to protect access to status_. */
     rclcpp::Logger node_logger_;        /**< Node-specific logger. */
     std::string viz_ss_name_;           /**< Name of the plan and visualization server. */
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
-        robot_traj_execution_client_; /**< Client for executing robot trajectory.
-                                       */
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr gripper_traj_execution_client_; /**< Client for executing
-                                                                                               gripper trajectory. */
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr
-        robot_and_gripper_traj_execution_client_;     /**< Client for executing robot
-                                                         and gripper trajectory
-                                                         together. */
+    ExecutionActionClients ex_clients_; /**< Action clients for trajectory execution. */
     rclcpp::Client<CcaRosViz>::SharedPtr viz_client_; /**< Client for visualizing the planned trajectory. */
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;     /**< Subscriber for joint states. */
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                       /**< TF2 buffer for transformation lookup. */
