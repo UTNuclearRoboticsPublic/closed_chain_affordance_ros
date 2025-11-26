@@ -27,6 +27,12 @@ void CcaRosRvizPlugin::onInitialize()
     // Initialize the CCA Ros action client to be able to send planning requests
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
+    // Extract planning group info and populate planning groups combo box options
+    const std::vector<std::string> cca_planning_groups = ros_cpp_util::get_required_str_array_param(this, "cca_planning_groups");
+    for (const auto &g : cca_planning_groups) {
+        planning_groups_ << QString::fromStdString(g);
+    }
+
     // Set up timer for spinning the node
     spin_timer_ = new QTimer(this);
     connect(spin_timer_, &QTimer::timeout, this, &CcaRosRvizPlugin::spin);
@@ -38,6 +44,8 @@ QWidget *CcaRosRvizPlugin::create_cca_ig_tab_()
     auto *cca_ig_tab_widget = new QWidget();
     auto *main_layout = new QVBoxLayout(cca_ig_tab_widget);
 
+    main_layout->addLayout(
+        this->create_combo_box_layout_("Planning Group:", planning_group_bl_, planning_groups_));
     main_layout->addLayout(
         this->create_combo_box_layout_("Planning Type:", mode_bl_, this->get_map_keys_(planning_type_map_)));
     auto *dynamic_content_layout = new QVBoxLayout;
@@ -376,6 +384,9 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
 {
 
     cca_ros::PlanningRequest req;
+
+    // Set planning group
+    req.planning_group = planning_group_bl_.combo_box->currentText().toStdString();
 
     // Deduce planning type
     const auto planning_type = planning_type_map_.at(mode_bl_.combo_box->currentText());

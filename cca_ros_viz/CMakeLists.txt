@@ -28,6 +28,7 @@ find_package(pluginlib REQUIRED)
 find_package(cca_ros REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(cca_ros_action REQUIRED)
+find_package(ros_cpp_util REQUIRED)
 
 # Non-ROS Packages
 # External libraries used for visualization and linear algebra
@@ -76,6 +77,7 @@ ament_target_dependencies(${PROJECT_NAME}
   tf2_ros
   cca_ros
   cca_ros_action
+  ros_cpp_util
 )
 
 # Link required libraries
@@ -129,6 +131,7 @@ ament_export_dependencies(
   tf2_ros
   cca_ros
   cca_ros_action
+  ros_cpp_util
   moveit_core
   moveit_ros_planning
   moveit_visual_tools

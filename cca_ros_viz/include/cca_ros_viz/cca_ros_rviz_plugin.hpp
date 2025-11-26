@@ -13,8 +13,10 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <qlist.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // CCA headers
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
@@ -22,11 +24,14 @@
 #include <cca_ros/cca_ros.hpp>
 #include <cca_ros_action/cca_ros_action.hpp>
 
-// ROS headers
+// Standard ROS headers
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rviz_common/panel.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
+
+// Custom ROS utility headers
+#include <ros_cpp_util/ros_cpp_util.hpp>
 
 // Qt headers
 #include <QComboBox>
@@ -258,6 +263,8 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
         {QString("Affordance Control"), CcaType::AFFORDANCE_CONTROL},
         {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
 
+    QStringList planning_groups_; ///< List of available planning groups
+
     const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
         {QString("Affordance"), cc_affordance_planner::PlanningType::AFFORDANCE},
         {QString("Cartesian Goal"), cc_affordance_planner::PlanningType::CARTESIAN_GOAL},
@@ -277,6 +284,7 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
     bool new_settings_applied_ = false; ///< Flag to track if advanced settings have been applied
 
     // UI components - main controls
+    QComboBoxAndLabel planning_group_bl_; ///< Planning group selection
     QComboBoxAndLabel mode_bl_;        ///< Planning mode selection
     QComboBoxAndLabel motion_type_bl_; ///< Motion type selection
     QComboBoxAndLabel axis_bl_;        ///< Axis selection
