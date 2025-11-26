@@ -95,6 +95,15 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     try {
       if (build_robot_from == "yaml") {
         robotConfig = affordance_util::robot_builder(robot_config_file_path);
+
+        // Set robot config
+        robot_slist_ = robotConfig.Slist;                         // Robot screw axes
+        M_ = robotConfig.M;                                       // Home configuration matrix
+        ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
+        tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
+        robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
+        gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
+
       } else { // urdf
         const auto& urdfConfig =
             affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
@@ -152,13 +161,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       throw; // rethrow preserves original exception where possible
     }
 
-    // Set robot config
-    robot_slist_ = robotConfig.Slist;                         // Robot screw axes
-    M_ = robotConfig.M;                                       // Home configuration matrix
-    ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
-    tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
-    robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
-    gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
 
     // Initialize service/action clients and subscribers
     viz_ss_name_ = "/" + robot_name + "/cca_ros_viz_server";
@@ -208,6 +210,17 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
         return cca_ros::PlanningResponse();
 
     }
+
+    // Determine robot config for this planning group
+    const affordance_util::RobotConfig& robotConfig = 
+	planning_group_info_map_.at(planning_requests.front().task_description.planning_group).robot_config;
+
+    robot_slist_ = robotConfig.Slist;                         // Robot screw axes
+    M_ = robotConfig.M;                                       // Home configuration matrix
+    ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
+    tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
+    robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
+    gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
 
     // Prepare to collect task descriptions for visualization. We don't directly use task descriptions from planning requests since 
     // sometimes the info is asked to be looked up later using different methods. 
