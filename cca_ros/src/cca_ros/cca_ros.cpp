@@ -125,6 +125,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 	  PlanningGroupInfo pg_info;
           pg_info.robot_config = affordance_util::robot_builder(robot_description, urdfConfig);
           pg_info.ex_as_names = ex_as_names;
+          pg_info.ex_clients = this->initialize_action_clients_(ex_as_names);
 
 	  // Add to map
 	  planning_group_info_map_[pg_name] = pg_info;
@@ -140,7 +141,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     // Initialize service/action clients and subscribers
     viz_ss_name_ = "/" + robot_name + "/cca_ros_viz_server";
     viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
-    this->initialize_action_clients_();
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
@@ -546,27 +546,32 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 }
 
 
-void CcaRos::initialize_action_clients_()
+cca_ros::ExecutionActionClients CcaRos::initialize_action_clients_(const cca_ros::ExecutionActionServerNames& ex_as_names)
 {
+    // Function output
+    cca_ros::ExecutionActionClients ex_clients;
+
     // If robot and gripper execution server is available, that's all we need.
-    if (!ex_as_names_.robot_and_gripper.empty())
+    if (!ex_as_names.robot_and_gripper.empty())
     {
-        ex_clients_.robot_and_gripper =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.robot_and_gripper);
-        return;
+        ex_clients.robot_and_gripper =
+            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot_and_gripper);
+        return ex_clients;
     }
 
     // Else initialize robot client
-    ex_clients_.robot =
-        rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.robot);
+    ex_clients.robot =
+        rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot);
 
     // Initialize gripper client in addition to the robot client if that is available
-    if (!ex_as_names_.gripper.empty())
+    if (!ex_as_names.gripper.empty())
     {
         // Only initialize if the gripper as name is provided
-        ex_clients_.gripper =
+        ex_clients.gripper =
             rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.gripper);
     }
+
+    return ex_clients;
 }
 
 // Helper function to validate input

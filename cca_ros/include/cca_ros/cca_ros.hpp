@@ -87,6 +87,7 @@ struct ExecutionActionServerNames{
 struct PlanningGroupInfo{
     affordance_util::RobotConfig robot_config; /**< Robot configuration details. */
     ExecutionActionServerNames ex_as_names;    /**< Names of execution action servers. */
+    ExecutionActionClients ex_clients;         /**< Execution action clients. */
 };
 
 /**
@@ -426,8 +427,9 @@ class CcaRos : public rclcpp::Node
 
     /**
      * @brief Initializes action clients based on available parameters.
+     * @param ex_as_names Execution action server names.
      */
-    void initialize_action_clients_();
+    cca_ros::ExecutionActionClients initialize_action_clients_(const cca_ros::ExecutionActionServerNames& ex_as_names);
 };
 
 } // namespace cca_ros
