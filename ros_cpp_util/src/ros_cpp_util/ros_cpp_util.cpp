@@ -358,7 +358,7 @@ trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<traj
     return stitched_traj;
 }
 
-std::string get_required_str_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key)
+std::string get_required_str_param(rclcpp::Node* node, const std::string& key)
 {
      // Declare only if not already declared
      if (!node->has_parameter(key)) {
@@ -374,7 +374,7 @@ std::string get_required_str_param(const std::shared_ptr<rclcpp::Node>& node, co
      log_and_throw_param_retrieval_failure(node, key, "string", got);
 }
 
-std::vector<std::string> get_required_str_array_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key)
+std::vector<std::string> get_required_str_array_param(rclcpp::Node* node, const std::string& key)
 {
      // Declare only if not already declared
      if (!node->has_parameter(key)) {
@@ -390,7 +390,7 @@ std::vector<std::string> get_required_str_array_param(const std::shared_ptr<rclc
      log_and_throw_param_retrieval_failure(node, key, "string array", got);
 }
 
-std::vector<double> get_required_double_array_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key)
+std::vector<double> get_required_double_array_param(rclcpp::Node* node, const std::string& key)
 {
      // Declare only if not already declared
      if (!node->has_parameter(key)) {
@@ -410,7 +410,7 @@ std::vector<double> get_required_double_array_param(const std::shared_ptr<rclcpp
 
 namespace {
 
-void log_and_throw_param_retrieval_failure(const std::shared_ptr<rclcpp::Node>& node, const std::string& key, const std::string& expected_type, bool got) {
+void log_and_throw_param_retrieval_failure(const rclcpp::Node* node, const std::string& key, const std::string& expected_type, bool got) {
     std::ostringstream oss;
     oss << "Required parameter '" << key << "' is "
      << (got ? "empty" : "not set or wrong type (expected " + expected_type + ")");

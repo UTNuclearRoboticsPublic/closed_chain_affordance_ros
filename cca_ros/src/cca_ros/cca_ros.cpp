@@ -12,9 +12,11 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       node_logger_(this->get_logger())   // Logger for the node
 {
 
+    using namespace ros_cpp_util;
+
     // --- Required params (throw if absent) ---
-    const std::string joint_states_topic = get_required_str("cca_joint_states_topic");
-    const std::string robot_name         = get_required_str("cca_robot");
+    const std::string joint_states_topic = get_required_str_param(this, "cca_joint_states_topic");
+    const std::string robot_name         = get_required_str_param(this, "cca_robot");
 
     // Get the path for robot configuration file
     const std::string robot_config_file_path =
@@ -25,10 +27,10 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
         const auto& urdfConfig =
             affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
 
-        const std::string robot_description = get_required_str("robot_description");
+        const std::string robot_description = get_required_str_param(this, "robot_description");
 
         // Extract planning group info:
-        const std::vector<std::string> cca_planning_groups = get_required_str_array("cca_planning_groups");
+        const std::vector<std::string> cca_planning_groups = get_required_str_array_param(this, "cca_planning_groups");
 
 	const std::string pg_prefix = "cca_planning_group_info.";
         // Create a map from planning group name to its info
@@ -38,13 +40,13 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
           
           // Extract URDF config 
           affordance_util::RobotConfig urdfConfig;
-          urdfConfig.frame_names.ref = get_required_str(param_prefix + ".ref_frame");
-          urdfConfig.kinematic_chain.base_joint_name = get_required_str(param_prefix + ".kinematic_chain.base_joint");
-          urdfConfig.kinematic_chain.end_joint_name =get_required_str(param_prefix + ".kinematic_chain.end_joint");
-          urdfConfig.frame_names.ee = get_required_str(param_prefix + ".end_effector.frame");
-          urdfConfig.frame_names.tool = get_required_str(param_prefix + ".tool.frame");
-          urdfConfig.ee_to_tool_offset = Eigen::Vector3d(get_required_double_array(param_prefix + ".tool.offset_from_ee_frame").data()); 
-          urdfConfig.joint_names.gripper = get_required_str(param_prefix + ".end_effector.gripper_joint_name");
+          urdfConfig.frame_names.ref = get_required_str_param(this, param_prefix + ".ref_frame");
+          urdfConfig.kinematic_chain.base_joint_name = get_required_str_param(this, param_prefix + ".kinematic_chain.base_joint");
+          urdfConfig.kinematic_chain.end_joint_name =get_required_str_param(this, param_prefix + ".kinematic_chain.end_joint");
+          urdfConfig.frame_names.ee = get_required_str_param(this, param_prefix + ".end_effector.frame");
+          urdfConfig.frame_names.tool = get_required_str_param(this, param_prefix + ".tool.frame");
+          urdfConfig.ee_to_tool_offset = Eigen::Vector3d(get_required_double_array_param(this, param_prefix + ".tool.offset_from_ee_frame").data()); 
+          urdfConfig.joint_names.gripper = get_required_str_param(this, param_prefix + ".end_effector.gripper_joint_name");
           
 	  // Get action server names
           cca_ros::ExecutionActionServerNames ex_as_names;

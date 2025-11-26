@@ -160,32 +160,32 @@ trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<traj
 /**
 * @brief Retrieves a required string parameter from the ROS node. Throws an exception if the parameter is not found.
 *
-* @param node shared pointer to the ROS node
+* @param node pointer to the ROS node
 * @param key name of the parameter
 *
 * @return the string value of the parameter
 */
-std::string get_required_str_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key);
+std::string get_required_str_param(rclcpp::Node* node, const std::string& key);
 
 /**
 * @brief Retrieves a required string array parameter from the ROS node. Throws an exception if the parameter is not found.
 *
-* @param node shared pointer to the ROS node
+* @param node pointer to the ROS node
 * @param key name of the parameter
 *
 * @return the string array value of the parameter
 */
-std::vector<std::string> get_required_str_array_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key);
+std::vector<std::string> get_required_str_array_param(rclcpp::Node* node, const std::string& key);
 
 /**
 * @brief Retrieves a required double array parameter from the ROS node. Throws an exception if the parameter is not found.
 *
-* @param node shared pointer to the ROS node
+* @param node pointer to the ROS node
 * @param key name of the parameter
 *
 * @return the double array value of the parameter
 */
-std::vector<double> get_required_double_array_param(const std::shared_ptr<rclcpp::Node>& node, const std::string& key);
+std::vector<double> get_required_double_array_param(rclcpp::Node* node, const std::string& key);
 } // namespace ros_cpp_util
 
 // Helpers restricted to this file
@@ -193,12 +193,12 @@ namespace {
 /**
 * @brief Logs an error and throws an exception when parameter retrieval fails.
 *
-* @param node shared pointer to the ROS node
+* @param node pointer to the ROS node
 * @param key name of the parameter
 * @param expected_type expected type of the parameter
 * @param got boolean indicating if the parameter was retrieved
 */
- void log_and_throw_param_retrieval_failure(const std::shared_ptr<rclcpp::Node>& node, const std::string& key, const std::string& expected_type, bool got); 
+[[noreturn]] void log_and_throw_param_retrieval_failure(const rclcpp::Node* node, const std::string& key, const std::string& expected_type, bool got); 
 }
 
 #endif // ROS_CPP_UTIL_HPP_
