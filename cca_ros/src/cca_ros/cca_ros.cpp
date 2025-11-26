@@ -168,10 +168,6 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     status_ = planning_response.status;
     *status_ = Status::PROCESSING;
 
-    // Determine action server names for this planning group -- We need this info for input validation
-    if (planning_requests.front().execute_trajectory) {
-        ex_as_names_ = planning_group_info_map_.at(planning_requests.front().task_description.planning_group).ex_as_names;
-    }
 
     // Validate input based on whether we have single or multiple requests
     try {
@@ -528,7 +524,12 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     planner_result_final.planning_time += std::chrono::microseconds(validation_response->validation_time_usecs);
 
     // Execute trajectory if requested (check first request for execute flag)
-    if (planning_requests.front().execute_trajectory) {
+    const cca_ros::PlanningRequest& first_req = planning_requests.front();
+    if (first_req.execute_trajectory) {
+        // Extract execution action server names and clients for this planning group
+        ex_as_names_ = planning_group_info_map_.at(first_req.task_description.planning_group).ex_as_names;
+        ex_clients_ = planning_group_info_map_.at(first_req.task_description.planning_group).ex_clients;
+
         if (!this->execute_(final_goal_msg, includes_gripper_trajectory)) {
             RCLCPP_ERROR(node_logger_, 
                 "Validated trajectory execution failed. See robot server side for more info.");
@@ -581,12 +582,12 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
     const std::string planning_group = reqs.front().task_description.planning_group;
     const bool execute_trajectory = reqs.front().execute_trajectory;
-    const bool gripper_traj_ex_as_exists = !ex_as_names_.gripper.empty() || !ex_as_names_.robot_and_gripper.empty();
+    const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().task_description.planning_group).ex_as_names;
+    const bool gripper_traj_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
 
     // Validate planning group is specified
     if (planning_group.empty()) {
-        throw std::invalid_argument(
-            index_log + "Planning group must be specified in task_description.planning_group");
+        throw std::invalid_argument("Planning group must be specified in task_description.planning_group");
     }
 
     // Gripper executor availability check

@@ -57,10 +57,12 @@ class CcaRosVizServer : public rclcpp::Node
         planning_group_ = this->declare_parameter("planning_group", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
         rviz_fixed_frame_ = this->declare_parameter("rviz_fixed_frame", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
         joint_states_topic_ = this->declare_parameter("joint_states_topic", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+	const std::string robot_name = this->declare_parameter("cca_robot", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+        const std::string cca_ros_viz_server_name = "/" + robot_name + "/cca_ros_viz_server";
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<cca_ros_msgs::srv::CcaRosViz>(
-            "/cca_ros_viz_server", std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
+            cca_ros_viz_server_name, std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
                                              std::placeholders::_1, std::placeholders::_2));
 
         // Initialize the publisher to show moveit planned path
