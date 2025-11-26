@@ -117,7 +117,7 @@ enum Status
 struct TrajectoryTimeStep
 {
     double robot = 0.3;             /**< Time step for robot trajectory (seconds). */
-    double gripper = 0.2;           /**< Time step for gripper trajectory (seconds). */
+    double gripper = 0.3;           /**< Time step for gripper trajectory (seconds). */
     double robot_and_gripper = 0.3; /**< Time step for combined robot and gripper
                                        trajectory (seconds). */
 };
@@ -127,6 +127,7 @@ struct TrajectoryTimeStep
  */
 struct PlanningRequest
 {
+    std::string planning_group; /**< Name of the planning group to use. */
     cc_affordance_planner::PlannerConfig planner_config = cc_affordance_planner::PlannerConfig(); /**< Configuration for
                                                                                                      the planner. */
     cc_affordance_planner::TaskDescription task_description; /**< Description of the task to plan. */

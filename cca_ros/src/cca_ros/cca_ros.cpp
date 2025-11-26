@@ -12,7 +12,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       node_logger_(this->get_logger())   // Logger for the node
 {
     // Helper: fetch a required string param or throw with context
-    auto get_required_str = [this](const char* key) -> std::string {
+    auto get_required_str = [this](const std::string& key) -> std::string {
      // Declare only if not already declared
      if (!this->has_parameter(key)) {
        (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING);
@@ -32,7 +32,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     };
 
     // Helper: fetch a required string array param or throw with context
-    auto get_required_str_array = [this](const char* key) -> std::vector<std::string> {
+    auto get_required_str_array = [this](const std::string& key) -> std::vector<std::string> {
      // Declare only if not already declared
      if (!this->has_parameter(key)) {
        (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
@@ -52,7 +52,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     };
 
     // Helper: fetch a required double array param or throw with context
-    auto get_required_double_array = [this](const char* key) -> std::vector<double> {
+    auto get_required_double_array = [this](const std::string& key) -> std::vector<double> {
      // Declare only if not already declared
      if (!this->has_parameter(key)) {
        (void)this->declare_parameter(key, rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
@@ -85,10 +85,9 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
             affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
 
         const std::string robot_description = get_required_str("robot_description");
-        robotConfig = affordance_util::robot_builder(robot_description, urdfConfig);
 
         // Extract planning group info:
-        const std::string cca_planning_groups = get_required_str("cca_planning_groups");
+        const std::vector<std::string> cca_planning_groups = get_required_str_array("cca_planning_groups");
 
 	const std::string pg_prefix = "cca_planning_group_info.";
         // Create a map from planning group name to its info
@@ -103,7 +102,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
           urdfConfig.kinematic_chain.end_joint_name =get_required_str(param_prefix + ".kinematic_chain.end_joint");
           urdfConfig.frame_names.ee = get_required_str(param_prefix + ".end_effector.frame");
           urdfConfig.frame_names.tool = get_required_str(param_prefix + ".tool.frame");
-          urdfConfig.ee_to_tool_offset = get_required_double_array(param_prefix + ".tool.offset_from_ee_frame"); 
+          urdfConfig.ee_to_tool_offset = Eigen::Vector3d(get_required_double_array(param_prefix + ".tool.offset_from_ee_frame").data()); 
           urdfConfig.joint_names.gripper = get_required_str(param_prefix + ".end_effector.gripper_joint_name");
           
 	  // Get action server names
@@ -184,7 +183,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     // Determine robot config for this planning group
     const affordance_util::RobotConfig& robotConfig = 
-	planning_group_info_map_.at(planning_requests.front().task_description.planning_group).robot_config;
+	planning_group_info_map_.at(planning_requests.front().planning_group).robot_config;
 
     robot_slist_ = robotConfig.Slist;                         // Robot screw axes
     M_ = robotConfig.M;                                       // Home configuration matrix
@@ -527,8 +526,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     const cca_ros::PlanningRequest& first_req = planning_requests.front();
     if (first_req.execute_trajectory) {
         // Extract execution action server names and clients for this planning group
-        ex_as_names_ = planning_group_info_map_.at(first_req.task_description.planning_group).ex_as_names;
-        ex_clients_ = planning_group_info_map_.at(first_req.task_description.planning_group).ex_clients;
+        ex_as_names_ = planning_group_info_map_.at(first_req.planning_group).ex_as_names;
+        ex_clients_ = planning_group_info_map_.at(first_req.planning_group).ex_clients;
 
         if (!this->execute_(final_goal_msg, includes_gripper_trajectory)) {
             RCLCPP_ERROR(node_logger_, 
@@ -580,14 +579,14 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 {
     const bool single_planning_request = reqs.size() == 1;
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
-    const std::string planning_group = reqs.front().task_description.planning_group;
+    const std::string planning_group = reqs.front().planning_group;
     const bool execute_trajectory = reqs.front().execute_trajectory;
-    const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().task_description.planning_group).ex_as_names;
+    const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
     const bool gripper_traj_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
 
     // Validate planning group is specified
     if (planning_group.empty()) {
-        throw std::invalid_argument("Planning group must be specified in task_description.planning_group");
+        throw std::invalid_argument("Planning Request: Planning group must be specified");
     }
 
     // Gripper executor availability check
@@ -613,7 +612,7 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
             }
 
             // Ensure all tasks use the same planning group
-            if (req.task_description.planning_group != planning_group) {
+            if (req.planning_group != planning_group) {
                 throw std::invalid_argument(
                     index_log + "Inconsistent planning group specification. All tasks must have the same planning group");
             }
