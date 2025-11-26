@@ -617,6 +617,12 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
                 throw std::invalid_argument(
                     index_log + "Inconsistent planning group specification. All tasks must have the same planning group");
             }
+
+            // Ensure all tasks either ask to execute or don't
+            if (req.execute_trajectory != execute_trajectory) {
+                throw std::invalid_argument(
+                    index_log + "Inconsistent execute trajectory specification. All tasks must either be executed together or none of them.");
+            }
         }
         
         // Validate frame_name is supplied if asked to lookup screw_info from frame name
