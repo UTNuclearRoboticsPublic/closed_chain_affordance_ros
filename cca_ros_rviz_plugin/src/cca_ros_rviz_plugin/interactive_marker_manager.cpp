@@ -1,4 +1,4 @@
-#include "cca_ros_viz/interactive_marker_manager.hpp"
+#include "cca_ros_rviz_plugin/interactive_marker_manager.hpp"
 
 namespace interactive_marker_manager
 {

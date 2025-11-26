@@ -1,4 +1,4 @@
-#include "cca_ros_viz/cca_ros_rviz_plugin.hpp"
+#include "cca_ros_rviz_plugin/cca_ros_rviz_plugin.hpp"
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 
 namespace cca_ros_rviz_plugin
