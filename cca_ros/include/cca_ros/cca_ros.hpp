@@ -55,11 +55,29 @@
 #include <tf2_ros/transform_listener.h>
 #include <thread>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <unordered_map>
 
 namespace cca_ros
 {
 using namespace std::chrono_literals;
 using FollowJointTrajectoryGoal = control_msgs::action::FollowJointTrajectory_Goal;
+
+/**
+* @brief Struct containing execution action server names.
+*/
+struct ExecutionActionServerNames{
+    std::string robot; /**< Action server name for robot trajectory execution. */
+    std::string gripper; /**< Action server name for gripper trajectory execution. */
+    std::string robot_and_gripper; /**< Action server name for combined robot and gripper trajectory execution. */
+};
+
+/**
+* @brief Struct containing planning group information.
+*/
+struct PlanningGroupInfo{
+    affordance_util::RobotConfig robot_config; /**< Robot configuration details. */
+    ExecutionActionServerNames ex_as_names;    /**< Names of execution action servers. */
+};
 
 /**
  * @brief Struct containing the kinematic state of a robot.
@@ -237,6 +255,7 @@ class CcaRos : public rclcpp::Node
     void cancel_execution();
 
   private:
+    std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
     constexpr static int partial_traj_failure_threshold_ = 2; /**< Threshold for partial trajectory failure. */
     std::shared_ptr<Status> status_{nullptr};                 /**< Current status of planning and execution. */
