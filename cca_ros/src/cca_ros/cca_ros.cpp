@@ -74,37 +74,13 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     // --- Required params (throw if absent) ---
     const std::string joint_states_topic = get_required_str("cca_joint_states_topic");
     const std::string robot_name         = get_required_str("cca_robot");
-    const std::string build_robot_from   = get_required_str("cca_build_robot_from");
-
-    // Validate build_robot_from param
-    if (build_robot_from != "yaml" && build_robot_from != "urdf") {
-      std::ostringstream oss;
-      oss << "Invalid value for 'cca_build_robot_from' param: " << build_robot_from
-          << ". Expected 'yaml' or 'urdf'.";
-      RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-      throw std::invalid_argument(oss.str());
-    }
 
     // Get the path for robot configuration file
     const std::string robot_config_file_path =
-        CcaRos::get_cc_affordance_robot_description_(robot_name, build_robot_from);
-
-    affordance_util::RobotConfig robotConfig;
+        CcaRos::get_cc_affordance_robot_description_(robot_name);
 
     // Load robot configuration
     try {
-      if (build_robot_from == "yaml") {
-        robotConfig = affordance_util::robot_builder(robot_config_file_path);
-
-        // Set robot config
-        robot_slist_ = robotConfig.Slist;                         // Robot screw axes
-        M_ = robotConfig.M;                                       // Home configuration matrix
-        ref_frame_ = robotConfig.frame_names.ref;                 // Reference frame
-        tool_frame_ = robotConfig.frame_names.tool;               // Tool frame
-        robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
-        gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
-
-      } else { // urdf
         const auto& urdfConfig =
             affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
 
@@ -160,7 +136,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
       throw; // rethrow preserves original exception where possible
     }
-
 
     // Initialize service/action clients and subscribers
     viz_ss_name_ = "/" + robot_name + "/cca_ros_viz_server";
@@ -662,17 +637,11 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 }
 
 // Helper function to get the full path to the robot description file.
-std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robot_name, const std::string &type)
+std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robot_name)
 {
     const std::string package_name = "cca_" + robot_name;
     const std::string rel_dir = "/config/";
-    std::string filename;
-    if (type=="yaml"){
-        filename = package_name + "_description.yaml";
-    }
-    else if (type=="urdf"){
-        filename = package_name + "_urdf.yaml";
-    }
+    const std::string filename = package_name + "_robot_description.yaml";
     return ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 

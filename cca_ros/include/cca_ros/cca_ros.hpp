@@ -315,10 +315,9 @@ class CcaRos : public rclcpp::Node
     /**
      * @brief Returns the path to the CC Affordance robot description file.
      * @param robot_name Name of the robot package.
-     * @param type Type of file ("yaml" or "urdf").
      * @return Full path to the robot description file.
      */
-    static std::string get_cc_affordance_robot_description_(const std::string &robot_name, const std::string &type);
+    static std::string get_cc_affordance_robot_description_(const std::string &robot_name);
 
     /**
      * @brief Callback function for processing joint state updates.
