@@ -39,7 +39,7 @@
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cc_affordance_planner/cc_affordance_planner_util.hpp>
-#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
+#include <cca_ros_msgs/srv/cca_ros_val_and_viz.hpp>
 #include <chrono>
 #include <cmath>
 #include <control_msgs/action/follow_joint_trajectory.hpp>
@@ -178,7 +178,7 @@ class CcaRos : public rclcpp::Node
 {
   public:
     // Type aliases
-    using CcaRosViz = cca_ros_msgs::srv::CcaRosViz;
+    using CcaRosValAndViz = cca_ros_msgs::srv::CcaRosValAndViz;
     using GoalHandleFollowJointTrajectory = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
     using JointState = sensor_msgs::msg::JointState;
 
@@ -278,9 +278,9 @@ class CcaRos : public rclcpp::Node
                                            and gripper trajectory results. */
     std::mutex status_mutex_;           /**< Mutex to protect access to status_. */
     rclcpp::Logger node_logger_;        /**< Node-specific logger. */
-    std::string viz_ss_name_;           /**< Name of the plan and visualization server. */
+    std::string val_and_viz_ss_name_;           /**< Name of the plan and visualization server. */
     ExecutionActionClients ex_clients_; /**< Action clients for trajectory execution. */
-    rclcpp::Client<CcaRosViz>::SharedPtr viz_client_; /**< Client for visualizing the planned trajectory. */
+    rclcpp::Client<CcaRosValAndViz>::SharedPtr val_and_viz_client_; /**< Client for visualizing the planned trajectory. */
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;     /**< Subscriber for joint states. */
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                       /**< TF2 buffer for transformation lookup. */
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr}; /**< TF2 transform listener. */
@@ -295,6 +295,8 @@ class CcaRos : public rclcpp::Node
     Eigen::Matrix<double, 4, 4> M_;                /**< Home configuration matrix for the robot. */
     std::string ref_frame_;                        /**< Reference frame for transformations. */
     std::string tool_frame_;                       /**< Tool frame for the robot's end-effector. */
+    std::string planning_group_;                    /**< Current planning group name. */
+
 
     ros_cpp_util::JointTrajPoint robot_joint_states_;   /**< Processed and ordered robot joint states. */
     ros_cpp_util::JointTrajPoint gripper_joint_states_; /**< Processed and ordered gripper joint states. */
@@ -341,7 +343,7 @@ class CcaRos : public rclcpp::Node
      * @param task_descriptions Descriptions of tasks for visualization.
      * @return Shared pointer to the visualization service response.
      */
-    cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr validate_and_visualize_(
+    cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr validate_and_visualize_(
         const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
         const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions);
 

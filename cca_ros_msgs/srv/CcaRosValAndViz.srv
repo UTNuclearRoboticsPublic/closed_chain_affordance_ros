@@ -1,4 +1,5 @@
 # Request
+string planning_group # planning group to use
 trajectory_msgs/JointTrajectory joint_traj # joint trajectory for visualization
 geometry_msgs/Pose[] cartesian_traj # corresponding cartesian trajectory
 geometry_msgs/Vector3[] aff_screw_axes # vector of screw axes

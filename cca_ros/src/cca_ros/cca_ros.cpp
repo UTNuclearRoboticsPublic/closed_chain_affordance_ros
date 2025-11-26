@@ -81,8 +81,8 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     }
 
     // Initialize service/action clients and subscribers
-    viz_ss_name_ = "/" + robot_name + "/cca_ros_viz_server";
-    viz_client_ = this->create_client<CcaRosViz>(viz_ss_name_);
+    val_and_viz_ss_name_ = "/" + robot_name + "/cca_ros_val_and_viz";
+    val_and_viz_client_ = this->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
@@ -125,8 +125,9 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     }
 
     // Determine robot config for this planning group
+    planning_group_ = planning_requests.front().planning_group; // Current planning group
     const affordance_util::RobotConfig& robotConfig = 
-	planning_group_info_map_.at(planning_requests.front().planning_group).robot_config;
+	planning_group_info_map_.at(planning_group_).robot_config;
 
     robot_slist_ = robotConfig.Slist;                         // Robot screw axes
     M_ = robotConfig.M;                                       // Home configuration matrix
@@ -138,8 +139,8 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     // Prepare to collect task descriptions for visualization. We don't directly use task descriptions from planning requests since 
     // sometimes the info is asked to be looked up later using different methods. 
     // We'll mostly use the planner result from the CCA planner for accurate reflection of what task was planned.
-    std::vector<cc_affordance_planner::TaskDescription> task_descriptions_for_viz;
-    task_descriptions_for_viz.reserve(planning_requests.size());
+    std::vector<cc_affordance_planner::TaskDescription> task_descriptions_for_val_and_viz;
+    task_descriptions_for_val_and_viz.reserve(planning_requests.size());
 
     // Determine if gripper trajectory is included
     const bool includes_gripper_trajectory = !std::isnan(planning_requests.front().task_description.goal.gripper);
@@ -299,7 +300,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 	    // Store the original for visualization 
 	    // Note: the subtask EeOrientationConstraint fields are reset below so we don't enter this block again for this original task
             // Potential TODO: Maybe in the future we wanna handle this in the cc_affordance_planner library so task info can be gotten FROM_FK
-            task_descriptions_for_viz.push_back(task_description); 
+            task_descriptions_for_val_and_viz.push_back(task_description); 
             
             // Compute forward kinematics and discretize screw path
             const Eigen::Matrix4d fk = affordance_util::FKinSpace(M_, robot_slist_, start_state.robot);
@@ -356,7 +357,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 	    // Store for visualization
             if (planning_requests.at(org_task_idx).task_description.ee_orientation_constraint != 
 		cc_affordance_planner::EeOrientationConstraint::PRESERVE){ // This case is handled above
-                task_descriptions_for_viz.push_back(task_result.task_description);
+                task_descriptions_for_val_and_viz.push_back(task_result.task_description);
             }
         } catch (const std::invalid_argument &e) {
             RCLCPP_ERROR(node_logger_, "Planner returned exception%s: %s", index_log.c_str(), e.what());
@@ -452,17 +453,17 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     
     // Validate and visualize the complete trajectory
     auto validation_response = this->validate_and_visualize_(
-        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_viz);
+        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_val_and_viz);
     
     if (!validation_response->success) {
         RCLCPP_ERROR(node_logger_, 
             "%s validation service failed. Trajectory likely violates self-collision or joint limit constraints. "
-            "Check server for more info.", viz_ss_name_.c_str());
+            "Check server for more info.", val_and_viz_ss_name_.c_str());
         *status_ = Status::FAILED;
         return planning_response;
     }
 
-    RCLCPP_INFO(node_logger_, " %s validation service succeeded", viz_ss_name_.c_str());
+    RCLCPP_INFO(node_logger_, " %s validation service succeeded", val_and_viz_ss_name_.c_str());
     planner_result_final.planning_time += std::chrono::microseconds(validation_response->validation_time_usecs);
 
     // Execute trajectory if requested (check first request for execute flag)
@@ -720,13 +721,14 @@ cca_ros::GoalMsg CcaRos::create_goal_msg_(
 }
 
 // Validates and visualizes a given trajectory
-cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions){
+cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions){
 
     // Create visualization request
-    auto viz_serv_req = std::make_shared<CcaRosViz::Request>();
-    viz_serv_req->joint_traj = goal.trajectory;
-    viz_serv_req->cartesian_traj = cartesian_trajectory;
-    viz_serv_req->ref_frame = ref_frame_;
+    auto val_and_viz_serv_req = std::make_shared<CcaRosValAndViz::Request>();
+    val_and_viz_serv_req->planning_group = planning_group_;
+    val_and_viz_serv_req->joint_traj = goal.trajectory;
+    val_and_viz_serv_req->cartesian_traj = cartesian_trajectory;
+    val_and_viz_serv_req->ref_frame = ref_frame_;
 
     // Sentinel affordance reference pose (identity)
     geometry_msgs::msg::Pose aff_ref_pose_sentinel;
@@ -774,28 +776,28 @@ cca_ros_msgs::srv::CcaRosViz::Response::SharedPtr CcaRos::validate_and_visualize
         }
 
         // Append to the request
-        viz_serv_req->aff_screw_axes.push_back(aff_screw_axis);
-        viz_serv_req->aff_locations.push_back(aff_location);
-        viz_serv_req->aff_ref_poses.push_back(aff_ref_pose);
+        val_and_viz_serv_req->aff_screw_axes.push_back(aff_screw_axis);
+        val_and_viz_serv_req->aff_locations.push_back(aff_location);
+        val_and_viz_serv_req->aff_ref_poses.push_back(aff_ref_pose);
     }
 
     // Wait for visualization service
-    while (!viz_client_->wait_for_service(1s))
+    while (!val_and_viz_client_->wait_for_service(1s))
     {
         if (!rclcpp::ok())
         {
-            RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.", viz_ss_name_.c_str());
+            RCLCPP_ERROR(node_logger_, "Interrupted while waiting for %s service. Exiting.", val_and_viz_ss_name_.c_str());
             *status_ = Status::FAILED;
-	     auto response = std::make_shared<cca_ros_msgs::srv::CcaRosViz::Response>();
+	     auto response = std::make_shared<cca_ros_msgs::srv::CcaRosValAndViz::Response>();
 	     response->success = false;
 	     return response;
         }
-        RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", viz_ss_name_.c_str());
+        RCLCPP_INFO(node_logger_, " %s service not available, waiting again...", val_and_viz_ss_name_.c_str());
     }
 
     // Send the request
-    auto result_future = viz_client_->async_send_request(viz_serv_req);
-    RCLCPP_INFO(node_logger_, "Sent trajectory visualization request to %s service", viz_ss_name_.c_str());
+    auto result_future = val_and_viz_client_->async_send_request(val_and_viz_serv_req);
+    RCLCPP_INFO(node_logger_, "Sent trajectory visualization request to %s service", val_and_viz_ss_name_.c_str());
     auto response = result_future.get();
     return response;
 

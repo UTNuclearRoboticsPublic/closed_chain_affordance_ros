@@ -32,7 +32,7 @@ set(msg_files
 )
 
 set(srv_files
-  "srv/CcaRosViz.srv"
+  "srv/CcaRosValAndViz.srv"
 )
 
 set(action_files
