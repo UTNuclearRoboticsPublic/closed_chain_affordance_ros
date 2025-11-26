@@ -9,7 +9,8 @@ namespace cca_ros
 // Constructor for CcaRos, initializes the node and sets up required parameters and clients.
 CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
     : Node(node_name, node_options),
-      node_logger_(this->get_logger())   // Logger for the node
+      node_logger_(this->get_logger()),   // Logger for the node
+      val_and_viz_ss_name_("/cca_ros_val_and_viz") // Validation and visualization service name
 {
 
     using namespace ros_cpp_util;
@@ -81,7 +82,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     }
 
     // Initialize service/action clients and subscribers
-    val_and_viz_ss_name_ = "/" + robot_name + "/cca_ros_val_and_viz";
     val_and_viz_client_ = this->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
     joint_states_sub_ = this->create_subscription<JointState>(
         joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));

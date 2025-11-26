@@ -52,25 +52,23 @@ class CcaRosValAndVizServer : public rclcpp::Node
 {
   public:
     explicit CcaRosValAndVizServer(const rclcpp::NodeOptions &options)
-        : Node("cca_ros_val_and_viz", options), node_logger_(this->get_logger())
+        : Node("cca_ros_val_and_viz", options), node_logger_(this->get_logger()), val_and_viz_ss_name_("/cca_ros_val_and_viz") 
     {
 
         // Extract parameters
         // robot_description and robot_description_semantic automatically extracted during runtime
         rviz_fixed_frame_ = ros_cpp_util::get_required_str_param(this, "rviz_fixed_frame");
         joint_states_topic_ = ros_cpp_util::get_required_str_param(this, "joint_states_topic");
-	const std::string robot_name = ros_cpp_util::get_required_str_param(this, "cca_robot");
-        cca_ros_val_ss_name_ = "/" + robot_name + "/cca_ros_val_and_viz";
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<cca_ros_msgs::srv::CcaRosValAndViz>(
-            cca_ros_val_ss_name_, std::bind(&CcaRosValAndVizServer::cca_ros_viz_server_callback_, this,
+            val_and_viz_ss_name_, std::bind(&CcaRosValAndVizServer::cca_ros_viz_server_callback_, this,
                                              std::placeholders::_1, std::placeholders::_2));
 
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
             this->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path", 1);
-        RCLCPP_INFO_STREAM(node_logger_, cca_ros_val_ss_name_ <<" service is active");
+        RCLCPP_INFO_STREAM(node_logger_, val_and_viz_ss_name_ <<" service is active");
     }
 
     ~CcaRosValAndVizServer()
@@ -106,7 +104,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
         psm_->startPublishingPlanningScene(planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
 
         rviz_visual_tools_.reset(
-            new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, cca_ros_val_ss_name_, node_handle));
+            new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, val_and_viz_ss_name_, node_handle));
         rviz_visual_tools_->loadMarkerPub(); 	    // Initialize publisher
         rviz_visual_tools_->setLifetime(0.0);       // Publish markers with zero timestamp to avoid future extrapolation
         rviz_visual_tools_->enableFrameLocking();   // Keep markers fixed in the RViz frame to bypass TF transforms
@@ -130,7 +128,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
     moveit::core::JointModelGroup *joint_model_group_;
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
 
-    std::string cca_ros_val_ss_name_;
+    std::string val_and_viz_ss_name_;
     std::string rviz_fixed_frame_;
     std::string joint_states_topic_;
 
