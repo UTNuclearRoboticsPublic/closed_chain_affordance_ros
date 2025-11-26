@@ -302,9 +302,6 @@ class CcaRos : public rclcpp::Node
     ros_cpp_util::JointTrajPoint robot_joint_states_;   /**< Processed and ordered robot joint states. */
     ros_cpp_util::JointTrajPoint gripper_joint_states_; /**< Processed and ordered gripper joint states. */
 
-    bool unified_executor_available_ = false; /**< Indicates whether an action server is available to execute the
-                                                 robot and gripper trajectory together. */
-
     std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
         unified_gh_future_; /**< Goal handle future for the unified trajectory
                                executor. */

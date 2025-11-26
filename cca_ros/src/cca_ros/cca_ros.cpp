@@ -76,20 +76,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     const std::string robot_name         = get_required_str("cca_robot");
     const std::string build_robot_from   = get_required_str("cca_build_robot_from");
 
-    // Optional params
-    robot_traj_execution_as_name_        = this->declare_parameter("cca_robot_as", "");
-    gripper_traj_execution_as_name_      = this->declare_parameter("cca_gripper_as", "");
-    robot_and_gripper_traj_execution_as_name_ = this->declare_parameter("cca_robot_and_gripper_as", "");
-
-    // Validate that robot traj or robot and gripper traj action server name is provided
-    if (robot_traj_execution_as_name_.empty() && robot_and_gripper_traj_execution_as_name_.empty()) {
-      std::ostringstream oss;
-      oss << "At least one of 'cca_robot_as' or 'cca_robot_and_gripper_as' parameters must be set up in the "
-	     "`cca_<robot>_ros_setup.yaml` file.";
-      RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-      throw std::invalid_argument(oss.str());
-    }
-
     // Validate build_robot_from param
     if (build_robot_from != "yaml" && build_robot_from != "urdf") {
       std::ostringstream oss;
@@ -137,9 +123,18 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
           
 	  // Get action server names
           cca_ros::ExecutionActionServerNames ex_as_names;
-          ex_as_names.robot = get_required_str(param_prefix + "_robot_as");
-	  ex_as_names.gripper = get_required_str(param_prefix + "_gripper_as");
-	  ex_as_names.robot_and_gripper = get_required_str(param_prefix + "_robot_and_gripper_as");
+          ex_as_names.robot = this->declare_parameter(param_prefix + ".robot_as", "");
+	  ex_as_names.gripper = this->declare_parameter(param_prefix + ".gripper_as", "");
+	  ex_as_names.robot_and_gripper = this->declare_parameter(param_prefix + ".robot_and_gripper_as", "");
+
+          // Validate that robot traj or robot and gripper traj action server name is provided
+          if (ex_as_names.robot.empty() && ex_as_names.robot_and_gripper.empty()) {
+            std::ostringstream oss;
+            oss << "At least one of '"<< param_prefix + ".robot_as'" <<" or '"<< param_prefix + ".robot_and_gripper_as'" <<" parameters must be set up in the "
+                   "`cca_<robot>_description.yaml` file.";
+            RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
+            throw std::invalid_argument(oss.str());
+          }
 
           // Create planning group info
 	  PlanningGroupInfo pg_info;
@@ -195,6 +190,14 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     cca_ros::PlanningResponse planning_response;
     status_ = planning_response.status;
     *status_ = Status::PROCESSING;
+
+    // Determine action server names for this planning group -- We need this info for input validation
+    if (planning_requests.front().execute_trajectory) {
+        const cca_ros::ExecutionActionServerNames ex_as_names = planning_group_info_map_.at(planning_requests.front().task_description.planning_group).ex_as_names;
+        robot_traj_execution_as_name_        = ex_as_names.robot;
+        gripper_traj_execution_as_name_      = ex_as_names.gripper;
+        robot_and_gripper_traj_execution_as_name_ = ex_as_names.robot_and_gripper;
+    }
 
     // Validate input based on whether we have single or multiple requests
     try {
@@ -565,7 +568,6 @@ void CcaRos::initialize_action_clients_()
     {
         robot_and_gripper_traj_execution_client_ =
             rclcpp_action::create_client<FollowJointTrajectory>(this, robot_and_gripper_traj_execution_as_name_);
-        unified_executor_available_ = true;
         return;
     }
 
@@ -587,13 +589,22 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 {
     const bool single_planning_request = reqs.size() == 1;
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
-    
+    const std::string planning_group = reqs.front().task_description.planning_group;
+    const bool execute_trajectory = reqs.front().execute_trajectory;
+    const bool gripper_traj_ex_as_exists = !gripper_traj_execution_as_name_.empty() || !robot_and_gripper_traj_execution_as_name_.empty();
+
+    // Validate planning group is specified
+    if (planning_group.empty()) {
+        throw std::invalid_argument(
+            index_log + "Planning group must be specified in task_description.planning_group");
+    }
+
     // Gripper executor availability check
-    if (gripper_goal_specified && gripper_traj_execution_as_name_.empty() && !unified_executor_available_)
+    if (execute_trajectory && gripper_goal_specified && gripper_traj_ex_as_exists)
     {
-        throw std::invalid_argument("Task description: `goal.gripper` is specified, but `cca_gripper_as` or "
-                                    "`cca_robot_and_gripper_as` parameters are"
-                                    " not set up in the `cca_<robot>_ros_setup.yaml` file. Need one of them to be able "
+        throw std::invalid_argument("Task description: `goal.gripper` is specified, but `cca_planning_group_info." + planning_group + ".gripper_as` or " +
+                                    "`cca_planning_group_info." + planning_group + "`.robot_and_gripper_as` parameters are"
+                                    " not set up in the `cca_<robot>_description.yaml` file. Need one of them to be able "
                                     "to execute gripper trajectories");
     }
     
@@ -602,12 +613,18 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
         const auto &req = reqs[task_index];
         const std::string index_log = single_planning_request ? "" : "Task " + std::to_string(task_index) + ": ";
         
-        // Ensure gripper goals are consistent (compare against first task)
         if (task_index > 0) {
+            // Ensure gripper goals are consistent (compare against first task)
             bool gripper_goal_status = !std::isnan(req.task_description.goal.gripper);
             if (gripper_goal_status != gripper_goal_specified) {
                 throw std::invalid_argument(
                     index_log + "Inconsistent gripper goal specification. All tasks must either specify a gripper goal or leave it unspecified");
+            }
+
+            // Ensure all tasks use the same planning group
+            if (req.task_description.planning_group != planning_group) {
+                throw std::invalid_argument(
+                    index_log + "Inconsistent planning group specification. All tasks must have the same planning group");
             }
         }
         
@@ -733,7 +750,7 @@ cca_ros::GoalMsg CcaRos::create_goal_msg_(
     if (includes_gripper_trajectory)
     {
         // Check if unified executor is available for combined trajectory
-        if (unified_executor_available_)
+        if (!robot_and_gripper_traj_execution_as_name_.empty())
         {
             // Combine robot and gripper joint names
             std::vector<std::string> robot_and_gripper_joint_names;
@@ -863,7 +880,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     // Check if both robot and gripper trajectories should be included
     if (includes_gripper_trajectory)
     {
-        if (unified_executor_available_)
+        if (!robot_and_gripper_traj_execution_as_name_.empty()) // Unified executor available
         {
             // Set result status and execute unified trajectory
             robot_result_status_ = status_;
