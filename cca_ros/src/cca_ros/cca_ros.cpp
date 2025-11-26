@@ -193,10 +193,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     // Determine action server names for this planning group -- We need this info for input validation
     if (planning_requests.front().execute_trajectory) {
-        const cca_ros::ExecutionActionServerNames ex_as_names = planning_group_info_map_.at(planning_requests.front().task_description.planning_group).ex_as_names;
-        robot_traj_execution_as_name_        = ex_as_names.robot;
-        gripper_traj_execution_as_name_      = ex_as_names.gripper;
-        robot_and_gripper_traj_execution_as_name_ = ex_as_names.robot_and_gripper;
+        ex_as_names_ = planning_group_info_map_.at(planning_requests.front().task_description.planning_group).ex_as_names;
     }
 
     // Validate input based on whether we have single or multiple requests
@@ -564,23 +561,23 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 void CcaRos::initialize_action_clients_()
 {
     // If robot and gripper execution server is available, that's all we need.
-    if (!robot_and_gripper_traj_execution_as_name_.empty())
+    if (!ex_as_names_.robot_and_gripper.empty())
     {
         robot_and_gripper_traj_execution_client_ =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, robot_and_gripper_traj_execution_as_name_);
+            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.robot_and_gripper);
         return;
     }
 
     // Else initialize robot client
     robot_traj_execution_client_ =
-        rclcpp_action::create_client<FollowJointTrajectory>(this, robot_traj_execution_as_name_);
+        rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.robot);
 
     // Initialize gripper client in addition to the robot client if that is available
-    if (!gripper_traj_execution_as_name_.empty())
+    if (!ex_as_names_.gripper.empty())
     {
         // Only initialize if the gripper as name is provided
         gripper_traj_execution_client_ =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, gripper_traj_execution_as_name_);
+            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.gripper);
     }
 }
 
@@ -591,7 +588,7 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
     const std::string planning_group = reqs.front().task_description.planning_group;
     const bool execute_trajectory = reqs.front().execute_trajectory;
-    const bool gripper_traj_ex_as_exists = !gripper_traj_execution_as_name_.empty() || !robot_and_gripper_traj_execution_as_name_.empty();
+    const bool gripper_traj_ex_as_exists = !ex_as_names_.gripper.empty() || !ex_as_names_.robot_and_gripper.empty();
 
     // Validate planning group is specified
     if (planning_group.empty()) {
@@ -750,7 +747,7 @@ cca_ros::GoalMsg CcaRos::create_goal_msg_(
     if (includes_gripper_trajectory)
     {
         // Check if unified executor is available for combined trajectory
-        if (!robot_and_gripper_traj_execution_as_name_.empty())
+        if (!ex_as_names_.robot_and_gripper.empty())
         {
             // Combine robot and gripper joint names
             std::vector<std::string> robot_and_gripper_joint_names;
@@ -880,12 +877,12 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     // Check if both robot and gripper trajectories should be included
     if (includes_gripper_trajectory)
     {
-        if (!robot_and_gripper_traj_execution_as_name_.empty()) // Unified executor available
+        if (!ex_as_names_.robot_and_gripper.empty()) // Unified executor available
         {
             // Set result status and execute unified trajectory
             robot_result_status_ = status_;
             return this->send_execution_goal_(robot_and_gripper_traj_execution_client_, robot_send_goal_options,
-                                       robot_and_gripper_traj_execution_as_name_, goal_msg.robot_and_gripper,
+                                       ex_as_names_.robot_and_gripper, goal_msg.robot_and_gripper,
                                        unified_gh_future_);
         }
         else
@@ -902,9 +899,9 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     
             // Execute trajectories for both robot and gripper
             return (this->send_execution_goal_(robot_traj_execution_client_, robot_send_goal_options,
-                                        robot_traj_execution_as_name_, goal_msg.robot, robot_gh_future_)) &&
+                                        ex_as_names_.robot, goal_msg.robot, robot_gh_future_)) &&
                    (this->send_execution_goal_(gripper_traj_execution_client_, gripper_send_goal_options,
-                                        gripper_traj_execution_as_name_, goal_msg.gripper, gripper_gh_future_));
+                                        ex_as_names_.gripper, goal_msg.gripper, gripper_gh_future_));
         }
     }
     else
@@ -912,7 +909,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
         // Set result status and execute trajectory for robot only
         robot_result_status_ = status_;
         return this->send_execution_goal_(robot_traj_execution_client_, robot_send_goal_options,
-                                   robot_traj_execution_as_name_, goal_msg.robot, robot_gh_future_);
+                                   ex_as_names_.robot, goal_msg.robot, robot_gh_future_);
     }
     
 }
@@ -979,7 +976,7 @@ bool CcaRos::send_execution_goal_(rclcpp_action::Client<FollowJointTrajectory>::
 void CcaRos::robot_traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
 {
     // Analyze result
-    *robot_result_status_ = this->analyze_as_result_(result.code, robot_traj_execution_as_name_);
+    *robot_result_status_ = this->analyze_as_result_(result.code, ex_as_names_.robot);
 }
 
 // Callback to handle the goal response for robot trajectory execution
@@ -987,12 +984,12 @@ void CcaRos::robot_traj_execution_goal_response_callback_(const GoalHandleFollow
 {
     if (!goal_handle)
     {
-        RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", robot_traj_execution_as_name_.c_str());
+        RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", ex_as_names_.robot.c_str());
     }
     else
     {
         RCLCPP_INFO(node_logger_, "Goal accepted by %s action server, waiting for result",
-                    robot_traj_execution_as_name_.c_str());
+                    ex_as_names_.robot.c_str());
     }
 }
 
@@ -1000,7 +997,7 @@ void CcaRos::robot_traj_execution_goal_response_callback_(const GoalHandleFollow
 void CcaRos::gripper_traj_execution_result_callback_(const GoalHandleFollowJointTrajectory::WrappedResult &result)
 {
     // Analyze result
-    *gripper_result_status_ = this->analyze_as_result_(result.code, gripper_traj_execution_as_name_);
+    *gripper_result_status_ = this->analyze_as_result_(result.code, ex_as_names_.gripper);
 }
 
 // Callback to handle the goal response for gripper trajectory execution
@@ -1009,12 +1006,12 @@ void CcaRos::gripper_traj_execution_goal_response_callback_(
 {
     if (!goal_handle)
     {
-        RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", gripper_traj_execution_as_name_.c_str());
+        RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", ex_as_names_.gripper.c_str());
     }
     else
     {
         RCLCPP_INFO(node_logger_, "Goal accepted by %s action server, waiting for result",
-                    gripper_traj_execution_as_name_.c_str());
+                    ex_as_names_.gripper.c_str());
     }
 }
 
@@ -1098,16 +1095,16 @@ void CcaRos::cancel_execution()
     {
         cancel_requests.push_back(
             CancelRequest(robot_and_gripper_traj_execution_client_->async_cancel_goal(unified_gh_future_.get()),
-                          robot_and_gripper_traj_execution_as_name_));
-        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_and_gripper_traj_execution_as_name_.c_str());
+                          ex_as_names_.robot_and_gripper));
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", ex_as_names_.robot_and_gripper.c_str());
     }
 
     // Check and send cancellation request for robot goal
     if (robot_gh_future_.valid())
     {
         cancel_requests.push_back(CancelRequest(robot_traj_execution_client_->async_cancel_goal(robot_gh_future_.get()),
-                                                robot_traj_execution_as_name_));
-        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", robot_traj_execution_as_name_.c_str());
+                                                ex_as_names_.robot));
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", ex_as_names_.robot.c_str());
     }
 
     // Check and send cancellation request for gripper goal
@@ -1115,8 +1112,8 @@ void CcaRos::cancel_execution()
     {
         cancel_requests.push_back(
             CancelRequest(gripper_traj_execution_client_->async_cancel_goal(gripper_gh_future_.get()),
-                          gripper_traj_execution_as_name_));
-        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", gripper_traj_execution_as_name_.c_str());
+                          ex_as_names_.gripper));
+        RCLCPP_INFO(node_logger_, "Attempting to cancel %s goal", ex_as_names_.gripper.c_str());
     }
 
     // Now check the responses from all cancellation requests

@@ -283,13 +283,7 @@ class CcaRos : public rclcpp::Node
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr}; /**< TF2 transform listener. */
 
     // Robot ROS setup data
-    std::string robot_traj_execution_as_name_;             /**< Action server name for robot
-                                                              trajectory execution. */
-    std::string gripper_traj_execution_as_name_;           /**< Action server name for gripper
-                                                              trajectory execution. */
-    std::string robot_and_gripper_traj_execution_as_name_; /**< Action server name for
-                                                              robot and gripper trajectory
-                                                              execution together. */
+    cca_ros::ExecutionActionServerNames ex_as_names_; /**< Current action server names for execution. */
 
     // Robot data
     Eigen::MatrixXd robot_slist_;                  /**< Screw axes list for the robot. */
