@@ -533,7 +533,7 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     }
 
     // Gripper executor availability check
-    if (execute_trajectory && gripper_goal_specified && gripper_traj_ex_as_exists)
+    if (execute_trajectory && gripper_goal_specified && !gripper_traj_ex_as_exists)
     {
         throw std::invalid_argument("Task description: `goal.gripper` is specified, but `cca_planning_group_info." + planning_group + ".gripper_as` or " +
                                     "`cca_planning_group_info." + planning_group + "`.robot_and_gripper_as` parameters are"
