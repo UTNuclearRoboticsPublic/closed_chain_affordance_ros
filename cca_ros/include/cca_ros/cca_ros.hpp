@@ -268,6 +268,7 @@ class CcaRos : public rclcpp::Node
   private:
     std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
+    constexpr static std::chrono::seconds execution_result_timeout_{20}; /**< Timeout for execution result checking. */ 
     constexpr static int partial_traj_failure_threshold_ = 2; /**< Threshold for partial trajectory failure. */
     std::shared_ptr<Status> status_{nullptr};                 /**< Current status of planning and execution. */
     std::shared_ptr<Status> robot_result_status_ = {
@@ -406,10 +407,11 @@ class CcaRos : public rclcpp::Node
     Status analyze_as_result_(const rclcpp_action::ResultCode &result_code, const std::string &as_name);
 
     /**
-     * @brief Checks statuses for robot and gripper trajectory execution and
+     * @brief Checks status(es) for execution result(s) from action server(s) and
      * updates the node status.
+     * @param includes_gripper_trajectory Whether gripper trajectory is included in the current task.
      */
-    void check_robot_and_gripper_result_status_();
+    void check_execution_result_status_(bool includes_gripper_trajectory);
 
     /**
      * @brief Creates goal messages for robot, gripper, and combined trajectories.

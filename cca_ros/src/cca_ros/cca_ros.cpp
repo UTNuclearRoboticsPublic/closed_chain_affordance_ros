@@ -511,7 +511,7 @@ cca_ros::ExecutionActionClients CcaRos::initialize_action_clients_(const cca_ros
     {
         // Only initialize if the gripper as name is provided
         ex_clients.gripper =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names_.gripper);
+            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.gripper);
     }
 
     return ex_clients;
@@ -816,8 +816,10 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     {
         if (!ex_as_names_.robot_and_gripper.empty()) // Unified executor available
         {
-            // Set result status and execute unified trajectory
-            robot_result_status_ = status_;
+            // Start a thread to check result status
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory]() {this->check_execution_result_status_(includes_gripper_trajectory);});
+
+	    // Execute combined trajectory for robot and gripper
             return this->send_execution_goal_(ex_clients_.robot_and_gripper, robot_send_goal_options,
                                        ex_as_names_.robot_and_gripper, goal_msg.robot_and_gripper,
                                        unified_gh_future_);
@@ -832,7 +834,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
                 std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
     
             // Start a thread to check result status
-            result_status_thread_ = std::jthread(&CcaRos::check_robot_and_gripper_result_status_, this);
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory]() {this->check_execution_result_status_(includes_gripper_trajectory);});
     
             // Execute trajectories for both robot and gripper
             return (this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
@@ -843,8 +845,10 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     }
     else
     {
-        // Set result status and execute trajectory for robot only
-        robot_result_status_ = status_;
+        // Start a thread to check result status
+        result_status_thread_ = std::jthread([this, includes_gripper_trajectory]() {this->check_execution_result_status_(includes_gripper_trajectory);});
+
+        // Execute only robot trajectory
         return this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
                                    ex_as_names_.robot, goal_msg.robot, robot_gh_future_);
     }
@@ -980,29 +984,72 @@ Status CcaRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code, 
     return result_status;
 }
 
-void CcaRos::check_robot_and_gripper_result_status_()
+void CcaRos::check_execution_result_status_(bool includes_gripper_trajectory)
 {
+   // Record start time for timeout tracking
+    auto start = std::chrono::steady_clock::now();
+
     // Start statuses as processing
     robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
     gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
+
+    // Determine execution mode
+    const bool robot_only_execution = !includes_gripper_trajectory && !ex_as_names_.robot.empty();
+    const bool unified_execution = includes_gripper_trajectory && !ex_as_names_.robot_and_gripper.empty();
+    const bool robot_and_gripper_separate_execution = !robot_only_execution && !unified_execution;
+    const std::string execution_as_name = robot_only_execution ? ex_as_names_.robot :
+					    unified_execution ? ex_as_names_.robot_and_gripper :
+					    ex_as_names_.robot + " and " + ex_as_names_.gripper;
     while (rclcpp::ok())
     {
-        if (*robot_result_status_ != cca_ros::Status::PROCESSING &&
-            *gripper_result_status_ != cca_ros::Status::PROCESSING)
+        // --- TIMEOUT ---
+        if (std::chrono::steady_clock::now() - start > execution_result_timeout_)
         {
-            // Both pointers are not in PROCESSING status, check their values
-            std::lock_guard<std::mutex> lock(status_mutex_); // Lock the mutex before modifying status_
-            if (*robot_result_status_ == cca_ros::Status::SUCCEEDED &&
-                *gripper_result_status_ == cca_ros::Status::SUCCEEDED)
+            RCLCPP_ERROR(node_logger_, "Timed out waiting for execution result on action server(s): %s", execution_as_name.c_str());
+            RCLCPP_ERROR(node_logger_, "Sending cancel request and exiting.");
             {
-                *status_ = cca_ros::Status::SUCCEEDED;
+                std::lock_guard<std::mutex> lock(status_mutex_);
+                *status_ = Status::FAILED;
             }
-            else
-            {
-                *status_ = cca_ros::Status::FAILED;
-            }
-            return; // Exit
+            this->cancel_execution();
+            return;
+
         }
+
+        if (robot_and_gripper_separate_execution){
+            if (*robot_result_status_ != cca_ros::Status::PROCESSING &&
+                *gripper_result_status_ != cca_ros::Status::PROCESSING)
+            {
+                // Both pointers are not in PROCESSING status, check their values
+                std::lock_guard<std::mutex> lock(status_mutex_); // Lock the mutex before modifying status_
+                if (*robot_result_status_ == cca_ros::Status::SUCCEEDED &&
+                    *gripper_result_status_ == cca_ros::Status::SUCCEEDED)
+                {
+                    *status_ = cca_ros::Status::SUCCEEDED;
+                }
+                else
+                {
+                    *status_ = cca_ros::Status::FAILED;
+                }
+                return; // Exit
+            }
+        }
+        else { // Robot only or unified execution
+            if (*robot_result_status_ != cca_ros::Status::PROCESSING)
+            {
+                // The pointer is in PROCESSING status, check its values
+                std::lock_guard<std::mutex> lock(status_mutex_); // Lock the mutex before modifying status_
+                if (*robot_result_status_ == cca_ros::Status::SUCCEEDED)
+                {
+                    *status_ = cca_ros::Status::SUCCEEDED;
+                }
+                else
+                {
+                    *status_ = cca_ros::Status::FAILED;
+                }
+                return; // Exit
+            }
+	}
 
         // Sleep for a short duration to avoid busy-waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
