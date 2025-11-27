@@ -133,10 +133,6 @@ class InteractiveMarkerManager : public rclcpp::Node
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                           ///< TF2 buffer for transformation lookup
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};     ///< TF2 transform listener
-    rclcpp::TimerBase::SharedPtr timer_;                                   ///< Timer to publish transform at a set rate
-    const std::chrono::milliseconds tf_publish_rate_{100};                 ///< TF publish rate
     std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_; ///< Static transform broadcaster
 
     // Variables for capturing the arrow pose
