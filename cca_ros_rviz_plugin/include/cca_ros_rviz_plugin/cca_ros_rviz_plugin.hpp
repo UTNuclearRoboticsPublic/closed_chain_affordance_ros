@@ -285,6 +285,8 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
 
     // State flags
     bool new_settings_applied_ = false; ///< Flag to track if advanced settings have been applied
+    bool arrow_marker_visible_ = false;  ///< Flag to track visibility of arrow marker
+    bool frame_marker_visible_ = false;  ///< Flag to track visibility of frame marker
 
     // UI components - main controls
     QComboBoxAndLabel planning_group_bl_; ///< Planning group selection
@@ -446,6 +448,26 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
      * @param goal_index The selected goal index
      */
     void update_execution_buttons_state_(int goal_index);
+
+    /**
+    * @brief Draws the arrow interactive marker and sets its visibility flag
+    */
+    void draw_arrow_im_();
+
+    /**
+    * @brief Draws the frame interactive marker and sets its visibility flag
+    */
+    void draw_frame_im_();
+
+    /**
+    * @brief Hides the arrow interactive marker and updates its visibility flag
+    */
+    void hide_arrow_im_();
+
+    /**
+    * @brief Hides the frame interactive marker and updates its visibility flag
+    */
+    void hide_frame_im_();
 };
 
 } // namespace cca_ros_rviz_plugin
