@@ -20,16 +20,13 @@
 // ROS headers
 #include <interactive_markers/interactive_marker_server.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_broadcaster.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <visualization_msgs/msg/interactive_marker.hpp>
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
 // Custom ROS utility headers
 #include <ros_cpp_util/ros_cpp_util.hpp>
-
 
 namespace interactive_marker_manager
 {
@@ -131,6 +128,8 @@ class InteractiveMarkerManager : public rclcpp::Node
     std::string tool_frame_name_;       ///< This is where the arrow will appear in "EE Orientation Only" planning mode
     std::vector<std::string> cca_planning_groups_; ///< List of planning groups for CCA
     std::string default_planning_group_;  ///< Default planning group for CCA
+    std::unordered_map<std::string, PlanningGroupFrameInfo>	
+	planning_group_frame_info_map_; ///< Map from planning group name to its frame info
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
@@ -138,13 +137,7 @@ class InteractiveMarkerManager : public rclcpp::Node
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};     ///< TF2 transform listener
     rclcpp::TimerBase::SharedPtr timer_;                                   ///< Timer to publish transform at a set rate
     const std::chrono::milliseconds tf_publish_rate_{100};                 ///< TF publish rate
-    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;        ///< Transform broadcaster
-
-    std::string ref_frame_name_;        ///< This is where the arrow will appear first in the "Affordance" planning mode
-    std::string ee_frame_name_;         ///< Name of the EE frame
-    Eigen::Vector3d ee_to_tool_offset_; ///< Location of the tool in the EE frame
-    std::unordered_map<std::string, PlanningGroupFrameInfo>	
-	planning_group_frame_info_map_; ///< Map from planning group name to its frame info
+    std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_; ///< Static transform broadcaster
 
     // Variables for capturing the arrow pose
     Eigen::Vector3d arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());

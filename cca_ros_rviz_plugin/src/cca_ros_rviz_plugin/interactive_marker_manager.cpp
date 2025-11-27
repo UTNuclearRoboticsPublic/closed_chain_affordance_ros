@@ -36,11 +36,8 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
         "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
         this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-
     // Initialize the tf broadcaster so we could publish static transforms
-    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+    tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
 
     // Extract frame names for planning groups and publish static transforms between EE and tool frames and for each planning group
     using namespace ros_cpp_util;
@@ -169,7 +166,7 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
     const std::string& ref_frame_name = planning_group_frame_info_map_.at(planning_group).ref_frame;
     const std::string& tool_frame_name = planning_group_frame_info_map_.at(planning_group).tool_frame;
     int_marker.header.frame_id = info.in_tool_frame ? tool_frame_name : ref_frame_name;
-    int_marker.description = "";
+    int_marker.header.stamp = this->now();
 
     // Lambda to add control using static axis vectors
     auto addControl = [&](const std::string &name, const Eigen::Vector3d &axis, bool isRotation) {
@@ -433,7 +430,7 @@ void InteractiveMarkerManager::publish_transform_(const std::string& parent_fram
     geometry_msgs::msg::TransformStamped transform_stamped;
 
     // Set header details
-    transform_stamped.header.stamp = this->now();
+    transform_stamped.header.stamp = rclcpp::Time(0);// static valid-for-all-time
     transform_stamped.header.frame_id = parent_frame;
     transform_stamped.child_frame_id = child_frame;
 
@@ -449,6 +446,6 @@ void InteractiveMarkerManager::publish_transform_(const std::string& parent_fram
     transform_stamped.transform.rotation.w = 1.0;
 
     // Publish the transform
-    tf_broadcaster_->sendTransform(transform_stamped);
+    tf_static_broadcaster_->sendTransform(transform_stamped);
 }
 } // namespace interactive_marker_manager
