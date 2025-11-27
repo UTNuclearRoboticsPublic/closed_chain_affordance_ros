@@ -58,7 +58,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
         // Extract parameters
         // robot_description and robot_description_semantic automatically extracted during runtime
         rviz_fixed_frame_ = ros_cpp_util::get_required_str_param(this, "rviz_fixed_frame");
-        joint_states_topic_ = ros_cpp_util::get_required_str_param(this, "joint_states_topic");
+        joint_states_topic_ = ros_cpp_util::get_required_str_param(this, "cca_joint_states_topic");
 
         // Create and advertise planning and visualization service
         srv_ = this->create_service<cca_ros_msgs::srv::CcaRosValAndViz>(
