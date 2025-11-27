@@ -17,7 +17,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 
     // --- Required params (throw if absent) ---
     const std::string joint_states_topic = get_required_str_param(this, "cca_joint_states_topic");
-    const std::string robot_name         = get_required_str_param(this, "cca_robot");
+    robot_name_ = get_required_str_param(this, "cca_robot");
 
     // Load robot configuration
     try {
@@ -530,6 +530,13 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     // Validate planning group is specified
     if (planning_group.empty()) {
         throw std::invalid_argument("Planning Request: Planning group must be specified");
+    }
+
+    // Validate planning group is valid
+    if (planning_group_info_map_.find(planning_group) == planning_group_info_map_.end()) {
+	throw std::invalid_argument("Planning Request: Specified planning group '" + planning_group + "' is not valid. "
+				    "Check cca_planning_groups parameter and cca_planning_group_info.<group_name> parameters" 
+			            "in cca_" + robot_name_ + "config/cca_" + robot_name_ + "_description.yaml");
     }
 
     // Gripper executor availability check
