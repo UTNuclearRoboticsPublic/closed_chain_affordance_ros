@@ -62,7 +62,9 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
         // Publish static transform between EE and tool frame
         const std::string& ee_frame = get_required_str_param(this, param_prefix + ".end_effector.frame");
         const Eigen::Vector3d& ee_to_tool_offset = Eigen::Vector3d(get_required_double_array_param(this, param_prefix + ".tool.offset_from_ee_frame").data());
-        this->publish_transform_(ee_frame, pg_frame_info.tool_frame, ee_to_tool_offset);
+        if (ee_frame!=pg_frame_info.tool_frame){ // Avoid publishing if both frames are the same
+            this->publish_transform_(ee_frame, pg_frame_info.tool_frame, ee_to_tool_offset);
+	}
     }
 
     default_planning_group_ = cca_planning_groups_.front(); // We will use the first planning group as default
