@@ -6,6 +6,14 @@ namespace cca_ros_rviz_plugin
 CcaRosRvizPlugin::CcaRosRvizPlugin(QWidget *parent)
     : rviz_common::Panel(parent), interactive_marker_manager::InteractiveMarkerManager("cca_ros_rviz_plugin")
 {
+    // Populate planning groups combo box options from InteractiveMarkerManager
+    // We need this to the create_cca_ig_tab with planning group options
+    for (const auto &g : this->cca_planning_groups_) {
+        planning_groups_ << QString::fromStdString(g);
+    }
+    current_planning_group_ = this->default_planning_group_; // Start with default planning group from InteractiveMarkerManager
+
+    // Now create the UI
     auto *tab_widget = new QTabWidget(this);
 
     tab_widget->addTab(this->create_cca_ig_tab_(), "CCA Planning");
@@ -26,12 +34,6 @@ void CcaRosRvizPlugin::onInitialize()
     // Do ROS client initializations in this function
     // Initialize the CCA Ros action client to be able to send planning requests
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
-
-    // Populate planning groups combo box options from InteractiveMarkerManager's planning groups
-    for (const auto &g : this->cca_planning_groups_) {
-        planning_groups_ << QString::fromStdString(g);
-    }
-    current_planning_group_ = this->default_planning_group_; // Start with default planning group from InteractiveMarkerManager
 
     // Set up timer for spinning the node
     spin_timer_ = new QTimer(this);
