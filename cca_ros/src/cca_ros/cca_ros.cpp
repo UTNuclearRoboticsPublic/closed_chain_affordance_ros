@@ -816,7 +816,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
         if (!ex_as_names_.robot_and_gripper.empty()) // Unified executor available
         {
             // Start a thread to check result status
-            result_status_thread_ = std::jthread([this, includes_gripper_trajectory]() {this->check_execution_result_status_(includes_gripper_trajectory);});
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
 
 	    // Execute combined trajectory for robot and gripper
             return this->send_execution_goal_(ex_clients_.robot_and_gripper, robot_send_goal_options,
@@ -833,7 +833,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
                 std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
     
             // Start a thread to check result status
-            result_status_thread_ = std::jthread([this, includes_gripper_trajectory]() {this->check_execution_result_status_(includes_gripper_trajectory);});
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
     
             // Execute trajectories for both robot and gripper
             return (this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
@@ -845,7 +845,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     else
     {
         // Start a thread to check result status
-        result_status_thread_ = std::jthread([this, includes_gripper_trajectory]() {this->check_execution_result_status_(includes_gripper_trajectory);});
+        result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
 
         // Execute only robot trajectory
         return this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
@@ -982,7 +982,7 @@ Status CcaRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code, 
     return result_status;
 }
 
-void CcaRos::check_execution_result_status_(bool includes_gripper_trajectory)
+void CcaRos::check_execution_result_status_(std::stop_token st, bool includes_gripper_trajectory)
 {
    // Record start time for timeout tracking
     auto start = std::chrono::steady_clock::now();
@@ -998,7 +998,7 @@ void CcaRos::check_execution_result_status_(bool includes_gripper_trajectory)
     const std::string execution_as_name = robot_only_execution ? ex_as_names_.robot :
 					    unified_execution ? ex_as_names_.robot_and_gripper :
 					    ex_as_names_.robot + " and " + ex_as_names_.gripper;
-    while (rclcpp::ok())
+    while (!st.stop_requested() && rclcpp::ok())
     {
         // --- TIMEOUT ---
         if (std::chrono::steady_clock::now() - start > execution_result_timeout_)

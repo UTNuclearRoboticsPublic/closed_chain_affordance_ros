@@ -50,6 +50,7 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <ros_cpp_util/ros_cpp_util.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <stop_token>
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -413,9 +414,10 @@ class CcaRos : public rclcpp::Node
     /**
      * @brief Checks status(es) for execution result(s) from action server(s) and
      * updates the node status.
+     * @param st Stop token to handle thread cancellation.
      * @param includes_gripper_trajectory Whether gripper trajectory is included in the current task.
      */
-    void check_execution_result_status_(bool includes_gripper_trajectory);
+    void check_execution_result_status_(std::stop_token st, bool includes_gripper_trajectory);
 
     /**
      * @brief Creates goal messages for robot, gripper, and combined trajectories.
