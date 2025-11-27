@@ -17,7 +17,7 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 
     // --- Required params (throw if absent) ---
     const std::string joint_states_topic = get_required_str_param(this, "cca_joint_states_topic");
-    robot_name_ = get_required_str_param(this, "cca_robot");
+    const std::string robot_name = get_required_str_param(this, "cca_robot");
 
     // Load robot configuration
     try {
@@ -84,6 +84,8 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     // Setup TF buffer to task info lookup from TF tree
     tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+    RCLCPP_INFO(node_logger_, "Initialized %s node for %s", node_name.c_str(), robot_name.c_str());
 }
 
 // Destructor for CcaRos, cleans up.
@@ -520,24 +522,34 @@ cca_ros::ExecutionActionClients CcaRos::initialize_action_clients_(const cca_ros
 // Helper function to validate input
 void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 {
-    const bool single_planning_request = reqs.size() == 1;
-    const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
+    // Validate planning group before we do anything else
     const std::string planning_group = reqs.front().planning_group;
-    const bool execute_trajectory = reqs.front().execute_trajectory;
-    const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
-    const bool gripper_traj_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
 
-    // Validate planning group is specified
+    // Ensure planning group is specified
     if (planning_group.empty()) {
         throw std::invalid_argument("Planning Request: Planning group must be specified");
     }
 
-    // Validate planning group is valid
-    if (planning_group_info_map_.find(planning_group) == planning_group_info_map_.end()) {
-	throw std::invalid_argument("Planning Request: Specified planning group '" + planning_group + "' is not valid. "
-				    "Check cca_planning_groups parameter and cca_planning_group_info.<group_name> parameters" 
-			            "in cca_" + robot_name_ + "config/cca_" + robot_name_ + "_description.yaml");
+    // Ensure planning group is valid
+    std::string valid_pg_s;
+    for (const auto& [name, _] : planning_group_info_map_) {
+        if (!valid_pg_s.empty()){ 
+	    valid_pg_s += ", ";
+	}
+        valid_pg_s += name;
     }
+
+    if (planning_group_info_map_.find(planning_group) == planning_group_info_map_.end()) {
+	throw std::invalid_argument("Planning Request: Specified planning group '" + planning_group + "' is not valid. " + 
+				    "Possible options are: " + valid_pg_s);
+    }
+
+    // Now use planning group to do further validation
+    const bool single_planning_request = reqs.size() == 1;
+    const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
+    const bool execute_trajectory = reqs.front().execute_trajectory;
+    const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
+    const bool gripper_traj_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
 
     // Gripper executor availability check
     if (execute_trajectory && gripper_goal_specified && !gripper_traj_ex_as_exists)

@@ -295,7 +295,6 @@ class CcaRos : public rclcpp::Node
     cca_ros::ExecutionActionServerNames ex_as_names_; /**< Current action server names for execution. */
 
     // Robot data
-    std::string robot_name_; 		           /**< Name of the robot. */
     Eigen::MatrixXd robot_slist_;                  /**< Screw axes list for the robot. */
     std::vector<std::string> robot_joint_names_;   /**< Robot joint names. */
     std::vector<std::string> gripper_joint_names_; /**< Gripper joint names. */
