@@ -166,7 +166,6 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
     const std::string& ref_frame_name = planning_group_frame_info_map_.at(planning_group).ref_frame;
     const std::string& tool_frame_name = planning_group_frame_info_map_.at(planning_group).tool_frame;
     int_marker.header.frame_id = info.in_tool_frame ? tool_frame_name : ref_frame_name;
-    int_marker.header.stamp = this->now();
 
     // Lambda to add control using static axis vectors
     auto addControl = [&](const std::string &name, const Eigen::Vector3d &axis, bool isRotation) {
