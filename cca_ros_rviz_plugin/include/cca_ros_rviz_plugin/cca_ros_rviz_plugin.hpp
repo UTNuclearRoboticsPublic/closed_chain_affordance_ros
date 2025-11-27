@@ -30,9 +30,6 @@
 #include <rviz_common/panel.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 
-// Custom ROS utility headers
-#include <ros_cpp_util/ros_cpp_util.hpp>
-
 // Qt headers
 #include <QComboBox>
 #include <QFormLayout>
@@ -192,6 +189,11 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
     void cancel_exe_button_clicked_();
 
     /**
+    * @brief Handle planning group selection change
+    */
+    void planning_group_selected_();
+
+    /**
      * @brief Handle planning mode selection change
      *
      * Updates the UI when user selects a different planning mode.
@@ -264,6 +266,7 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
         {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
 
     QStringList planning_groups_; ///< List of available planning groups
+    std::string current_planning_group_; ///< Currently selected planning group
 
     const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
         {QString("Affordance"), cc_affordance_planner::PlanningType::AFFORDANCE},

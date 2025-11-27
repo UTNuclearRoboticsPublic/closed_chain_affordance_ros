@@ -27,11 +27,11 @@ void CcaRosRvizPlugin::onInitialize()
     // Initialize the CCA Ros action client to be able to send planning requests
     ccaRosActionClient = std::make_shared<cca_ros_action::CcaRosActionClient>();
 
-    // Extract planning group info and populate planning groups combo box options
-    const std::vector<std::string> cca_planning_groups = ros_cpp_util::get_required_str_array_param(this, "cca_planning_groups");
-    for (const auto &g : cca_planning_groups) {
+    // Populate planning groups combo box options from InteractiveMarkerManager's planning groups
+    for (const auto &g : this->cca_planning_groups_) {
         planning_groups_ << QString::fromStdString(g);
     }
+    current_planning_group_ = this->default_planning_group_; // Start with default planning group from InteractiveMarkerManager
 
     // Set up timer for spinning the node
     spin_timer_ = new QTimer(this);
@@ -124,12 +124,13 @@ void CcaRosRvizPlugin::update_ui_state_()
     motion_type_bl_.combo_box->setCurrentText("");
 
     // Hide markers
-    this->hide_im(this->arrow_marker_name_);
-    this->hide_im(this->frame_marker_name_);
+    this->hide_im(this->arrow_marker_name_, current_planning_group_);
+    this->hide_im(this->frame_marker_name_, current_planning_group_);
 }
 
 void CcaRosRvizPlugin::connect_signals_()
 {
+    connect(planning_group_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(planning_group_selected_()));
     connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_()));
     connect(motion_type_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(motion_type_selected_()));
     connect(goal_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(goal_selected_(int)));
@@ -143,14 +144,19 @@ void CcaRosRvizPlugin::connect_signals_()
 }
 
 // Slot function implementations follow
+void CcaRosRvizPlugin::planning_group_selected_()
+{
+    current_planning_group_ = planning_group_bl_.combo_box->currentText().toStdString();
+}
+
 void CcaRosRvizPlugin::mode_selected_()
 {
     // Disable all execution buttons
     set_execute_buttons_enabled_(false);
 
     // Hide the markers
-    this->hide_im(this->arrow_marker_name_);
-    this->hide_im(this->frame_marker_name_);
+    this->hide_im(this->arrow_marker_name_, current_planning_group_);
+    this->hide_im(this->frame_marker_name_, current_planning_group_);
 
     // Check if a mode is selected
     bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
@@ -178,7 +184,7 @@ void CcaRosRvizPlugin::mode_selected_()
         frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
         frame_enable_info.reset = false;
         frame_enable_info.in_tool_frame = true;
-        this->enable_im_controls(frame_enable_info);
+        this->enable_im_controls(frame_enable_info, current_planning_group_);
 
 	// Enable buttons for planning, executing, etc.
         set_execute_buttons_enabled_(true);
@@ -215,7 +221,7 @@ void CcaRosRvizPlugin::motion_type_selected_()
         arrow_enable_info.marker_name = this->arrow_marker_name_;
         arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
         arrow_enable_info.reset = false;
-        this->enable_im_controls(arrow_enable_info);
+        this->enable_im_controls(arrow_enable_info, current_planning_group_);
 
 	// If approach motion, enable frame marker controls
 	if (mode_bl_.combo_box->currentText() == "Approach"){
@@ -224,14 +230,14 @@ void CcaRosRvizPlugin::motion_type_selected_()
             frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
             frame_enable_info.reset = false;
             frame_enable_info.in_tool_frame = true;
-            this->enable_im_controls(frame_enable_info);
+            this->enable_im_controls(frame_enable_info, current_planning_group_);
 	}
     }
     else
     {
 	// Hide markers
-        this->hide_im(this->arrow_marker_name_);
-        this->hide_im(this->frame_marker_name_);
+        this->hide_im(this->arrow_marker_name_, current_planning_group_);
+        this->hide_im(this->frame_marker_name_, current_planning_group_);
     }
 
     // Show pitch controls for Screw motion type
@@ -283,7 +289,7 @@ void CcaRosRvizPlugin::axis_option_selected_(QString axis)
     goal_bl_.combo_box->addItems(rotation_goals_);
 
     // Draw the appropriate interactive marker
-    this->draw_ee_or_control_im(axis.toStdString());
+    this->draw_ee_or_control_im(axis.toStdString(), current_planning_group_);
 }
 void CcaRosRvizPlugin::plan_button_clicked_()
 {
@@ -386,7 +392,7 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
     cca_ros::PlanningRequest req;
 
     // Set planning group
-    req.planning_group = planning_group_bl_.combo_box->currentText().toStdString();
+    req.planning_group = current_planning_group_;
 
     // Deduce planning type
     const auto planning_type = planning_type_map_.at(mode_bl_.combo_box->currentText());

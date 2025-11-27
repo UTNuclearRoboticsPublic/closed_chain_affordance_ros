@@ -27,8 +27,21 @@
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
+// Custom ROS utility headers
+#include <ros_cpp_util/ros_cpp_util.hpp>
+
+
 namespace interactive_marker_manager
 {
+
+/**
+* @brief Struct that holds reference and tool frame names for a planning group.
+*/
+struct PlanningGroupFrameInfo{
+    std::string ref_frame;  ///< Reference frame
+    std::string tool_frame;  ///< Tool frame
+};
+
 /**
  * @brief Enum representing options to enable different parts of an interactive marker.
  */
@@ -63,6 +76,7 @@ class InteractiveMarkerManager : public rclcpp::Node
      * @param info A struct containing information on how to enable the interactive marker.
      *             This includes the marker's name, the parts to enable, and options for creation,
      *             resetting the pose, and drawing in the tool frame.
+     * @param planning_group The planning group for which to draw the interactive marker.
      *
      * @note The `info` struct holds the following fields:
      *   - `marker_name`: The name of the interactive marker.
@@ -71,14 +85,15 @@ class InteractiveMarkerManager : public rclcpp::Node
      *   - `reset`: A boolean specifying whether to reset the marker's pose (default is `true`).
      *   - `in_tool_frame`: A boolean indicating whether to draw the marker in the tool frame (default is `false`).
      */
-    void enable_im_controls(const ImControlEnableInfo &info);
+    void enable_im_controls(const ImControlEnableInfo &info, const std::string& planning_group);
 
     /**
      * @brief Hides the specified interactive marker.
      *
      * @param marker_name The name of the marker to hide.
+     * @param planning_group The planning group for which to draw the interactive marker.
      */
-    void hide_im(const std::string &marker_name);
+    void hide_im(const std::string &marker_name, const std::string& planning_group);
 
     /**
      * @brief Returns the pose of the arrow representing the screw axis based on the given CCA planning and axis modes.
@@ -102,8 +117,9 @@ class InteractiveMarkerManager : public rclcpp::Node
      * axis name.
      *
      * @param axis An axis option from the CCA planning plugin EE Orientation Control mode.
+     * @param planning_group The planning group for which to draw the interactive marker.
      */
-    void draw_ee_or_control_im(const std::string &axis);
+    void draw_ee_or_control_im(const std::string &axis, const std::string& planning_group);
 
   protected:
     static constexpr const char *marker_namespace_ =
@@ -113,6 +129,8 @@ class InteractiveMarkerManager : public rclcpp::Node
     static constexpr const char *frame_marker_name_ =
         "affordance_start_frame"; ///< Name of the interactive marker for the screw start frame
     std::string tool_frame_name_;       ///< This is where the arrow will appear in "EE Orientation Only" planning mode
+    std::vector<std::string> cca_planning_groups_; ///< List of planning groups for CCA
+    std::string default_planning_group_;  ///< Default planning group for CCA
 
   private:
     std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_; ///< Server managing interactive markers
@@ -125,6 +143,8 @@ class InteractiveMarkerManager : public rclcpp::Node
     std::string ref_frame_name_;        ///< This is where the arrow will appear first in the "Affordance" planning mode
     std::string ee_frame_name_;         ///< Name of the EE frame
     Eigen::Vector3d ee_to_tool_offset_; ///< Location of the tool in the EE frame
+    std::unordered_map<std::string, PlanningGroupFrameInfo>	
+	planning_group_frame_info_map_; ///< Map from planning group name to its frame info
 
     // Variables for capturing the arrow pose
     Eigen::Vector3d arrow_axis_ = Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
@@ -173,9 +193,9 @@ class InteractiveMarkerManager : public rclcpp::Node
     void process_frame_feedback_(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr &feedback);
 
     /**
-     * @brief Publishes transform between the EE and tool frame
+     * @brief Publishes a static transform between the specified parent and child frames with the given translation. Assumes no rotation.
      */
-    void publish_transform_();
+    void publish_transform_(const std::string& parent_frame, const std::string& child_frame, const Eigen::Vector3d& translation);
 };
 
 } // namespace interactive_marker_manager
