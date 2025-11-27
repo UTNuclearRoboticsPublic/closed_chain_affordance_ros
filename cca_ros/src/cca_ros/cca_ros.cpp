@@ -19,10 +19,6 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     const std::string joint_states_topic = get_required_str_param(this, "cca_joint_states_topic");
     const std::string robot_name         = get_required_str_param(this, "cca_robot");
 
-    // Get the path for robot configuration file
-    const std::string robot_config_file_path =
-        CcaRos::get_cc_affordance_robot_description_(robot_name);
-
     // Load robot configuration
     try {
 
@@ -592,15 +588,6 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
                 index_log + "task_description.canonical_pose_from: method FROM_FRAME_NAME requires frame_name, but is empty");
         }
     }
-}
-
-// Helper function to get the full path to the robot description file.
-std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robot_name)
-{
-    const std::string package_name = "cca_" + robot_name;
-    const std::string rel_dir = "/config/";
-    const std::string filename = package_name + "_description.yaml";
-    return ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 
 // Callback for joint_states topic.

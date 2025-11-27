@@ -324,13 +324,6 @@ class CcaRos : public rclcpp::Node
     void validate_input_(const std::vector<cca_ros::PlanningRequest> &reqs);
 
     /**
-     * @brief Returns the path to the CC Affordance robot description file.
-     * @param robot_name Name of the robot package.
-     * @return Full path to the robot description file.
-     */
-    static std::string get_cc_affordance_robot_description_(const std::string &robot_name);
-
-    /**
      * @brief Callback function for processing joint state updates.
      * @param msg Incoming joint state message.
      */
