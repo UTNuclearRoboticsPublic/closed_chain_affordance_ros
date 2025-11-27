@@ -93,6 +93,10 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 // Destructor for CcaRos, cleans up.
 CcaRos::~CcaRos()
 {
+    // Stop status checking thread before other members begin destruction
+    result_status_thread_.request_stop();
+
+    // Shutdown ROS
     rclcpp::shutdown();
 }
 
@@ -816,6 +820,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
         if (!ex_as_names_.robot_and_gripper.empty()) // Unified executor available
         {
             // Start a thread to check result status
+            robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
             result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
 
 	    // Execute combined trajectory for robot and gripper
@@ -833,6 +838,8 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
                 std::bind(&CcaRos::gripper_traj_execution_result_callback_, this, std::placeholders::_1);
     
             // Start a thread to check result status
+            robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
+            gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
             result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
     
             // Execute trajectories for both robot and gripper
@@ -845,6 +852,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     else
     {
         // Start a thread to check result status
+        robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
         result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
 
         // Execute only robot trajectory
@@ -923,6 +931,10 @@ void CcaRos::robot_traj_execution_goal_response_callback_(const GoalHandleFollow
 {
     if (!goal_handle)
     {
+        {
+            std::lock_guard<std::mutex> lock(status_mutex_);
+            *robot_result_status_ = Status::FAILED;
+        }
         RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", ex_as_names_.robot.c_str());
     }
     else
@@ -945,6 +957,10 @@ void CcaRos::gripper_traj_execution_goal_response_callback_(
 {
     if (!goal_handle)
     {
+        {
+            std::lock_guard<std::mutex> lock(status_mutex_);
+            *gripper_result_status_ = Status::FAILED;
+        }
         RCLCPP_ERROR(node_logger_, "Goal was rejected by %s action server", ex_as_names_.gripper.c_str());
     }
     else
@@ -987,14 +1003,13 @@ void CcaRos::check_execution_result_status_(std::stop_token st, bool includes_gr
    // Record start time for timeout tracking
     auto start = std::chrono::steady_clock::now();
 
-    // Start statuses as processing
-    robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-    gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-
     // Determine execution mode
     const bool robot_only_execution = !includes_gripper_trajectory && !ex_as_names_.robot.empty();
     const bool unified_execution = includes_gripper_trajectory && !ex_as_names_.robot_and_gripper.empty();
-    const bool robot_and_gripper_separate_execution = !robot_only_execution && !unified_execution;
+    const bool robot_and_gripper_separate_execution = includes_gripper_trajectory &&
+                                                      ex_as_names_.robot_and_gripper.empty() &&
+                                                      !ex_as_names_.robot.empty() &&
+                                                      !ex_as_names_.gripper.empty();
     const std::string execution_as_name = robot_only_execution ? ex_as_names_.robot :
 					    unified_execution ? ex_as_names_.robot_and_gripper :
 					    ex_as_names_.robot + " and " + ex_as_names_.gripper;
