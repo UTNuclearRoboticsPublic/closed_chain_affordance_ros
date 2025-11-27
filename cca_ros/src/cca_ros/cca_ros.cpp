@@ -616,7 +616,6 @@ KinematicState CcaRos::read_joint_states_()
 
     auto start_time = this->now();
     rclcpp::Rate loop_rate(10); // 10 Hz loop rate
-    const auto timeout = std::chrono::seconds(5);
 
     while (rclcpp::ok())
     {
@@ -627,7 +626,7 @@ KinematicState CcaRos::read_joint_states_()
         }
 
         // Check for timeout
-        if ((this->now() - start_time) > rclcpp::Duration(timeout))
+        if ((this->now() - start_time) > rclcpp::Duration(joint_states_read_timeout_))
         {
             throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
         }
@@ -781,7 +780,7 @@ cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_vis
     }
 
     // Wait for visualization service
-    while (!val_and_viz_client_->wait_for_service(1s))
+    while (!val_and_viz_client_->wait_for_service(val_and_viz_ss_avail_wait_))
     {
         if (!rclcpp::ok())
         {
@@ -867,10 +866,9 @@ bool CcaRos::send_execution_goal_(rclcpp_action::Client<FollowJointTrajectory>::
         const KinematicState current_state = read_joint_states_();
         const Eigen::VectorXd goal_state =
             Eigen::VectorXd::Map(goal.trajectory.points[0].positions.data(), current_state.robot.size());
-        const double tolerance = 1 * 1e-1; // Declare tolerance as double
 
         // Compare goal state and current state within the tolerance
-        if ((goal_state - current_state.robot).cwiseAbs().maxCoeff() > tolerance)
+        if ((goal_state - current_state.robot).cwiseAbs().maxCoeff() > start_state_tolerance_)
         {
             RCLCPP_ERROR(node_logger_, "Refusing to execute trajectory due to the current robot state being "
                                        "significantly different from the trajectory start state.");
@@ -901,7 +899,7 @@ bool CcaRos::send_execution_goal_(rclcpp_action::Client<FollowJointTrajectory>::
     }
 
     // Wait for the action server to be ready
-    if (!traj_execution_client->wait_for_action_server())
+    if (!traj_execution_client->wait_for_action_server(ex_as_avail_wait_))
     {
         RCLCPP_ERROR(node_logger_, " %s action server not available after waiting", traj_execution_as_name.c_str());
         *status_ = Status::FAILED;

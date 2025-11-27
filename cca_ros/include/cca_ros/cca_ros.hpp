@@ -269,7 +269,11 @@ class CcaRos : public rclcpp::Node
     std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
     constexpr static std::chrono::seconds execution_result_timeout_{20}; /**< Timeout for execution result checking. */ 
+    constexpr static std::chrono::seconds joint_states_read_timeout_{5}; /**< Timeout for reading joint states. */ 
+    constexpr static std::chrono::seconds val_and_viz_ss_avail_wait_{1}; /**< How long to wait for the validation service to be available. */ 
+    constexpr static std::chrono::seconds ex_as_avail_wait_{1}; /**< How long to wait for the execution action servers to be available. */ 
     constexpr static int partial_traj_failure_threshold_ = 2; /**< Threshold for partial trajectory failure. */
+    constexpr static double start_state_tolerance_ = 1e-1; /**< Tolerance for start state deviation check during execution. */
     std::shared_ptr<Status> status_{nullptr};                 /**< Current status of planning and execution. */
     std::shared_ptr<Status> robot_result_status_ = {
         nullptr}; /**< Current status of robot trajectory execution result. */
