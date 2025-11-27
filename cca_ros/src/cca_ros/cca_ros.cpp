@@ -25,15 +25,14 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
 
     // Load robot configuration
     try {
-        const auto& urdfConfig =
-            affordance_util::extract_info_for_urdf_robot_builder(robot_config_file_path);
 
+        // Extract robot description
         const std::string robot_description = get_required_str_param(this, "robot_description");
 
         // Extract planning group info:
         const std::vector<std::string> cca_planning_groups = get_required_str_array_param(this, "cca_planning_groups");
-
 	const std::string pg_prefix = "cca_planning_group_info.";
+
         // Create a map from planning group name to its info
         for (const auto& pg_name : cca_planning_groups) {
 
@@ -596,7 +595,7 @@ std::string CcaRos::get_cc_affordance_robot_description_(const std::string &robo
 {
     const std::string package_name = "cca_" + robot_name;
     const std::string rel_dir = "/config/";
-    const std::string filename = package_name + "_robot_description.yaml";
+    const std::string filename = package_name + "_description.yaml";
     return ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
 }
 
