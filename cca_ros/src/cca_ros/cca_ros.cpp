@@ -548,17 +548,26 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     // Now use planning group to do further validation
     const bool single_planning_request = reqs.size() == 1;
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
+    const bool robot_only_trajectory = !gripper_goal_specified;
     const bool execute_trajectory = reqs.front().execute_trajectory;
     const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
-    const bool gripper_traj_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
+    const bool robot_ex_as_exists = !ex_as_names.robot.empty();
+    const bool gripper_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
 
     // Gripper executor availability check
-    if (execute_trajectory && gripper_goal_specified && !gripper_traj_ex_as_exists)
+    if (execute_trajectory && gripper_goal_specified && !gripper_ex_as_exists)
     {
         throw std::invalid_argument("Task description: `goal.gripper` is specified, but `cca_planning_group_info." + planning_group + ".gripper_as` or " +
                                     "`cca_planning_group_info." + planning_group + "`.robot_and_gripper_as` parameters are"
                                     " not set up in the `cca_<robot>_description.yaml` file. Need one of them to be able "
                                     "to execute gripper trajectories");
+    }
+
+    // Ensure robot trajectory action server exists if execution is requested
+    if (execute_trajectory && robot_only_trajectory && !robot_ex_as_exists) {
+	throw std::invalid_argument("Task description: asks to execute a robot-only trajectory (i.e. no gripper goals specified), but `cca_planning_group_info." + 
+			             planning_group + ".robot_as` ""parameter is not set up in the `cca_<robot>_description.yaml` file. Need it to be " + 
+			             "able to execute robot-only trajectories");
     }
     
     for (size_t task_index = 0; task_index < reqs.size(); ++task_index)
