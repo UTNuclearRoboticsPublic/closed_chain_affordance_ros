@@ -137,6 +137,12 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     robot_joint_names_ = robotConfig.joint_names.robot;       // Robot joint names
     gripper_joint_names_ = {robotConfig.joint_names.gripper}; // Gripper joint names
 
+    // Extract execution action server names and clients for this planning group
+    const cca_ros::PlanningRequest& first_req = planning_requests.front();
+    const bool execute_trajectory = first_req.execute_trajectory; // All requests have the same value due to validation
+    ex_as_names_ = planning_group_info_map_.at(first_req.planning_group).ex_as_names; // Need this for create_goal_msg_ as well as execute_
+    ex_clients_ = planning_group_info_map_.at(first_req.planning_group).ex_clients; // Might as well extract here too although only needed in execute_
+
     // Prepare to collect task descriptions for visualization. We don't directly use task descriptions from planning requests since 
     // sometimes the info is asked to be looked up later using different methods. 
     // We'll mostly use the planner result from the CCA planner for accurate reflection of what task was planned.
@@ -467,12 +473,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     RCLCPP_INFO(node_logger_, " %s validation service succeeded", val_and_viz_ss_name_.c_str());
     planner_result_final.planning_time += std::chrono::microseconds(validation_response->validation_time_usecs);
 
-    // Execute trajectory if requested (check first request for execute flag)
-    const cca_ros::PlanningRequest& first_req = planning_requests.front();
-    if (first_req.execute_trajectory) {
-        // Extract execution action server names and clients for this planning group
-        ex_as_names_ = planning_group_info_map_.at(first_req.planning_group).ex_as_names;
-        ex_clients_ = planning_group_info_map_.at(first_req.planning_group).ex_clients;
+    if (execute_trajectory) {
 
         if (!this->execute_(final_goal_msg, includes_gripper_trajectory)) {
             RCLCPP_ERROR(node_logger_, 
