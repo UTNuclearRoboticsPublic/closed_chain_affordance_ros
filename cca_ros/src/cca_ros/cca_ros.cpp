@@ -13,67 +13,16 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
       val_and_viz_ss_name_("/cca_ros_val_and_viz") // Validation and visualization service name
 {
 
-    using namespace ros_cpp_util;
-
     // --- Required params (throw if absent) ---
-    const std::string joint_states_topic = get_required_str_param(this, "cca_joint_states_topic");
-    const std::string robot_name = get_required_str_param(this, "cca_robot");
+    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(this, "cca_joint_states_topic");
+    const std::string robot_name = ros_cpp_util::get_required_str_param(this, "cca_robot");
 
-    // Load robot configuration
-    try {
+    // Extract robot configuration and action-server names for various planning groups
+    planning_group_info_map_ = CcaRos::get_planning_group_info_map(this);
 
-        // Extract robot description
-        const std::string robot_description = get_required_str_param(this, "robot_description");
-
-        // Extract planning group info:
-        const std::vector<std::string> cca_planning_groups = get_required_str_array_param(this, "cca_planning_groups");
-	const std::string pg_prefix = "cca_planning_group_info.";
-
-        // Create a map from planning group name to its info
-        for (const auto& pg_name : cca_planning_groups) {
-
-          const std::string param_prefix = pg_prefix + pg_name;
-          
-          // Extract URDF config 
-          affordance_util::RobotConfig urdfConfig;
-          urdfConfig.frame_names.ref = get_required_str_param(this, param_prefix + ".ref_frame");
-          urdfConfig.kinematic_chain.base_joint_name = get_required_str_param(this, param_prefix + ".kinematic_chain.base_joint");
-          urdfConfig.kinematic_chain.end_joint_name =get_required_str_param(this, param_prefix + ".kinematic_chain.end_joint");
-          urdfConfig.frame_names.ee = get_required_str_param(this, param_prefix + ".end_effector.frame");
-          urdfConfig.frame_names.tool = get_required_str_param(this, param_prefix + ".tool.frame");
-          urdfConfig.ee_to_tool_offset = Eigen::Vector3d(get_required_double_array_param(this, param_prefix + ".tool.offset_from_ee_frame").data()); 
-          urdfConfig.joint_names.gripper = get_required_str_param(this, param_prefix + ".end_effector.gripper_joint_name");
-          
-	  // Get action server names
-          cca_ros::ExecutionActionServerNames ex_as_names;
-          ex_as_names.robot = this->declare_parameter(param_prefix + ".robot_as", "");
-	  ex_as_names.gripper = this->declare_parameter(param_prefix + ".gripper_as", "");
-	  ex_as_names.robot_and_gripper = this->declare_parameter(param_prefix + ".robot_and_gripper_as", "");
-
-          // Validate that robot traj or robot and gripper traj action server name is provided
-          if (ex_as_names.robot.empty() && ex_as_names.robot_and_gripper.empty()) {
-            std::ostringstream oss;
-            oss << "At least one of '"<< param_prefix + ".robot_as'" <<" or '"<< param_prefix + ".robot_and_gripper_as'" <<" parameters must be set up in the "
-                   "`cca_<robot>_description.yaml` file.";
-            RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-            throw std::invalid_argument(oss.str());
-          }
-
-          // Create planning group info
-	  PlanningGroupInfo pg_info;
-          pg_info.robot_config = affordance_util::robot_builder(robot_description, urdfConfig);
-          pg_info.ex_as_names = ex_as_names;
-          pg_info.ex_clients = this->initialize_action_clients_(ex_as_names);
-
-	  // Add to map
-	  planning_group_info_map_[pg_name] = pg_info;
-
-      }
-    } catch (const std::exception& e) {
-      std::ostringstream oss;
-      oss << "Exception while building robot configuration: " << e.what();
-      RCLCPP_FATAL(node_logger_, "%s", oss.str().c_str());
-      throw; // rethrow preserves original exception where possible
+    // Initialize execution action clients for each planning group
+    for (auto& [pg_name, pg_info] : planning_group_info_map_) {
+          pg_info.ex_clients = this->initialize_action_clients_(pg_info.ex_as_names);
     }
 
     // Initialize service/action clients and subscribers
@@ -489,6 +438,73 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     // Fill out the rest of the planning response
     planning_response.result.success = true;
     return planning_response;
+}
+
+std::unordered_map<std::string, cca_ros::PlanningGroupInfo> CcaRos::get_planning_group_info_map(rclcpp::Node* node_ptr){
+
+    std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map; // Function output
+
+    // Load robot configuration
+    try {
+
+        // Namespace for get_required_param functions
+        using namespace ros_cpp_util;
+
+        // Extract robot description
+        const std::string robot_description = get_required_str_param(node_ptr, "robot_description");
+
+        // Extract planning group info:
+        const std::vector<std::string> cca_planning_groups = get_required_str_array_param(node_ptr, "cca_planning_groups");
+	const std::string pg_prefix = "cca_planning_group_info.";
+
+        // Create a map from planning group name to its info
+        for (const auto& pg_name : cca_planning_groups) {
+
+          const std::string param_prefix = pg_prefix + pg_name;
+          
+          // Extract URDF config 
+          affordance_util::RobotConfig urdfConfig;
+          urdfConfig.frame_names.ref = get_required_str_param(node_ptr, param_prefix + ".ref_frame");
+          urdfConfig.kinematic_chain.base_joint_name = get_required_str_param(node_ptr, param_prefix + ".kinematic_chain.base_joint");
+          urdfConfig.kinematic_chain.end_joint_name =get_required_str_param(node_ptr, param_prefix + ".kinematic_chain.end_joint");
+          urdfConfig.frame_names.ee = get_required_str_param(node_ptr, param_prefix + ".end_effector.frame");
+          urdfConfig.frame_names.tool = get_required_str_param(node_ptr, param_prefix + ".tool.frame");
+          urdfConfig.ee_to_tool_offset = Eigen::Vector3d(get_required_double_array_param(node_ptr, param_prefix + ".tool.offset_from_ee_frame").data()); 
+          urdfConfig.joint_names.gripper = get_required_str_param(node_ptr, param_prefix + ".end_effector.gripper_joint_name");
+          
+	  // Get action server names
+          cca_ros::ExecutionActionServerNames ex_as_names;
+          ex_as_names.robot = node_ptr->declare_parameter(param_prefix + ".robot_as", "");
+	  ex_as_names.gripper = node_ptr->declare_parameter(param_prefix + ".gripper_as", "");
+	  ex_as_names.robot_and_gripper = node_ptr->declare_parameter(param_prefix + ".robot_and_gripper_as", "");
+
+          // Validate that robot traj or robot and gripper traj action server name is provided
+          if (ex_as_names.robot.empty() && ex_as_names.robot_and_gripper.empty()) {
+            std::ostringstream oss;
+            oss << "At least one of '"<< param_prefix + ".robot_as'" <<" or '"<< param_prefix + ".robot_and_gripper_as'" <<" parameters must be set up in the "
+                   "`cca_<robot>_description.yaml` file.";
+            RCLCPP_FATAL(node_ptr->get_logger(), "%s", oss.str().c_str());
+            throw std::invalid_argument(oss.str());
+          }
+
+          // Create planning group info
+	  PlanningGroupInfo pg_info;
+          pg_info.robot_config = affordance_util::robot_builder(robot_description, urdfConfig);
+          pg_info.ex_as_names = ex_as_names;
+
+	  // Add to map
+	  planning_group_info_map[pg_name] = pg_info;
+
+      }
+
+      return planning_group_info_map;
+
+    } catch (const std::exception& e) {
+      std::ostringstream oss;
+      oss << "Exception while building robot configuration: " << e.what();
+      RCLCPP_FATAL(node_ptr->get_logger(), "%s", oss.str().c_str());
+      throw; // rethrow preserves original exception where possible
+    }
 }
 
 

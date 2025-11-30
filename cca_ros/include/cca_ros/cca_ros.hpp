@@ -266,8 +266,17 @@ class CcaRos : public rclcpp::Node
      */
     void cancel_execution();
 
+    /**
+    * @brief Retrieves the Cca planning group information map from ROS parameters.
+    *
+    * @param node_ptr Pointer to the ROS node.
+    *
+    * @return 
+    */
+    static std::unordered_map<std::string, PlanningGroupInfo> get_planning_group_info_map(rclcpp::Node* node_ptr);
+
   private:
-    std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
+    std::unordered_map<std::string, cca_ros::PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
     constexpr static std::chrono::seconds execution_result_timeout_{20}; /**< Timeout for execution result checking. */ 
     constexpr static std::chrono::seconds joint_states_read_timeout_{5}; /**< Timeout for reading joint states. */ 
