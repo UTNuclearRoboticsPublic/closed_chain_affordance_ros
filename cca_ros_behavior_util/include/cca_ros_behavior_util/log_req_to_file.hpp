@@ -16,6 +16,47 @@
 #include <cca_ros/cca_ros.hpp>
 #include <cca_ros_util/cca_ros_util.hpp>
 
+namespace BT
+{
+/**
+ * @brief Convert a BT string value into a std::filesystem::path.
+ *
+ * Ensures the string is non-empty and, if a parent directory is present,
+ * verifies that it exists. Throws BT::RuntimeError on invalid input.
+ *
+ * @param key String from the BehaviorTree port.
+ * @return Parsed filesystem path.
+ */
+template<>
+inline std::optional<std::filesystem::path>
+convertFromString(StringView key)
+{
+    std::string s = std::string(key);
+
+    // Reject empty input
+    if (s.empty())
+    {
+        throw RuntimeError("convertFromString<std::filesystem::path>: empty string");
+    }
+
+    std::filesystem::path p{s};
+
+    // Validate parent directory if present
+    if (p.has_parent_path())
+    {
+        const auto parent = p.parent_path();
+        if (!parent.empty() && !std::filesystem::exists(parent))
+        {
+            throw RuntimeError(
+                "convertFromString<std::filesystem::path>: parent directory does not exist: " +
+                parent.string());
+        }
+    }
+
+    return p;
+}
+} // namespace BT
+
 namespace cca_ros_behavior_util
 {
 
