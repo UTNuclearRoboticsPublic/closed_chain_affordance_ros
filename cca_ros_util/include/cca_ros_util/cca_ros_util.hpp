@@ -23,6 +23,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 namespace cca_ros_util
 {
@@ -70,6 +73,46 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req);
  * @return A std::stringstream containing the formatted log output.
  */
 std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerResult& res);
+
+/**
+ * @brief Writes a single PlanningRequest to a specified file.
+ *
+ * Converts the provided PlanningRequest into a textual log representation using
+ * `log_cca_planning_request()` and writes the resulting content into the file
+ * specified by @p filepath. Existing file contents are overwritten.
+ *
+ * @param req       The PlanningRequest to serialize.
+ * @param filepath  Destination file path where the log will be written.
+ *
+ * @throws std::runtime_error If the file cannot be opened for writing.
+ */
+void log_cca_planning_request_to_file(const cca_ros::PlanningRequest& req,
+                                  const std::filesystem::path& filepath);
+
+/**
+ * @brief Writes multiple PlanningRequests to a single file.
+ *
+ * Iterates through the collection of PlanningRequests, logging each request
+ * using `log_cca_planning_request()`. Each request is delineated by an index
+ * marker in the output file, following this format:
+ *
+ * @code
+ * --- Request 0 ---
+ * <log text>
+ *
+ * --- Request 1 ---
+ * <log text>
+ * @endcode
+ *
+ * Existing file contents are overwritten.
+ *
+ * @param reqs      The list of PlanningRequests to serialize.
+ * @param filepath  Destination file path where the combined log will be written.
+ *
+ * @throws std::runtime_error If the file cannot be opened for writing.
+ */
+void log_cca_planning_requests_to_file(const std::vector<cca_ros::PlanningRequest>& reqs,
+                                   const std::filesystem::path& filepath);
 
 } // namespace cca_ros_util
 

@@ -277,6 +277,48 @@ std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerRe
     return log;
 }
 
+void log_cca_planning_request_to_file(const cca_ros::PlanningRequest& req,
+                                  const std::filesystem::path& filepath)
+{
+    // Convert request to text
+    std::stringstream ss = log_cca_planning_request(req);
+
+    // Open output file (write + truncate)
+    std::ofstream out(filepath, std::ios::out | std::ios::trunc);
+    if (!out.is_open())
+    {
+        throw std::runtime_error("Failed to open file for writing: " + filepath.string());
+    }
+
+    // Stream buffer → file (efficient, avoids copying large strings)
+    out << ss.rdbuf();
+}
+
+
+void log_cca_planning_requests_to_file(const std::vector<cca_ros::PlanningRequest>& reqs,
+                                   const std::filesystem::path& filepath)
+{
+    // Open output file (write + truncate)
+    std::ofstream out(filepath, std::ios::out | std::ios::trunc);
+    if (!out.is_open())
+    {
+        throw std::runtime_error("Failed to open file for writing: " + filepath.string());
+    }
+
+    // Combine all request logs into a single stringstream
+    std::stringstream ss;
+
+    for (size_t i = 0; i < reqs.size(); ++i)
+    {
+        ss << "--- Request " << i << " ---\n";
+        ss << log_cca_planning_request(reqs[i]).str();
+        ss << "\n";
+    }
+
+    // Write aggregated logs
+    out << ss.rdbuf();
+}
+
 } // namespace cca_ros_util
 
 namespace
