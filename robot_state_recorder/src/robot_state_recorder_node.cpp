@@ -15,6 +15,7 @@
 #include <iomanip> // for std::precision
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.h>
+#include <string>
 #include <thread>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 /*
@@ -156,7 +157,8 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     void write_pred_data(const std::vector<ros_cpp_util::JointTrajPoint> &pred_traj_)
     {
 
-        const std::string filename = "pred_tf_and_joint_states_data.csv";
+        const std::string timestamp = std::to_string(this->now().nanoseconds());
+        const std::string filename = "pred_tf_and_joint_states_data_" + timestamp +".csv";
         const std::string filepath = abs_data_save_path_ + filename;
 
         // Open a CSV file for writing
@@ -213,7 +215,8 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
         rclcpp::Rate loop_rate(10); // Rate for the writing loop
 
-        const std::string filename = "act_tf_and_joint_states_data.csv";
+        const std::string timestamp = std::to_string(this->now().nanoseconds());
+        const std::string filename = "act_tf_and_joint_states_data_" + timestamp +".csv";
         const std::string filepath = abs_data_save_path_ + filename;
 
         // Open a CSV file for writing
