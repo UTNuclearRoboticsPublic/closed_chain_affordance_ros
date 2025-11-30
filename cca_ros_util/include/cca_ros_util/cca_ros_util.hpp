@@ -116,33 +116,4 @@ void log_cca_planning_requests_to_file(const std::vector<cca_ros::PlanningReques
 
 } // namespace cca_ros_util
 
-namespace
-{
-// Helper functions restricted to this file
-cc_affordance_planner::UpdateMethod update_method_from_msg(uint8_t update_method);
-cc_affordance_planner::MotionType motion_type_from_msg(uint8_t motion_type);
-affordance_util::PoseSpecificationMethod pose_specification_method_from_msg(uint8_t pose_specification_method);
-affordance_util::GripperGoalType gripper_goal_type_from_msg(uint8_t gripper_goal_type);
-affordance_util::ScrewType screw_type_from_msg(uint8_t screw_type);
-affordance_util::VirtualScrewOrder virtual_screw_order_from_msg(uint8_t virtual_screw_order);
-cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint_from_msg(uint8_t ee_orientation_constraint);
-uint8_t update_method_to_msg(cc_affordance_planner::UpdateMethod update_method);
-uint8_t motion_type_to_msg(cc_affordance_planner::MotionType motion_type);
-uint8_t pose_specification_method_to_msg(affordance_util::PoseSpecificationMethod pose_specification_method);
-uint8_t gripper_goal_type_to_msg(affordance_util::GripperGoalType gripper_goal_type);
-uint8_t screw_type_to_msg(affordance_util::ScrewType screw_type);
-uint8_t virtual_screw_order_to_msg(affordance_util::VirtualScrewOrder virtual_screw_order);
-uint8_t ee_orientation_constraint_to_msg(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint);
-std::string update_method_to_string(cc_affordance_planner::UpdateMethod method); 
-std::string motion_type_to_string(cc_affordance_planner::MotionType type); 
-std::string pose_specification_method_to_string(affordance_util::PoseSpecificationMethod method); 
-std::string gripper_goal_type_to_string(affordance_util::GripperGoalType type); 
-std::string screw_type_to_string(affordance_util::ScrewType type); 
-std::string virtual_screw_order_to_string(affordance_util::VirtualScrewOrder order); 
-std::string ee_orientation_constraint_to_string(cc_affordance_planner::EeOrientationConstraint ee_orientation_constraint); 
-std::string trajectory_description_to_string(cc_affordance_planner::TrajectoryDescription trajectory_description); 
-std::string format_matrix4d(const Eigen::Matrix4d& mat, int precision = 4, int width = 10);
-
-} // namespace
-
 #endif // CCA_ROS_UTIL_H
