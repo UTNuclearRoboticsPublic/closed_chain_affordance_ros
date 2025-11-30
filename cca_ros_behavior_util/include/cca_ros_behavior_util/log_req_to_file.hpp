@@ -1,12 +1,12 @@
 ///////////////////////////////////////////////////////////////////////////////
-//      Title     : write_req_to_file.hpp
+//      Title     : log_req_to_file.hpp
 //      Project   : cca_ros_behavior_util
 //      Created   : Fall 2025
 //      Author    : Janak Panthi (Crasun Jans)
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef WRITE_REQ_TO_FILE_HPP
-#define WRITE_REQ_TO_FILE_HPP
+#ifndef LOG_REQ_TO_FILE_HPP
+#define LOG_REQ_TO_FILE_HPP
 
 #include <behaviortree_cpp/action_node.h>
 #include <filesystem>
@@ -20,19 +20,19 @@ namespace cca_ros_behavior_util
 {
 
 /**
- * @class WriteReqToFile
- * @brief BehaviorTree.CPP synchronous action that writes a single
+ * @class LogReqToFile
+ * @brief BehaviorTree.CPP synchronous action that logs a single
  *        PlanningRequest to a specified file.
  *
  * This node retrieves a `cca_planning_request` from its input port,
  * converts it into a log-formatted string representation using
- * `cca_ros_util::log_cca_planning_request()`, and writes the resulting
+ * `cca_ros_util::log_cca_planning_request()`, and logs the resulting
  * text into a file specified by the `output_path` input port.
  *
  * This is typically used for debugging or for storing input requests
  * for later offline analysis, verification, or regression testing.
  */
-class WriteReqToFile : public BT::SyncActionNode
+class LogReqToFile : public BT::SyncActionNode
 {
 public:
     /**
@@ -41,7 +41,7 @@ public:
      * @param name   Node instance name within the behavior tree.
      * @param config Node configuration containing input/output ports.
      */
-    inline WriteReqToFile(const std::string& name, const BT::NodeConfig& config)
+    inline LogReqToFile(const std::string& name, const BT::NodeConfig& config)
         : BT::SyncActionNode(name, config)
     {}
 
@@ -105,7 +105,7 @@ public:
 
         std::shared_ptr<cca_ros::PlanningRequest> req = req_expected.value();
 
-        // Write using utility function
+        // Log using utility function
         cca_ros_util::log_planning_request_to_file(*req, filepath);
 
         return BT::NodeStatus::SUCCESS;
@@ -114,20 +114,20 @@ public:
 
 
 /**
- * @class WriteReqsToFile
- * @brief BehaviorTree.CPP synchronous action that writes a sequence of
+ * @class LogReqsToFile
+ * @brief BehaviorTree.CPP synchronous action that logs a sequence of
  *        PlanningRequests (vector) to a specified file.
  *
  * This node retrieves a vector of PlanningRequests from the
  * `cca_planning_requests` input port, converts each entry into a
  * log-formatted string using `cca_ros_util::log_cca_planning_request()`,
- * and writes all entries—annotated with request indices—into a single file
+ * and logs all entries—annotated with request indices—into a single file
  * specified by the `output_path` port.
  *
  * The resulting file is typically used to store batches of requests
  * from planning pipelines or replay logs for debug and analysis.
  */
-class WriteReqsToFile : public BT::SyncActionNode
+class LogReqsToFile : public BT::SyncActionNode
 {
 public:
     /**
@@ -136,7 +136,7 @@ public:
      * @param name   Node instance name within the behavior tree.
      * @param config Node configuration containing ports.
      */
-    inline WriteReqsToFile(const std::string& name, const BT::NodeConfig& config)
+    inline LogReqsToFile(const std::string& name, const BT::NodeConfig& config)
         : BT::SyncActionNode(name, config)
     {}
 
@@ -178,7 +178,7 @@ public:
      * <log text>
      * @endcode
      *
-     * @return BT::NodeStatus::SUCCESS on successful write.
+     * @return BT::NodeStatus::SUCCESS on successful log.
      *
      * @throws BT::RuntimeError if required input ports are missing.
      * @throws std::runtime_error if the output file cannot be opened.
@@ -210,7 +210,7 @@ public:
         std::shared_ptr<std::vector<cca_ros::PlanningRequest>> reqs =
             reqs_expected.value();
 
-        // Write using utility function
+        // Log using utility function
         cca_ros_util::log_planning_requests_to_file(*reqs, filepath);
 
         return BT::NodeStatus::SUCCESS;
@@ -219,4 +219,4 @@ public:
 
 } // namespace cca_ros_behavior_util
 
-#endif // WRITE_REQ_TO_FILE_HPP
+#endif // LOG_REQ_TO_FILE_HPP
