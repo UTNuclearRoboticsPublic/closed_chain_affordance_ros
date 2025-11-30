@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 //      Title     : cca_ros_behavior_util.hpp
-//      Project   : cca_ros_behavior
-//      Created   : Spring 2025
+//      Project   : cca_ros_behavior_util
+//      Created   : Fall 2025
 //      Author    : Janak Panthi (Crasun Jans)
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <cca_ros/cca_ros.hpp>
 
-namespace cca_ros_behavior
+namespace cca_ros_behavior_util
 {
 
 /**
@@ -142,7 +142,7 @@ template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, std:
 
 };
 
-} // namespace cca_ros_behavior
+} // namespace cca_ros_behavior_util
 
 #endif // CCA_ROS_BEHAVIOR_UTIL_HPP
 
