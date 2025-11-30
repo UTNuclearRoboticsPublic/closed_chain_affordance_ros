@@ -14,7 +14,7 @@
 #include <vector>
 
 #include <cca_ros/cca_ros.hpp>
-#include <cca_ros/cca_ros_util.hpp>
+#include <cca_ros_util/cca_ros_util.hpp>
 
 namespace cca_ros_behavior_util
 {
@@ -73,7 +73,7 @@ public:
      *  3. Converts the request into a text log using
      *     `cca_ros_util::log_cca_planning_request()`.
      *  4. Delegates file-writing to
-     *     `cca_ros_util::log_planning_request_to_file()`.
+     *     `cca_ros_util::log_cca_planning_request_to_file()`.
      *
      * @return BT::NodeStatus::SUCCESS upon successful completion.
      *
@@ -106,7 +106,7 @@ public:
         std::shared_ptr<cca_ros::PlanningRequest> req = req_expected.value();
 
         // Log using utility function
-        cca_ros_util::log_planning_request_to_file(*req, filepath);
+        cca_ros_util::log_cca_planning_request_to_file(*req, filepath);
 
         return BT::NodeStatus::SUCCESS;
     }
@@ -166,7 +166,7 @@ public:
      *  1. Retrieves the output file path.
      *  2. Retrieves the vector of PlanningRequests.
      *  3. Delegates log generation + file writing to
-     *     `cca_ros_util::log_planning_requests_to_file()`.
+     *     `cca_ros_util::log_cca_planning_requests_to_file()`.
      *
      * Each entry in the result file is delineated using this format:
      *
@@ -211,7 +211,7 @@ public:
             reqs_expected.value();
 
         // Log using utility function
-        cca_ros_util::log_planning_requests_to_file(*reqs, filepath);
+        cca_ros_util::log_cca_planning_requests_to_file(*reqs, filepath);
 
         return BT::NodeStatus::SUCCESS;
     }
