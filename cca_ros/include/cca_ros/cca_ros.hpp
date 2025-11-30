@@ -68,9 +68,9 @@ using FollowJointTrajectoryGoal = control_msgs::action::FollowJointTrajectory_Go
 * @brief Struct containing execution action clients.
 */
 struct ExecutionActionClients{
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr robot; /**< Client for executing robot trajectory.*/
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr gripper; /**< Client for executing gripper trajectory. */
-    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr robot_and_gripper;     /**< Client for executing robot and gripper trajectory together. */
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr robot{nullptr}; /**< Client for executing robot trajectory.*/
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr gripper{nullptr}; /**< Client for executing gripper trajectory. */
+    rclcpp_action::Client<FollowJointTrajectory>::SharedPtr robot_and_gripper{nullptr};     /**< Client for executing robot and gripper trajectory together. */
 };
 
 /**
@@ -267,7 +267,8 @@ class CcaRos : public rclcpp::Node
     void cancel_execution();
 
     /**
-    * @brief Retrieves the Cca planning group information map from ROS parameters.
+    * @brief Retrieves the Cca planning group information map from ROS parameters. Note that this function does not initialize execution action clients in the 
+    * planning group info. That should be done outside using the CcaRos node context.
     *
     * @param node_ptr Pointer to the ROS node.
     *
