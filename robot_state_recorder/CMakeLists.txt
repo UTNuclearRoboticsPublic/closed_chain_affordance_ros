@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ros_cpp_util REQUIRED)
+find_package(cca_ros REQUIRED)
 
 # Non-ROS libraries
 find_package(Eigen3 REQUIRED )
@@ -23,7 +24,7 @@ include_directories(
 )
 
 add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp trajectory_msgs sensor_msgs ros_cpp_util)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp trajectory_msgs sensor_msgs ros_cpp_util cca_ros)
 target_link_libraries(${PROJECT_NAME}_node affordance_util::affordance_util Eigen3::Eigen)
 install(TARGETS
   ${PROJECT_NAME}_node
