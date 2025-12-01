@@ -43,13 +43,10 @@ class JointTrajAndTfRecorder
                           const affordance_util::RobotConfig &robot_config, 
                           const std::string &as_server_name, 
                           const std::string& joint_states_topic,
-                          const std::string& recorder_name) 
-        : node_(node), recorder_name_(recorder_name)
+                          const std::string& recorder_name,
+			  const std::string& output_dir) 
+        : node_(node), recorder_name_(recorder_name), output_dir_(output_dir)
     {
-        // Get abs path to the directory where we will save data
-        const std::string rel_data_save_path = "/../data/";
-        abs_data_save_path_ = ros_cpp_util::get_abs_path_to_rel_dir(__FILE__, rel_data_save_path);
-
         // Subscribers
         follow_joint_traj_sub_ = node_->create_subscription<trajectory_msgs::msg::JointTrajectory>(
             as_server_name + "/goal", 1000,
@@ -109,7 +106,7 @@ class JointTrajAndTfRecorder
     bool cb_called_ = false;
     bool joint_states_ready_ = false;
     // Other variables
-    std::string abs_data_save_path_;
+    std::string output_dir_;
 
     // Function to handle cleanup on signal interruption
     void cleanup_post_interruption_()
@@ -172,7 +169,7 @@ class JointTrajAndTfRecorder
     {
         const std::string timestamp = std::to_string(node_->now().nanoseconds());
         const std::string filename = "pred_tf_and_joint_states_data_" + recorder_name_ + "_" + timestamp + ".csv";
-        const std::string filepath = abs_data_save_path_ + filename;
+        const std::string filepath = output_dir_ + filename;
 
         // Open a CSV file for writing
         std::ofstream csvFile(filepath);
@@ -228,7 +225,7 @@ class JointTrajAndTfRecorder
 
         const std::string timestamp = std::to_string(node_->now().nanoseconds());
         const std::string filename = "act_tf_and_joint_states_data_" + recorder_name_ + "_" + timestamp + ".csv";
-        const std::string filepath = abs_data_save_path_ + filename;
+        const std::string filepath = output_dir_ + filename;
 
         // Open a CSV file for writing
         std::ofstream csvFile(filepath);
@@ -323,6 +320,23 @@ struct JointTrajAndTfRecorderSet{
     std::unique_ptr<JointTrajAndTfRecorder> robot_and_gripper;
 };
 
+void validate_output_directory(const std::string &dir_str)
+{
+    std::filesystem::path dir(dir_str);
+    
+    // Must exist
+    if (!std::filesystem::exists(dir)) {
+	throw std::runtime_error(
+	    "Recorder directory does not exist: " + dir.string());
+    }
+    
+    // Must be a directory
+    if (!std::filesystem::is_directory(dir)) {
+	throw std::runtime_error(
+	    "Recorder path is not a directory: " + dir.string());
+    }
+}
+
 } // namespace robot_state_recorder
 
 int main(int argc, char **argv)
@@ -335,7 +349,11 @@ int main(int argc, char **argv)
     // Extract planning group info including robot config and action server names for various planning groups
     const std::unordered_map<std::string, cca_ros::PlanningGroupInfo> planning_group_info_map = 
         cca_ros::CcaRos::get_planning_group_info_map(node_weak_ptr);
+    // Extract joint states topic
     const std::string joint_states_topic = ros_cpp_util::get_required_str_param(node_weak_ptr, "cca_joint_states_topic");
+    // Extract and validate output directory
+    const std::string output_dir = ros_cpp_util::get_required_str_param(node_weak_ptr, "output_dir");
+    robot_state_recorder::validate_output_directory(output_dir);
     
     // Create recorder map
     std::unordered_map<std::string, robot_state_recorder::JointTrajAndTfRecorderSet> planning_group_recorder_map;
@@ -350,7 +368,8 @@ int main(int argc, char **argv)
                 pg_info.robot_config,
                 pg_info.ex_as_names.robot,
                 joint_states_topic,
-                pg_name + "_robot");
+                pg_name + "_robot", 
+		output_dir);
         }
         
         if (!pg_info.ex_as_names.gripper.empty()) {
@@ -360,7 +379,8 @@ int main(int argc, char **argv)
                 pg_info.robot_config,
                 pg_info.ex_as_names.gripper,
                 joint_states_topic,
-                pg_name + "_gripper");
+                pg_name + "_gripper", 
+		output_dir);
         }
         
         if (!pg_info.ex_as_names.robot_and_gripper.empty()) {
@@ -370,7 +390,8 @@ int main(int argc, char **argv)
                 pg_info.robot_config,
                 pg_info.ex_as_names.robot_and_gripper,
                 joint_states_topic,
-                pg_name + "_robot_and_gripper");
+                pg_name + "_robot_and_gripper",
+		output_dir);
         }
         
         planning_group_recorder_map[pg_name] = std::move(set);
