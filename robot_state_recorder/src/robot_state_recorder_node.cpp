@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
+#include <rclcpp/node.hpp>
 #include <ros_cpp_util/ros_cpp_util.hpp>
 #include <condition_variable>
 #include <csignal>
@@ -18,6 +19,8 @@
 #include <string>
 #include <thread>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <cca_ros/cca_ros.hpp>
+#include <unordered_map>
 /*
 Author: Crasun Jans
 */
@@ -29,32 +32,29 @@ static bool g_exit_flag = false; // signal to shutdown ROS on ctrl+c
 static void signal_callback_handler([[maybe_unused]] int signum) { g_exit_flag = true; }
 
 /****************** EOF Signal handling ****************************/
+
+namespace robot_state_recorder{
+
 /***** Joint Trajectory and EE TF Recorder class ******************/
-class JointTrajAndTfRecorder : public rclcpp::Node
+class JointTrajAndTfRecorder
 {
   public:
-    JointTrajAndTfRecorder(const std::string &robot_config_file_path, const std::string &as_server_name)
-        : Node("robot_state_recorder_node")
+    JointTrajAndTfRecorder(std::shared_ptr<rclcpp::Node> node, const std::string &robot_config, const std::string &as_server_name, const std::string& joint_states_topic) : node_(node)
     {
 
         // Subscribers
-        follow_joint_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+        follow_joint_traj_sub_ = node_->create_subscription<trajectory_msgs::msg::JointTrajectory>(
             as_server_name + "/goal", 1000,
-            std::bind(&JointTrajAndTfRecorder::follow_joint_traj_sub_cb_, this, std::placeholders::_1));
-        joint_states_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-            "/spot_driver/joint_states", 1000,
-            std::bind(&JointTrajAndTfRecorder::joint_states_cb_, this, std::placeholders::_1));
-
-        // Get abs path to the directory where we will save data
-        const std::string rel_data_save_path = "/../data/";
-        abs_data_save_path_ = ros_cpp_util::get_abs_path_to_rel_dir(__FILE__, rel_data_save_path);
+            std::bind(&JointTrajAndTfRecorder::follow_joint_traj_sub_cb_, node_, std::placeholders::_1));
+        joint_states_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
+            joint_states_topic, 1000,
+            std::bind(&JointTrajAndTfRecorder::joint_states_cb_, node_, std::placeholders::_1));
 
         // Extract robot config info
-        const affordance_util::RobotConfig &robotConfig = affordance_util::robot_builder(robot_config_file_path);
-        slist_ = robotConfig.Slist;
-        joint_names_ = robotConfig.joint_names.robot;
-        M_ = robotConfig.M;
-        tool_name_ = robotConfig.frame_names.tool;
+        slist_ = robot_config.Slist;
+        joint_names_ = robot_config.joint_names.robot;
+        M_ = robot_config.M;
+        tool_name_ = robot_config.frame_names.tool;
 
         // Concurrently, while writing predicted data, we'll write actual data as
         // well, because while predicted data is being written, action server is
@@ -73,6 +73,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
   private:
     // ROS variables
+    rclcpp::Node::SharedPtr node_;
     rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr follow_joint_traj_sub_;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
     ros_cpp_util::JointTrajPoint joint_states_;
@@ -157,7 +158,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     void write_pred_data(const std::vector<ros_cpp_util::JointTrajPoint> &pred_traj_)
     {
 
-        const std::string timestamp = std::to_string(this->now().nanoseconds());
+        const std::string timestamp = std::to_string(node_->now().nanoseconds());
         const std::string filename = "pred_tf_and_joint_states_data_" + timestamp +".csv";
         const std::string filepath = abs_data_save_path_ + filename;
 
@@ -215,7 +216,7 @@ class JointTrajAndTfRecorder : public rclcpp::Node
 
         rclcpp::Rate loop_rate(10); // Rate for the writing loop
 
-        const std::string timestamp = std::to_string(this->now().nanoseconds());
+        const std::string timestamp = std::to_string(node_->now().nanoseconds());
         const std::string filename = "act_tf_and_joint_states_data_" + timestamp +".csv";
         const std::string filepath = abs_data_save_path_ + filename;
 
@@ -304,19 +305,53 @@ class JointTrajAndTfRecorder : public rclcpp::Node
     }
 };
 /***** EOF Joint Trajectory and EE TF Recorder class *************/
+
+struct JointTrajAndTfRecorderSet{
+    JointTrajAndTfRecorder robot;
+    JointTrajAndTfRecorder gripper;
+    JointTrajAndTfRecorder robot_and_gripper;
+};
+}
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
-    // Furnish the filepath where the robot config yaml file is located and
-    // supply the action server name whose goal to listen to
-    const std::string package_name = "cca_spot";
-    const std::string rel_dir = "/config/";                          // relative directory where yaml file is located
-    const std::string filename = package_name + "_description.yaml"; // yaml file name
-    const std::string robot_config_file_path =
-        ros_cpp_util::get_filepath_inside_pkg(package_name, rel_dir, filename);
-    const std::string as_server_name = "/arm_controller/follow_joint_trajectory";
-    auto node = std::make_shared<JointTrajAndTfRecorder>(robot_config_file_path, as_server_name);
+    auto node = std::make_shared<rclcpp::Node>("robot_state_recorder");
+    auto node_weak_ptr = node->get_node_base_interface();
+
+    // Extract planning group info including robot config and action server names for various planning groups
+    const std::unordered_map<std::string, cca_ros::PlanningGroupInfo> planning_group_info_map = cca_ros::CcaRos::get_planning_group_info_map(node_weak_ptr);
+    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(node_weak_ptr, "cca_joint_states_topic");
+    const std::unordered_map<std::string, robot_state_recorder::JointTrajAndTfRecorderSet> planning_group_recorder_map;
+
+    for (const auto& [pg_name, pg_info] : planning_group_info_map) {
+	robot_state_recorder::JointTrajAndTfRecorderSet set;
+        if (!pg_info.ex_as_names.robot.empty()) {
+	    // Initialize recorder for robot-only action server
+	    set.robot = JointTrajAndTfRecorder(
+		node,
+		pg_info.robot_config,
+		pg_info.ex_as_names.robot,
+		joint_states_topic);
+	}
+        if (!pg_info.ex_as_names.gripper.empty()) {
+	    // Initialize recorder for gripper-only action server
+	    set.gripper = JointTrajAndTfRecorder(
+		node,
+		pg_info.robot_config,
+		pg_info.ex_as_names.gripper,
+		joint_states_topic);
+	}
+	if (!pg_info.ex_as_names.robot_and_gripper.empty()) {
+	    // Initialize recorder for robot-and-gripper combined action server
+	    set.robot_and_gripper = JointTrajAndTfRecorder(
+		node,
+		pg_info.robot_config,
+		pg_info.ex_as_names.robot_and_gripper,
+		joint_states_topic);
+	}
+	planning_group_recorder_map[pg_name] = set;
+    }
 
     // Ctrl+c signal handling
     signal(SIGINT,
