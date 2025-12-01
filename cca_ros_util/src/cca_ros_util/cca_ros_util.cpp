@@ -350,6 +350,22 @@ std::string format_matrix4d(const Eigen::Matrix4d& mat, int precision = 4, int w
     return ss.str();
 }
 
+std::filesystem::path timestamp_filepath(const std::filesystem::path& filepath)
+{
+    // Timestamp
+    const auto now = std::chrono::system_clock::to_time_t(
+        std::chrono::system_clock::now());
+    std::stringstream ts;
+    ts << std::put_time(std::localtime(&now), "%Y%m%d_%H%M%S");
+
+    // Extract base and extension
+    const std::string base = filepath.stem().string();
+    const std::string ext  = filepath.extension().string();
+
+    // Construct: parent / (base + "_" + timestamp + ext)
+    return filepath.parent_path() / (base + "_" + ts.str() + ext);
+}
+
 } // namespace
 
 namespace cca_ros_util
@@ -630,14 +646,17 @@ std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerRe
 void log_cca_planning_request_to_file(const cca_ros::PlanningRequest& req,
                                   const std::filesystem::path& filepath)
 {
+    // Timestamp filepath for uniqueness
+    const std::filesystem::path ts_filepath = timestamp_filepath(filepath);
+    
     // Convert request to text
     std::stringstream ss = log_cca_planning_request(req);
 
     // Open output file (write + truncate)
-    std::ofstream out(filepath, std::ios::out | std::ios::trunc);
+    std::ofstream out(ts_filepath, std::ios::out | std::ios::trunc);
     if (!out.is_open())
     {
-        throw std::runtime_error("Failed to open file for writing: " + filepath.string());
+        throw std::runtime_error("Failed to open file for writing: " + ts_filepath.string());
     }
 
     // Stream buffer → file (efficient, avoids copying large strings)
@@ -648,11 +667,14 @@ void log_cca_planning_request_to_file(const cca_ros::PlanningRequest& req,
 void log_cca_planning_requests_to_file(const std::vector<cca_ros::PlanningRequest>& reqs,
                                    const std::filesystem::path& filepath)
 {
+    // Timestamp filepath for uniqueness
+    const std::filesystem::path ts_filepath = timestamp_filepath(filepath);
+
     // Open output file (write + truncate)
-    std::ofstream out(filepath, std::ios::out | std::ios::trunc);
+    std::ofstream out(ts_filepath, std::ios::out | std::ios::trunc);
     if (!out.is_open())
     {
-        throw std::runtime_error("Failed to open file for writing: " + filepath.string());
+        throw std::runtime_error("Failed to open file for writing: " + ts_filepath.string());
     }
 
     // Combine all request logs into a single stringstream
