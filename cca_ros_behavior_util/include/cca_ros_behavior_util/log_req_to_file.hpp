@@ -28,8 +28,7 @@ namespace BT
  * @return Parsed filesystem path.
  */
 template<>
-inline std::optional<std::filesystem::path>
-convertFromString(StringView key)
+inline std::filesystem::path convertFromString(BT::StringView key)
 {
     std::string s = std::string(key);
 
