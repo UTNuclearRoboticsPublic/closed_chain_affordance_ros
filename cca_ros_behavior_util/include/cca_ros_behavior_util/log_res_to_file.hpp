@@ -69,6 +69,8 @@ namespace cca_ros_behavior_util
  * converts it into a log-formatted string representation using
  * `cca_ros_util::log_cca_planning_result()`, and logs the resulting
  * text into a file specified by the `output_path` input port.
+ * NOTE: Currently, this behavior only logs the cca_result portion of 
+ * the planning response.
  *
  * This is typically used for debugging or for storing input responses
  * for later offline analysis, verification, or regression testing.
