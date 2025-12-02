@@ -167,8 +167,8 @@ class JointTrajAndTfRecorder
     // Function to write predicted data to file
     void write_pred_data(const std::vector<ros_cpp_util::JointTrajPoint> &pred_traj_)
     {
-        const std::string timestamp = std::to_string(node_->now().nanoseconds());
-        const std::string filename = "pred_tf_and_joint_states_data_" + recorder_name_ + "_" + timestamp + ".csv";
+        const std::string file_timestamp = std::to_string(node_->now().nanoseconds());
+        const std::string filename = "pred_tf_and_joint_states_data_" + recorder_name_ + "_" + file_timestamp + ".csv";
         const std::string filepath = output_dir_ + filename;
 
         // Open a CSV file for writing
@@ -210,7 +210,7 @@ class JointTrajAndTfRecorder
             csvFile << ee_htm(0, 3) << "," << ee_htm(1, 3) << "," << ee_htm(2, 3) << ",";
             csvFile << ee_htm_or.x() << "," << ee_htm_or.y() << "," << ee_htm_or.z() << "," << ee_htm_or.w() << ",";
 
-            // Timestamp
+            // Timestamp(nanosecs)
             csvFile << pred_traj_point.timestamp << "\n";
         }
 
@@ -223,8 +223,8 @@ class JointTrajAndTfRecorder
     {
         rclcpp::Rate loop_rate(10); // Rate for the writing loop
 
-        const std::string timestamp = std::to_string(node_->now().nanoseconds());
-        const std::string filename = "act_tf_and_joint_states_data_" + recorder_name_ + "_" + timestamp + ".csv";
+        const std::string file_timestamp = std::to_string(node_->now().nanoseconds());
+        const std::string filename = "act_tf_and_joint_states_data_" + recorder_name_ + "_" + file_timestamp + ".csv";
         const std::string filepath = output_dir_ + filename;
 
         // Open a CSV file for writing
@@ -297,7 +297,7 @@ class JointTrajAndTfRecorder
             csvFile << ee_htm(0, 3) << "," << ee_htm(1, 3) << "," << ee_htm(2, 3) << ",";
             csvFile << ee_htm_or.x() << "," << ee_htm_or.y() << "," << ee_htm_or.z() << "," << ee_htm_or.w() << ",";
 
-            // Write timestamp to file
+            // Write timestamp(nanosecs) to file
             csvFile << joint_states_copy.timestamp << "\n";
 
             // Sleep
