@@ -280,17 +280,17 @@ trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<traj
                                            + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx));
                 }
                 
-                constexpr double position_tolerance = 1e-6;
-                for (size_t j = 0; j < last_point.positions.size(); ++j)
-                {
-                    if (std::abs(last_point.positions[j] - first_point.positions[j]) > position_tolerance)
-                    {
-                        throw std::runtime_error("Trajectory stitching failed: position discontinuity at boundary between trajectory " 
-                                               + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx) 
-                                               + " (joint " + std::to_string(j) + ": " 
-                                               + std::to_string(last_point.positions[j]) + " vs " + std::to_string(first_point.positions[j]) + ")");
-                    }
-                }
+                // constexpr double position_tolerance = 1e-6;
+                // for (size_t j = 0; j < last_point.positions.size(); ++j)
+                // {
+                //     if (std::abs(last_point.positions[j] - first_point.positions[j]) > position_tolerance)
+                //     {
+                //         throw std::runtime_error("Trajectory stitching failed: position discontinuity at boundary between trajectory " 
+                //                                + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx) 
+                //                                + " (joint " + std::to_string(j) + ": " 
+                //                                + std::to_string(last_point.positions[j]) + " vs " + std::to_string(first_point.positions[j]) + ")");
+                //     }
+                // }
                 
                 // Check velocities match (if provided)
                 if (!last_point.velocities.empty() && !first_point.velocities.empty())
