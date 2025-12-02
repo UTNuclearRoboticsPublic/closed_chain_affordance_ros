@@ -53,6 +53,30 @@ cca_ros::PlanningRequest convert_cca_ros_action_to_req(const cca_ros_msgs::msg::
 cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::PlanningRequest &req);
 
 /**
+* @brief Logs the details of a CCA PlannerConfig object as a formatted string.
+*
+* Generates a detailed, human-readable representation of the provided
+* cc_affordance_planner::PlannerConfig object for debugging and logging purposes.
+*
+* @param planner_config The CCA PlannerConfig object to log.
+*
+* @return A std::stringstream containing the formatted log output.
+*/
+std::stringstream log_cca_planner_config(const cc_affordance_planner::PlannerConfig &planner_config);
+
+/**
+* @brief Logs the details of a CCA TaskDescription object as a formatted string.
+*
+* Generates a detailed, human-readable representation of the provided
+* cc_affordance_planner::TaskDescription object for debugging and logging purposes.
+*
+* @param task_description The CCA TaskDescription object to log.
+*
+* @return A std::stringstream containing the formatted log output.
+*/
+std::stringstream log_cca_task_description(const cc_affordance_planner::TaskDescription &task_description);
+
+/**
  * @brief Logs the details of a CCA PlanningRequest object as a formatted string.
  *
  * Generates a detailed, human-readable representation of the provided
@@ -114,6 +138,18 @@ void log_cca_planning_request_to_file(const cca_ros::PlanningRequest& req,
 void log_cca_planning_requests_to_file(const std::vector<cca_ros::PlanningRequest>& reqs,
                                    const std::filesystem::path& filepath);
 
+/**
+* @brief Writes a CCA PlannerResult to a specified file.
+*
+* Converts the provided PlannerResult into a textual log representation using
+* `log_cca_planning_result()` and writes the resulting content into the file
+* specified by @p filepath. Existing file contents are overwritten.
+*
+* @param res      The PlannerResult to serialize.
+* @param filepath Destination file path where the log will be written.
+*/
+void log_cca_planning_result_to_file(const cc_affordance_planner::PlannerResult& res,
+                                  const std::filesystem::path& filepath);
 } // namespace cca_ros_util
 
 #endif // CCA_ROS_UTIL_H

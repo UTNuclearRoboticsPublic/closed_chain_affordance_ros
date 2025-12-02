@@ -533,6 +533,61 @@ cca_ros_msgs::msg::PlanningRequest convert_req_to_cca_ros_action(const cca_ros::
 
     return msg;
 }
+std::stringstream log_cca_planner_config(const cc_affordance_planner::PlannerConfig &planner_config){
+
+    std::stringstream log;
+
+    log << "Planner Config:\n";
+    log << "  Accuracy: " << planner_config.accuracy << "\n";
+    log << "  Closure error threshold (angular): " << planner_config.closure_err_threshold_ang << "\n";
+    log << "  Closure error threshold (linear): " << planner_config.closure_err_threshold_lin << "\n";
+    log << "  IK max iterations: " << planner_config.ik_max_itr << "\n";
+    log << "  Update method: " << update_method_to_string(planner_config.update_method) << "\n";
+
+    return log;
+}
+
+std::stringstream log_cca_task_description(const cc_affordance_planner::TaskDescription &task_description){
+
+    std::stringstream log;
+
+    // Affordance Info
+    log << "Task Description - Affordance Info:\n";
+    log << "  Type: " << screw_type_to_string(task_description.affordance_info.type) << "\n";
+    log << "  Axis: " << task_description.affordance_info.axis.transpose() << "\n";
+    log << "  Location: " << task_description.affordance_info.location.transpose() << "\n";
+    log << "  Screw: " << task_description.affordance_info.screw.transpose() << "\n";
+    log << "  Pitch: " << task_description.affordance_info.pitch << "\n";
+
+    // Affordance Info - From
+    log << "  From Method: " << pose_specification_method_to_string(task_description.affordance_info_from.method) << "\n";
+    log << "  From Frame Name: " << task_description.affordance_info_from.frame_name << "\n";
+    log << "  From Post Transform:\n" << format_matrix4d(task_description.affordance_info_from.post_transform) << "\n";
+    log << "  Axis in Final Pose: " << task_description.affordance_info_from.axis_in_final_pose.transpose() << "\n";
+
+    // Canonical Pose From
+    log << "Canonical Pose From:\n";
+    log << "  Method: " << pose_specification_method_to_string(task_description.canonical_pose_from.method) << "\n";
+    log << "  Frame Name: " << task_description.canonical_pose_from.frame_name << "\n";
+    log << "  Post Transform:\n" << format_matrix4d(task_description.canonical_pose_from.post_transform) << "\n";
+
+    // Task Description - Goal
+    log << "Task Description - Goal:\n";
+    log << "  Affordance: " << task_description.goal.affordance << "\n";
+    log << "  EE Orientation: " << task_description.goal.ee_orientation.transpose() << "\n";
+    log << "  Canonical Pose:\n" << format_matrix4d(task_description.goal.canonical_pose) << "\n";
+    log << "  Gripper: " << task_description.goal.gripper << "\n";
+
+    // Task Description - Other Fields
+    log << "  Trajectory Density: " << task_description.trajectory_density << "\n";
+    log << "  Motion Type: " << motion_type_to_string(task_description.motion_type) << "\n";
+    log << "  Virtual Screw Order: " << virtual_screw_order_to_string(task_description.vir_screw_order) << "\n";
+    log << "  Gripper Goal Type: " << gripper_goal_type_to_string(task_description.gripper_goal_type) << "\n";
+    log << "  Ee Orientation Constraint: " << ee_orientation_constraint_to_string(task_description.ee_orientation_constraint) << "\n";
+
+    return log;
+
+}
 
 // Logs a cca ros planning request
 std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
@@ -545,46 +600,10 @@ std::stringstream log_cca_planning_request(const cca_ros::PlanningRequest &req)
     log << "Planning Group: " << req.planning_group << "\n";
 
     // Planner Config
-    log << "Planner Config:\n";
-    log << "  Accuracy: " << req.planner_config.accuracy << "\n";
-    log << "  Closure error threshold (angular): " << req.planner_config.closure_err_threshold_ang << "\n";
-    log << "  Closure error threshold (linear): " << req.planner_config.closure_err_threshold_lin << "\n";
-    log << "  IK max iterations: " << req.planner_config.ik_max_itr << "\n";
-    log << "  Update method: " << update_method_to_string(req.planner_config.update_method) << "\n";
+    log << log_cca_planner_config(req.planner_config).str() << "\n";
 
-    // Task Description - Affordance Info
-    log << "Task Description - Affordance Info:\n";
-    log << "  Type: " << screw_type_to_string(req.task_description.affordance_info.type) << "\n";
-    log << "  Axis: " << req.task_description.affordance_info.axis.transpose() << "\n";
-    log << "  Location: " << req.task_description.affordance_info.location.transpose() << "\n";
-    log << "  Screw: " << req.task_description.affordance_info.screw.transpose() << "\n";
-    log << "  Pitch: " << req.task_description.affordance_info.pitch << "\n";
-
-    // Affordance Info - From
-    log << "  From Method: " << pose_specification_method_to_string(req.task_description.affordance_info_from.method) << "\n";
-    log << "  From Frame Name: " << req.task_description.affordance_info_from.frame_name << "\n";
-    log << "  From Post Transform:\n" << format_matrix4d(req.task_description.affordance_info_from.post_transform) << "\n";
-    log << "  Axis in Final Pose: " << req.task_description.affordance_info_from.axis_in_final_pose.transpose() << "\n";
-
-    // Canonical Pose From
-    log << "Canonical Pose From:\n";
-    log << "  Method: " << pose_specification_method_to_string(req.task_description.canonical_pose_from.method) << "\n";
-    log << "  Frame Name: " << req.task_description.canonical_pose_from.frame_name << "\n";
-    log << "  Post Transform:\n" << format_matrix4d(req.task_description.canonical_pose_from.post_transform) << "\n";
-
-    // Task Description - Goal
-    log << "Task Description - Goal:\n";
-    log << "  Affordance: " << req.task_description.goal.affordance << "\n";
-    log << "  EE Orientation: " << req.task_description.goal.ee_orientation.transpose() << "\n";
-    log << "  Canonical Pose:\n" << format_matrix4d(req.task_description.goal.canonical_pose) << "\n";
-    log << "  Gripper: " << req.task_description.goal.gripper << "\n";
-
-    // Task Description - Other Fields
-    log << "  Trajectory Density: " << req.task_description.trajectory_density << "\n";
-    log << "  Motion Type: " << motion_type_to_string(req.task_description.motion_type) << "\n";
-    log << "  Virtual Screw Order: " << virtual_screw_order_to_string(req.task_description.vir_screw_order) << "\n";
-    log << "  Gripper Goal Type: " << gripper_goal_type_to_string(req.task_description.gripper_goal_type) << "\n";
-    log << "  Ee Orientation Constraint: " << ee_orientation_constraint_to_string(req.task_description.ee_orientation_constraint) << "\n";
+    // Task Description
+    log << log_cca_task_description(req.task_description).str() << "\n";
 
     // Start State
     log << "Start State:\n";
@@ -610,6 +629,9 @@ std::stringstream log_cca_planning_result(const cc_affordance_planner::PlannerRe
     
     // Success status
     log << "  Success: " << (res.success ? "true" : "false") << "\n";
+
+    // Task description
+    log << log_cca_task_description(res.task_description).str() << "\n";
     
     // Trajectory description
     log << "  Trajectory description: " << trajectory_description_to_string(res.trajectory_description) << "\n";
@@ -688,6 +710,26 @@ void log_cca_planning_requests_to_file(const std::vector<cca_ros::PlanningReques
     }
 
     // Write aggregated logs
+    out << ss.rdbuf();
+}
+
+void log_cca_planning_result_to_file(const cc_affordance_planner::PlannerResult& res,
+                                  const std::filesystem::path& filepath)
+{
+    // Timestamp filepath for uniqueness
+    const std::filesystem::path ts_filepath = timestamp_filepath(filepath);
+    
+    // Convert result to text
+    std::stringstream ss = log_cca_planning_result(res);
+
+    // Open output file (write + truncate)
+    std::ofstream out(ts_filepath, std::ios::out | std::ios::trunc);
+    if (!out.is_open())
+    {
+        throw std::runtime_error("Failed to open file for writing: " + ts_filepath.string());
+    }
+
+    // Stream buffer → file (efficient, avoids copying large strings)
     out << ss.rdbuf();
 }
 
