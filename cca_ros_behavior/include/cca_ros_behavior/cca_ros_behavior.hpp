@@ -43,6 +43,8 @@ class CcaRosAction : public BT::StatefulActionNode
      * This action node requires one of the following input ports:
      * - "cca_planning_request" or "cca_planning_requests", both of which contain task description(s), optional planner
      * configuration(s), start state, and a shared pointer for monitoring status.
+     * The action node provides the following output port:
+     * - "cca_planning_response", shared pointer to the planning response from CcaRos.
      *
      * @return A list of input ports used by the action node.
      */

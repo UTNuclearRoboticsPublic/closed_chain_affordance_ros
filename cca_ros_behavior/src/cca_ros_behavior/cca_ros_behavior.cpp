@@ -16,7 +16,8 @@ BT::PortsList CcaRosAction::providedPorts()
 {
     // Define the ports required by this action node
     return {BT::InputPort<std::shared_ptr<cca_ros::PlanningRequest>>("cca_planning_request"),
-            BT::InputPort<std::shared_ptr<std::vector<cca_ros::PlanningRequest>>>("cca_planning_requests")};
+            BT::InputPort<std::shared_ptr<std::vector<cca_ros::PlanningRequest>>>("cca_planning_requests"),
+            BT::InputPort<std::shared_ptr<std::vector<cca_ros::PlanningResponse>>>("cca_planning_response")};
 }
 
 BT::NodeStatus CcaRosAction::onStart()
@@ -50,6 +51,8 @@ BT::NodeStatus CcaRosAction::onStart()
         status_ = response.status;
         if (!response.result.success)
         {
+            const auto response_ptr = std::make_shared<cca_ros::PlanningResponse>(response);
+            setOutput("cca_planning_response", response_ptr);
             return BT::NodeStatus::FAILURE; // Return failure if planning fails
         }
 
