@@ -158,6 +158,10 @@ JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::Cons
 
     // Extract and set the timestamp as well
     ordered_joint_states.timestamp = joint_states->header.stamp.sec;
+    // Extract and set the timestamp as well (combine seconds and nanoseconds)
+    ordered_joint_states.timestamp = 
+        static_cast<uint64_t>(joint_states->header.stamp.sec) * 1000000000ULL + 
+        static_cast<uint64_t>(joint_states->header.stamp.nanosec);
 
     return ordered_joint_states;
 }

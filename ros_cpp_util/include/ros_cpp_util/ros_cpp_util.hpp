@@ -82,7 +82,7 @@ std::string get_filepath_inside_pkg(const std::string &package_name, const std::
 struct JointTrajPoint
 {
     Eigen::VectorXd positions;
-    int timestamp; // In seconds
+    uint64_t timestamp; // In nanoseconds
 };
 
 /**
