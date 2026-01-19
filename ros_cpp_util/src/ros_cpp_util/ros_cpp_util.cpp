@@ -280,6 +280,7 @@ trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<traj
                                            + std::to_string(traj_idx - 1) + " and " + std::to_string(traj_idx));
                 }
                 
+                // TODO: Uncomment and allow position discontinuities for desired joints (like gripper)
                 // constexpr double position_tolerance = 1e-6;
                 // for (size_t j = 0; j < last_point.positions.size(); ++j)
                 // {
