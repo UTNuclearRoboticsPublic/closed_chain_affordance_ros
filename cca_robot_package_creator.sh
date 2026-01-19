@@ -40,12 +40,12 @@ cat << EOF > $package_name/config/cca_${robot_name}_description.yaml
     # Core robot parameters
     # ----------------------------------------------------------
 
-    cca_robot: "<robot name, e.g., 'spot'>"
-    cca_joint_states_topic: "<topic to read joint states from, e.g., '/spot_driver/joint_states'>"
-    rviz_fixed_frame: "<first frame in the URDF, e.g., 'base_footprint'>"
+    cca_robot: "${robot_name}" # Robot name (package typically named cca_<robot>)
+    cca_joint_states_topic: # Example: "/spot_driver/joint_states" # Topic to read joint states from
+    rviz_fixed_frame: # Example: "base_footprint" # First frame in the URDF, used for visualization
 
     # List of planning groups that will be loaded
-    cca_planning_groups: ["<group_name1, e.g., 'arm'>", "<group_name2, e.g., 'mobile_body_and_arm'>"] # Groups representing desired kinematic chains for planning
+    cca_planning_groups: # Example: ["arm", "mobile_body_and_arm"] # Groups representing desired kinematic chains for planning. Match names in MoveIt SRDF.
 
     # ----------------------------------------------------------
     # Configuration for each planning group
@@ -55,48 +55,48 @@ cat << EOF > $package_name/config/cca_${robot_name}_description.yaml
       # -----------------------------
       # Planning group 1
       # -----------------------------
-      <group_name1, e.g., 'arm'>:
-        ref_frame: "<reference frame for this planning group, e.g., 'arm0_base_link'>"
+      arm: # Must match an entry in cca_planning_groups, arm is just an example
+        ref_frame: # Example: "arm0_base_link" # Reference frame for this planning group
 
         kinematic_chain:
-          base_joint: "<base joint of the kinematic chain, e.g., 'arm0_shoulder_yaw'>"
-          end_joint: "<end joint of the kinematic chain, e.g., 'arm0_wrist_roll'>"
+          base_joint: # Example: "arm0_shoulder_yaw" # Base joint of the kinematic chain
+          end_joint: # Example: "arm0_wrist_roll" # End joint of the kinematic chain
 
         end_effector:
-          frame: "<end-effector frame, e.g., 'arm0_wrist_roll'>"
-          gripper_joint_name: "<gripper joint name, e.g., 'arm0_fingers'>"
+          frame: # Example: "arm0_wrist_roll" # End-effector frame
+          gripper_joint_name: # Example: "arm0_fingers" # Gripper joint name
 
         tool:
-          frame: "<tool frame representing robot palm, e.g., 'cca_arm_tool_frame'>"
-          offset_from_ee_frame: "<location of tool relative to EE frame, e.g., [0.19557, 0.0, 0.0]>"
+          frame: # Example: "cca_arm_tool_frame" # Tool frame representing robot palm (must NOT exist in URDF)
+          offset_from_ee_frame: # Example: [0.19557, 0.0, 0.0] # Tool location expressed in EE frame
 
-        # Action servers for execution (robot or robot_and_gripper must be specified)
-        robot_as: "<robot-only action server, e.g., '/spot_moveit/arm_controller/follow_joint_trajectory'>"
-        gripper_as: "<gripper-only action server, e.g., '/spot_moveit/finger_controller/follow_joint_trajectory'>"
-        robot_and_gripper_as: "<robot+gripper action server, e.g., '/spot_moveit/arm_and_finger_controller/follow_joint_trajectory'>"
+        # Action servers for execution (robot OR robot_and_gripper must be specified. OK to leave others blank)
+        robot_as: # Example: "/spot_moveit/arm_controller/follow_joint_trajectory" # To execute Robot-only trajectory
+        gripper_as: # Example: "/spot_moveit/finger_controller/follow_joint_trajectory" # To execute Gripper-only trajectory
+        robot_and_gripper_as: # Example: "/spot_moveit/arm_and_finger_controller/follow_joint_trajectory" # Robot and gripper trajectory
 
       # -----------------------------
       # Planning group 2
       # -----------------------------
-      <group_name2, e.g., 'mobile_body_and_arm'>:
-        ref_frame: "<reference frame for this planning group, e.g., 'base_footprint'>"
+      mobile_body_and_arm: # Must match an entry in cca_planning_groups, mobile_body_and_arm is just an example
+        ref_frame: # Example: "base_footprint" # Reference frame for this planning group
 
         kinematic_chain:
-          base_joint: "<base joint of the kinematic chain, e.g., 'body_x'>"
-          end_joint: "<end joint of the kinematic chain, e.g., 'arm0_wrist_roll'>"
+          base_joint: # Example: "body_x" # Base joint of the kinematic chain
+          end_joint: # Example: "arm0_wrist_roll" # End joint of the kinematic chain
 
         end_effector:
-          frame: "<end-effector frame, e.g., 'arm0_wrist_roll'>"
-          gripper_joint_name: "<gripper joint name, e.g., 'arm0_fingers'>"
+          frame: # Example: "arm0_wrist_roll" # End-effector frame
+          gripper_joint_name: # Example: "arm0_fingers" # Gripper joint name
 
         tool:
-          frame: "<tool frame representing robot palm, e.g., 'cca_arm_tool_frame'>"
-          offset_from_ee_frame: "<location of tool relative to EE frame, e.g., [0.19557, 0.0, 0.0]>"
+          frame: # Example: "cca_arm_tool_frame" # Tool frame representing robot palm (must NOT exist in URDF)
+          offset_from_ee_frame: # Example: [0.19557, 0.0, 0.0] # Tool location expressed in EE frame
 
-        # Action servers for execution (robot or robot_and_gripper must be specified)
-        robot_as: "<robot-only action server, e.g., '/spot_moveit/body_controller/follow_joint_trajectory'>"
-        gripper_as: "<gripper-only action server, e.g., '/spot_moveit/finger_controller/follow_joint_trajectory'>"
-        robot_and_gripper_as: "<full body+gripper action server, e.g., '/spot_moveit/mobile_manipulation_controller/follow_joint_trajectory'>"
+        # Action servers for execution (robot OR robot_and_gripper must be specified. OK to leave others blank)
+        robot_as: # Example: "/spot_moveit/body_controller/follow_joint_trajectory" # To execute Robot-only trajectory
+        gripper_as: # Example: "/spot_moveit/finger_controller/follow_joint_trajectory" # To execute Gripper-only trajectory
+        robot_and_gripper_as: # Example: "/spot_moveit/mobile_manipulation_controller/follow_joint_trajectory" # Robot and gripper trajectory
 EOF
 
 # Create the task execution launch file
@@ -474,7 +474,7 @@ EOF
 
 # In the above file replace ${robot_name} which was read as literal due to 'EOF' with the value of that variable
 sed -i "s/\${robot_name}/$robot_name/g" \
-    $package_name/launch/cca_${robot_name}_viz.launch.py
+    $package_name/launch/cca_${robot_name}_val_and_viz.launch.py
 
 # Create the python module that houses robot-related settings such as CCA ros-setup, robot description, etc.
 cat << 'EOF' > $package_name/launch/cca_${robot_name}_settings.py
