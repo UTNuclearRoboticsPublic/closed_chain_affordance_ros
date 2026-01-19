@@ -54,12 +54,9 @@ A user-friendly Rviz plugin is also available and enables visual trajectory plan
    ```
 
 2. Configure the generated package:
-   - Complete the following configuration files in the `config/` folder:
-   
-       - **`cca_<robot>_description.yaml`** – Contains info about the robot kinematic chain.  
-       - **`cca_<robot>_ros_setup.yaml`** – Contains ROS-related info pertaining to the robot.  
-       - **`cca_<robot>_ros_viz_setup.yaml`** – Configures visualization settings for displaying the robot and its planned trajectories in RViz.  
-     Each file contains inline comments with detailed instructions for customization.
+   - Complete the **`config/cca_<robot>_description.yaml`** file, which contains information about the robot kinematic chain, planning group, relevant action servers, etc. 
+   - Complete the **`launch/cca_<robot>_settings.py`** module by providing information about how to generate robot description and robot description semantic parameters.
+     Inline comments provide detailed guidance on filling out these files.
    
    - For programmatic trajectory planning and execution, implement task (affordance) details in `cca_<robot>_node.cpp`. Alternatively, you may use the [Rviz plugin](#interactive-rviz-plugin-planning) for interactive planning.
 
@@ -81,7 +78,7 @@ To plan without a physical robot, simply provide `joint_states` and TF data.
 
 1. Launch trajectory visualization server:
    ```bash
-   ros2 launch cca_<robot> cca_<robot>_viz.launch.py
+   ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py
    ```
 
 2. Run the planner for defined tasks:
@@ -98,7 +95,7 @@ To plan without a physical robot, simply provide `joint_states` and TF data.
 
 2. Launch Rviz with the interactive planning plugin:
    ```bash
-   ros2 launch cca_<robot> cca_<robot>_viz.launch.py
+   ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py
    ```
 
 ## Author
