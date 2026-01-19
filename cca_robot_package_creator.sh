@@ -32,111 +32,71 @@ rm -rf $package_name/include
 
 # Create the description file
 cat << EOF > $package_name/config/cca_${robot_name}_description.yaml
-# **Info for the ${robot_name} robot to build description from this yaml** #
-# If a URDF is available, use cca_${robot_name}_urdf.yaml instead.
-# Define the reference frame, joint axes, their locations, and the tool's position.
-# Add or remove joint fields as needed to accurately represent the robot.
-ref_frame:
-  - name: # Example: arm0_base_link
-
-robot_joints:
-  - name: # Example: arm0_shoulder_roll 
-    w: # Example: [0, 0, 1]
-    q: # Example: [0, 0, 0]
-
-  - name: 
-    w: 
-    q: 
-
-  - name: 
-    w: 
-    q: 
-
-  - name: 
-    w: 
-    q: 
-
-  - name: 
-    w: 
-    q: 
-
-  - name: 
-    w: 
-    q: 
-
-end_effector:
-  - gripper_joint_name: 
-    frame_name: # This will be the parent frame for the tool
-    q: 
-
-tool:
-  - name: # This is usually at the center of the palm
-    offset_from_ee_frame: # Tool location from EE frame
-EOF
-
-# Create the description file
-cat << EOF > $package_name/config/cca_${robot_name}_urdf.yaml
-# **Info for the ${robot_name} robot to build description from URDF** #
-# Provide the reference frame, kinematic chain, end effector and tool info.
-ref_frame:
-  - name: # Example: base_link
-
-kinematic_chain:
-  - base_joint_name: # Example: joint_1
-    end_joint_name: # Example: joint_6
-
-end_effector:
-  - frame_name: # Example: ee_link
-    gripper_joint_name: # Example: joint_6 # Unused but provide one valid joint name
-
-tool: # This does not have to be in the URDF, and is usually located at the center of the palm.
-  - name: # Example: robot_tool 
-    offset_from_ee_frame: # Example: [0.0, 0.0, 0.02] # Tool location in the EE frame
-EOF
-
-# Create the ROS setup file
-cat << EOF > $package_name/config/cca_${robot_name}_ros_setup.yaml
-# *** ROS-related attributes pertaining to ${robot_name} *** #
-
-/**:
-  ros__parameters:
-    # --- Robot Name ---
-    cca_robot: "${robot_name}" # Robot name. This package must be named cca_${robot_name}
-
-    # --- Action Servers - follow_joint_trajectory types---
-    cca_robot_as: # To execute joint trajectory on the robot
-
-    # cca_gripper_as: # To execute gripper trajectory on the robot. Goal will be sent simultaneously with the robot trajectory but separately. #Optional
-
-    # cca_robot_and_gripper_as: # To execute robot and gripper trajectory together on the robot. One unified trajectory is sent. #Optional
-
-    # --- Joint states topic ---
-    cca_joint_states_topic: # Topic to read joint states from
-
-    # --- How to build the robot ---
-    cca_build_robot_from: # Possible values are "yaml" or "urdf"
-EOF
-
-# Create the ROS Viz setup file
-cat << EOF > $package_name/config/cca_${robot_name}_ros_viz_setup.yaml
-# *** ROS-related attributes pertaining to ${robot_name} for visualization of joint trajectories *** #
-
+# **Kinematic and ROS-Setup Info for the ${robot_name} robot** #
 /**:
   ros__parameters:
 
-    joint_states_topic: # Joint states topic name. Example: "robot_driver/joint_states"
+    # ----------------------------------------------------------
+    # Core robot parameters
+    # ----------------------------------------------------------
 
-    planning_group: # MoveIt planning group name
+    cca_robot: "<robot name, e.g., 'spot'>"
+    cca_joint_states_topic: "<topic to read joint states from, e.g., '/spot_driver/joint_states'>"
+    rviz_fixed_frame: "<first frame in the URDF, e.g., 'base_footprint'>"
 
-    ref_frame: # Default frame where the CCA planning plugin will show the screw interactive marker
+    # List of planning groups that will be loaded
+    cca_planning_groups: ["<group_name1, e.g., 'arm'>", "<group_name2, e.g., 'mobile_body_and_arm'>"] # Groups representing desired kinematic chains for planning
 
-    ee_frame: # End-effector frame
+    # ----------------------------------------------------------
+    # Configuration for each planning group
+    # ----------------------------------------------------------
+    cca_planning_group_info:
 
-    tool_frame: # Frame that follows the screw path for planning purposes
+      # -----------------------------
+      # Planning group 1
+      # -----------------------------
+      <group_name1, e.g., 'arm'>:
+        ref_frame: "<reference frame for this planning group, e.g., 'arm0_base_link'>"
 
-    ee_to_tool_offset: # Location of the tool in the EE frame. Example: [0.07805, 0.0008, -0.01772] 
+        kinematic_chain:
+          base_joint: "<base joint of the kinematic chain, e.g., 'arm0_shoulder_yaw'>"
+          end_joint: "<end joint of the kinematic chain, e.g., 'arm0_wrist_roll'>"
 
-    rviz_fixed_frame: # Base frame from the urdf
+        end_effector:
+          frame: "<end-effector frame, e.g., 'arm0_wrist_roll'>"
+          gripper_joint_name: "<gripper joint name, e.g., 'arm0_fingers'>"
+
+        tool:
+          frame: "<tool frame representing robot palm, e.g., 'cca_arm_tool_frame'>"
+          offset_from_ee_frame: "<location of tool relative to EE frame, e.g., [0.19557, 0.0, 0.0]>"
+
+        # Action servers for execution (robot or robot_and_gripper must be specified)
+        robot_as: "<robot-only action server, e.g., '/spot_moveit/arm_controller/follow_joint_trajectory'>"
+        gripper_as: "<gripper-only action server, e.g., '/spot_moveit/finger_controller/follow_joint_trajectory'>"
+        robot_and_gripper_as: "<robot+gripper action server, e.g., '/spot_moveit/arm_and_finger_controller/follow_joint_trajectory'>"
+
+      # -----------------------------
+      # Planning group 2
+      # -----------------------------
+      <group_name2, e.g., 'mobile_body_and_arm'>:
+        ref_frame: "<reference frame for this planning group, e.g., 'base_footprint'>"
+
+        kinematic_chain:
+          base_joint: "<base joint of the kinematic chain, e.g., 'body_x'>"
+          end_joint: "<end joint of the kinematic chain, e.g., 'arm0_wrist_roll'>"
+
+        end_effector:
+          frame: "<end-effector frame, e.g., 'arm0_wrist_roll'>"
+          gripper_joint_name: "<gripper joint name, e.g., 'arm0_fingers'>"
+
+        tool:
+          frame: "<tool frame representing robot palm, e.g., 'cca_arm_tool_frame'>"
+          offset_from_ee_frame: "<location of tool relative to EE frame, e.g., [0.19557, 0.0, 0.0]>"
+
+        # Action servers for execution (robot or robot_and_gripper must be specified)
+        robot_as: "<robot-only action server, e.g., '/spot_moveit/body_controller/follow_joint_trajectory'>"
+        gripper_as: "<gripper-only action server, e.g., '/spot_moveit/finger_controller/follow_joint_trajectory'>"
+        robot_and_gripper_as: "<full body+gripper action server, e.g., '/spot_moveit/mobile_manipulation_controller/follow_joint_trajectory'>"
 EOF
 
 # Create the task execution launch file
@@ -209,8 +169,9 @@ def generate_launch_description():
         launch_args=robot_args,
     )
 
-    # Get CCA ROS setup parameters for the robot
-    cca_robot_setup_params = settings["cca_robot_ros_setup_path"]
+    # Get CCA-relevant robot description and ros setup info for the robot
+    cca_robot_description_params = settings["cca_robot_description_path"]
+    robot_name = settings["cca_robot_package"].removeprefix("cca_")
 
     # Declare debug mode argument
     debug_arg = DeclareLaunchArgument(
@@ -228,7 +189,7 @@ def generate_launch_description():
     # Node parameters
     params = [
         {"robot_description": robot_description},
-        cca_robot_setup_params,
+        cca_robot_description_params,
     ]
 
     return LaunchDescription(
@@ -244,6 +205,9 @@ def generate_launch_description():
                 prefix=[node_prefix],
                 emulate_tty=emulate_tty,
                 parameters=params,
+                remappings=[
+                    ("/cca_ros_val_and_viz", f"/{robot_name}/cca_ros_val_and_viz"),
+                ],
             ),
         ]
     )
@@ -323,8 +287,9 @@ def generate_launch_description():
         launch_args=robot_args,
     )
 
-    # Get CCA ROS setup parameters for the robot
-    cca_robot_setup_params = settings["cca_robot_ros_setup_path"]
+    # Get CCA-relevant robot description and ros setup info for the robot
+    cca_robot_description_params = settings["cca_robot_description_path"]
+    robot_name = settings["cca_robot_package"].removeprefix("cca_")
 
     # Declare debug mode argument
     debug_arg = DeclareLaunchArgument(
@@ -342,7 +307,7 @@ def generate_launch_description():
     # Node parameters
     params = [
         {"robot_description": robot_description},
-        cca_robot_setup_params,
+        cca_robot_description_params,
     ]
 
     return LaunchDescription(
@@ -358,6 +323,9 @@ def generate_launch_description():
                 prefix=[node_prefix],
                 emulate_tty=emulate_tty,
                 parameters=params,
+                remappings=[
+                    ("/cca_ros_val_and_viz", f"/{robot_name}/cca_ros_val_and_viz"),
+                ],
             ),
         ]
     )
@@ -368,7 +336,7 @@ sed -i "s/\${robot_name}/$robot_name/g" \
     $package_name/launch/cca_${robot_name}_action_server.launch.py
 
 # Create the visualization server/RVIZ plugin launch file
-cat << 'EOF' > $package_name/launch/cca_${robot_name}_viz.launch.py
+cat << 'EOF' > $package_name/launch/cca_${robot_name}_val_and_viz.launch.py
 """ROS 2 launch script for CCA robot trajectory validation and optional visualization with RViz.
 
 Author: Crasun Jans
@@ -376,15 +344,15 @@ Author: Crasun Jans
 This launch script visualizes and validates joint trajectories generated by the
 Closed-Chain Affordance (CCA) planner. It launches:
 - robot_state_publisher: Publishes robot transforms from URDF
-- cca_ros_viz_node: Validates and visualizes CCA trajectories
+- cca_ros_val_and_viz_node: Validates and visualizes CCA trajectories
 - rviz2: Interactive 3D visualization (optional)
 
 The robot-specific configuration is automatically imported from cca_<robot>_settings.py in the
 same directory.
 
 ### Usage:
-    ros2 launch cca_${robot_name} cca_${robot_name}_ros_viz.launch.py
-    ros2 launch cca_${robot_name} cca_${robot_name}_ros_viz.launch.py launch_rviz:=true
+    ros2 launch cca_${robot_name} cca_${robot_name}_val_and_viz.launch.py
+    ros2 launch cca_${robot_name} cca_${robot_name}_val_and_viz.launch.py launch_rviz:=true
 ====================================================================
 THIS FILE IS AUTOGENERATED AND USUALLY DOES NOT REQUIRE MODIFICATION.
 ====================================================================
@@ -445,15 +413,16 @@ def generate_launch_description():
         srdf_path=settings["srdf_path"],
         all_launch_args=robot_args,
         srdf_arg_usage=settings["srdf_arg_usage"],
-	srdf_subset_args=settings.get("srdf_subset_args"),
+        srdf_subset_args=settings.get("srdf_subset_args"),
     )
 
-    # Get CCA validation and visualization setup parameters
-    cca_viz_params = settings["cca_robot_ros_viz_setup_path"]
+    # Get CCA-relevant robot description and ros setup info for the robot
+    cca_robot_description_params = settings["cca_robot_description_path"]
+    robot_name = settings["cca_robot_package"].removeprefix("cca_")
 
     # RViz configuration
     rviz_config = PathJoinSubstitution(
-        [FindPackageShare("cca_ros_viz"), "rviz", "cca_ros_viz.rviz"]
+        [FindPackageShare("cca_ros_val_and_viz"), "rviz", "cca_ros_val_and_viz.rviz"]
     )
 
     # Prepare parameters
@@ -461,7 +430,7 @@ def generate_launch_description():
     params_common = [
         {"robot_description": robot_description},
         {"robot_description_semantic": robot_description_semantic},
-        cca_viz_params,
+        cca_robot_description_params,
         use_sim_time,
     ]
 
@@ -478,11 +447,14 @@ def generate_launch_description():
                 parameters=params_common,
             ),
             Node(
-                package="cca_ros_viz",
-                executable="cca_ros_viz_node",
-                name="cca_ros_viz",
+                package="cca_ros_val_and_viz",
+                executable="cca_ros_val_and_viz_node",
+                name="cca_ros_val_and_viz",
                 output="screen",
                 parameters=params_common,
+                remappings=[
+                    ("/cca_ros_val_and_viz", f"/{robot_name}/cca_ros_val_and_viz"),
+                ],
             ),
             Node(
                 package="rviz2",
@@ -492,6 +464,9 @@ def generate_launch_description():
                 condition=IfCondition(LaunchConfiguration("launch_rviz")),
                 arguments=["-d", rviz_config],
                 parameters=params_common,
+                remappings=[
+                    ("/cca_ros_val_and_viz", f"/{robot_name}/cca_ros_val_and_viz"),
+                ],
             ),
         ]
     )
@@ -548,7 +523,7 @@ def declare_launch_args():
     """
     # ---- ROBOT-SPECIFIC ARGS (Modify as needed) ----
     robot_args = [
-        # Example:
+        # Example: 
         # DeclareLaunchArgument(
         #     "has_arm",
         #     default_value="True",
@@ -595,48 +570,30 @@ def define_robot_paths_and_settings():
             - srdf_arg_usage: How SRDF uses launch args ("all", "none", or "subset")
             - srdf_subset_args: List of arg names if using "subset" mode
             - cca_robot_package: Package containing CCA configuration files
-            - cca_robot_ros_setup_path: Path to ROS setup YAML
-            - cca_robot_ros_viz_setup_path: Path to visualization setup YAML
             - cca_robot_description_path: Path to CCA robot description YAML
-            - cca_robot_urdf_path: Path to CCA URDF configuration YAML
     """
     return {
         # ---- ROBOT DESCRIPTION - URDF (Modify as needed) ----
-        "urdf_package": "", # Example: spot_description
-        "urdf_xacro_path": "", # Example: urdf/spot.urdf.xacro
+        "urdf_package": "<fill_out>", # Example: ${robot_name}_description
+        "urdf_xacro_path": "<fill_out>", # Example: urdf/${robot_name}.urdf.xacro
         
         # ---- ROBOT DESCRIPTION SEMANTIC  - SRDF (Modify as needed) ----
-        "srdf_package": "", # Example spot_moveit_config
-        "srdf_path": "", # Example: config/spot.srdf.xacro
+        "srdf_package": "<fill_out>", # Example: ${robot_name}_moveit_config
+        "srdf_path": "<fill_out>", # Example: config/${robot_name}.srdf.xacro
         
         # SRDF argument reuse options:
         # - "all": Pass all robot_args to SRDF xacro
         # - "none": Don't pass any arguments to SRDF
         # - "subset": Pass only the arguments listed in srdf_subset_args
-        "srdf_arg_usage": "", # Example: "all"
-        "srdf_subset_args": [],  # Used if srdf_arg_usage == "subset", Example: "has_arm", "kinematic_model"
+        "srdf_arg_usage": "all",
+        "srdf_subset_args": [],  # Used if srdf_arg_usage == "subset"
         
         # ---- CCA CONFIGURATION FILES (AUTOGENERATED) ----
         "cca_robot_package": "cca_${robot_name}",
-        "cca_robot_ros_setup_path": os.path.join(
-            get_package_share_directory("cca_${robot_name}"),
-            "config",
-            "cca_${robot_name}_ros_setup.yaml"
-        ),
-        "cca_robot_ros_viz_setup_path": os.path.join(
-            get_package_share_directory("cca_${robot_name}"),
-            "config",
-            "cca_${robot_name}_ros_viz_setup.yaml"
-        ),
         "cca_robot_description_path": os.path.join(
             get_package_share_directory("cca_${robot_name}"),
             "config",
             "cca_${robot_name}_description.yaml"
-        ),
-        "cca_robot_urdf_path": os.path.join(
-            get_package_share_directory("cca_${robot_name}"),
-            "config",
-            "cca_${robot_name}_urdf.yaml"
         ),
     }
 
@@ -862,8 +819,6 @@ int main(int argc, char **argv)
     rclcpp::NodeOptions node_options;
     auto node = std::make_shared<CcaRobot>("cca_ros", node_options);
 
-    RCLCPP_INFO(node->get_logger(), "CCA Planner is active");
-
     // Spin the node so joint states can be read
     std::jthread spinner_thread([node]() { rclcpp::spin(node); });
 
@@ -874,31 +829,31 @@ int main(int argc, char **argv)
     /// joint trajectory.
     ///------------------------------------------------------------------///
     cca_ros::PlanningRequest req;
+    req.planning_group = "<fill_in>";
 
+    // Task description
     // Specify planning type
     req.task_description = cc_affordance_planner::TaskDescription(cc_affordance_planner::PlanningType::AFFORDANCE);
-
     // Affordance info
     req.task_description.affordance_info.type = affordance_util::ScrewType::TRANSLATION;
-    req.task_description.affordance_info.axis = Eigen::Vector3d(0, 0, 1);
-    req.task_description.affordance_info.location = Eigen::Vector3d::Zero();
-
-    // Goals
-    req.task_description.goal.affordance = 0.1; // Set desired goal for the affordance
-
-    ///------------------------------------------------------------------///
+    req.task_description.affordance_info.axis = affordance_util::axis_to_vec(affordance_util::Axis::Z);
+    req.task_description.affordance_info.location = affordance_util::axis_to_vec(affordance_util::Axis::ORIGIN);
+    // Goal
+    req.task_description.goal.affordance = 0.1; // 10cm
 
     // Run CCA planner and executor
     if (node->run(req))
     {
-        RCLCPP_INFO(node->get_logger(), "Successfully called CCA action");
+        RCLCPP_INFO(node->get_logger(), "Successfully executed %s tasks", req.planning_group.c_str());
         node->block_until_trajectory_execution(); // Optionally, block until execution
+
     }
     else
     {
-        RCLCPP_ERROR(node->get_logger(), "CCA action failed");
-        rclcpp::shutdown();
+        RCLCPP_ERROR(node->get_logger(), "CCA action failed for the %s group", req.planning_group.c_str());
     }
+
+    ///------------------------------------------------------------------///
 
     rclcpp::shutdown();
     return 0;
