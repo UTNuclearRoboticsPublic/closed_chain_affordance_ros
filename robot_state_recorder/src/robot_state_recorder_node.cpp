@@ -384,20 +384,10 @@ int main(int argc, char **argv)
         }
         
         if (!pg_info.ex_as_names.robot_and_gripper.empty()) {
-            // Create a modified robot config with _vision appended to body joints
-            auto modified_config = pg_info.robot_config;
-            
-            // Append _vision to body joint names
-            for (auto& joint_name : modified_config.joint_names.robot) {
-                if (joint_name == "body_x" || joint_name == "body_y" || joint_name == "body_or") {
-                    joint_name += "_vision";
-                }
-            }
-            
             // Initialize recorder for robot-and-gripper combined action server
             set.robot_and_gripper = std::make_unique<robot_state_recorder::JointTrajAndTfRecorder>(
                 node,
-                modified_config,
+                pg_info.robot_config,
                 pg_info.ex_as_names.robot_and_gripper,
                 joint_states_topic,
                 pg_name + "_robot_and_gripper",
