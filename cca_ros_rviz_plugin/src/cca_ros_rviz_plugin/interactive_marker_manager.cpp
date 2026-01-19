@@ -1,15 +1,15 @@
-#include "cca_ros_viz/interactive_marker_manager.hpp"
+#include "cca_ros_rviz_plugin/interactive_marker_manager.hpp"
 
 namespace interactive_marker_manager
 {
 
 // Initialize Eigen static consts
-const Eigen::Vector3d InteractiveMarkerManager::X_AXIS_(1.0, 0.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::Y_AXIS_(0.0, 1.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::Z_AXIS_(0.0, 0.0, 1.0);
-const Eigen::Vector3d InteractiveMarkerManager::NEG_X_AXIS_(-1.0, 0.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::NEG_Y_AXIS_(0.0, -1.0, 0.0);
-const Eigen::Vector3d InteractiveMarkerManager::NEG_Z_AXIS_(0.0, 0.0, -1.0);
+const Eigen::Vector3d InteractiveMarkerManager::X_AXIS_ = affordance_util::axis_to_vec(affordance_util::Axis::X);
+const Eigen::Vector3d InteractiveMarkerManager::Y_AXIS_ = affordance_util::axis_to_vec(affordance_util::Axis::Y);
+const Eigen::Vector3d InteractiveMarkerManager::Z_AXIS_ = affordance_util::axis_to_vec(affordance_util::Axis::Z);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_X_AXIS_= affordance_util::axis_to_vec(affordance_util::Axis::X_MINUS);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_Y_AXIS_= affordance_util::axis_to_vec(affordance_util::Axis::Y_MINUS);
+const Eigen::Vector3d InteractiveMarkerManager::NEG_Z_AXIS_= affordance_util::axis_to_vec(affordance_util::Axis::Z_MINUS);
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_AXIS_ = InteractiveMarkerManager::X_AXIS_;
 const Eigen::Vector3d InteractiveMarkerManager::DEFAULT_ARROW_LOCATION_(0.0, 0.0, 0.0);
 const Eigen::Matrix4d InteractiveMarkerManager::DEFAULT_FRAME_POSE_ =
@@ -36,49 +36,51 @@ InteractiveMarkerManager::InteractiveMarkerManager(const std::string &node_name)
         "interactive_goals", this->get_node_base_interface(), this->get_node_clock_interface(),
         this->get_node_logging_interface(), this->get_node_topics_interface(), this->get_node_services_interface());
 
-    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    // Initialize the tf broadcaster so we could publish static transforms
+    tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+
+    // Extract frame names for planning groups and publish static transforms between EE and tool frames and for each planning group
+    using namespace ros_cpp_util;
+    cca_planning_groups_ = get_required_str_array_param(this, "cca_planning_groups");
+    const std::string pg_prefix = "cca_planning_group_info.";
+
+    for (const auto& pg_name : cca_planning_groups_) {
+
+        // Extract frame names for this planning group
+        const std::string param_prefix = pg_prefix + pg_name;
+
+        PlanningGroupFrameInfo pg_frame_info;
+        pg_frame_info.ref_frame = get_required_str_param(this, param_prefix + ".ref_frame");
+        pg_frame_info.tool_frame = get_required_str_param(this, param_prefix + ".tool.frame");
+
+        // Add to map
+        planning_group_frame_info_map_[pg_name] = pg_frame_info;
+
+        // Publish static transform between EE and tool frame
+        const std::string& ee_frame = get_required_str_param(this, param_prefix + ".end_effector.frame");
+        const Eigen::Vector3d& ee_to_tool_offset = Eigen::Vector3d(get_required_double_array_param(this, param_prefix + ".tool.offset_from_ee_frame").data());
+        if (ee_frame!=pg_frame_info.tool_frame){ // Avoid publishing if both frames are the same
+            this->publish_transform_(ee_frame, pg_frame_info.tool_frame, ee_to_tool_offset);
+	}
+    }
+
+    default_planning_group_ = cca_planning_groups_.front(); // We will use the first planning group as default
 
     // Enable the arrow
     ImControlEnableInfo arrow_enable_info;
     arrow_enable_info.marker_name = arrow_marker_name_;
     arrow_enable_info.enable = ImControlEnable::ALL;
     arrow_enable_info.create = true;
-    enable_im_controls(arrow_enable_info);
+    enable_im_controls(arrow_enable_info, default_planning_group_);
 
     // Enable the frame
     ImControlEnableInfo frame_enable_info;
     frame_enable_info.marker_name = frame_marker_name_;
     frame_enable_info.enable = ImControlEnable::ALL;
     frame_enable_info.create = true;
-    enable_im_controls(frame_enable_info);
+    frame_enable_info.in_tool_frame = true;
+    enable_im_controls(frame_enable_info, default_planning_group_);
 
-    try
-    {
-        this->declare_parameter<std::string>("tool_frame");
-        tool_frame_name_ = this->get_parameter("tool_frame").as_string();
-        this->declare_parameter<std::string>("ref_frame");
-        ref_frame_name_ = this->get_parameter("ref_frame").as_string();
-        this->declare_parameter<std::string>("ee_frame");
-        ee_frame_name_ = this->get_parameter("ee_frame").as_string();
-        this->declare_parameter<std::vector<double>>("ee_to_tool_offset");
-        auto tool_offset = this->get_parameter("ee_to_tool_offset").as_double_array();
-        ee_to_tool_offset_ =
-            Eigen::Vector3d(tool_offset[0], tool_offset[1], tool_offset[2]); // Location of tool in the EE frame
-    }
-    catch (const std::exception &e)
-    {
-        RCLCPP_ERROR(this->get_logger(),
-                     "Failed to get parameter 'tool_frame' or 'ref_frame': %s. You may have forgetten to load the "
-                     "cca_<robot>_ros_viz_setup.yaml file with the "
-                     "rviz2 node.",
-                     e.what());
-    }
-
-    // Initialize the tf broadcaster and timer to publish transform between the EE and tool frames
-    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(tf_publish_rate_),
-                                     std::bind(&InteractiveMarkerManager::publish_transform_, this));
     RCLCPP_INFO(this->get_logger(), "Interactive marker manager initialized.");
 }
 
@@ -134,7 +136,7 @@ void InteractiveMarkerManager::process_frame_feedback_(
 }
 
 
-void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &info)
+void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &info, const std::string& planning_group)
 {
     visualization_msgs::msg::InteractiveMarker int_marker;
 
@@ -161,22 +163,9 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
 	}
     }
 
-    int_marker.header.frame_id = ref_frame_name_;
-    int_marker.description = "";
-
-    // Draw in tool frame if asked
-    if (info.in_tool_frame)
-    {
-        const Eigen::Isometry3d aff_htm = ros_cpp_util::get_htm(ref_frame_name_, tool_frame_name_, *tf_buffer_);
-        int_marker.pose.position.x = aff_htm.translation().x();
-        int_marker.pose.position.y = aff_htm.translation().y();
-        int_marker.pose.position.z = aff_htm.translation().z();
-        if (aff_htm.matrix().isApprox(Eigen::Matrix4d::Identity()))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Could not lookup [%s] frame. Will place [%s] interactive marker at [%s] instead.",
-                         tool_frame_name_.c_str(), info.marker_name.c_str(), ref_frame_name_.c_str());
-        }
-    }
+    const std::string& ref_frame_name = planning_group_frame_info_map_.at(planning_group).ref_frame;
+    const std::string& tool_frame_name = planning_group_frame_info_map_.at(planning_group).tool_frame;
+    int_marker.header.frame_id = info.in_tool_frame ? tool_frame_name : ref_frame_name;
 
     // Lambda to add control using static axis vectors
     auto addControl = [&](const std::string &name, const Eigen::Vector3d &axis, bool isRotation) {
@@ -315,13 +304,13 @@ void InteractiveMarkerManager::enable_im_controls(const ImControlEnableInfo &inf
     server_->applyChanges();
 }
 
-void InteractiveMarkerManager::hide_im(const std::string &marker_name)
+void InteractiveMarkerManager::hide_im(const std::string &marker_name, const std::string& planning_group)
 {
     // Disable interactive marker controls
     ImControlEnableInfo enable_info;
     enable_info.marker_name = marker_name;
     enable_info.enable = ImControlEnable::NONE;
-    enable_im_controls(enable_info);
+    enable_im_controls(enable_info, planning_group);
 
     // Get the interactive marker object
     visualization_msgs::msg::InteractiveMarker int_marker;
@@ -336,7 +325,7 @@ void InteractiveMarkerManager::hide_im(const std::string &marker_name)
     server_->applyChanges();
 }
 
-void InteractiveMarkerManager::draw_ee_or_control_im(const std::string &axis)
+void InteractiveMarkerManager::draw_ee_or_control_im(const std::string &axis, const std::string& planning_group)
 {
     ImControlEnableInfo arrow_enable_info;
     arrow_enable_info.marker_name = arrow_marker_name_;
@@ -345,13 +334,13 @@ void InteractiveMarkerManager::draw_ee_or_control_im(const std::string &axis)
     if (axis == "Interactive Axis")
     {
         arrow_enable_info.enable = ImControlEnable::ROTATION;
-        enable_im_controls(arrow_enable_info);
+        enable_im_controls(arrow_enable_info, planning_group);
         return;
     }
 
     // Enable the arrow with no interactive control
     arrow_enable_info.enable = ImControlEnable::NONE;
-    enable_im_controls(arrow_enable_info);
+    enable_im_controls(arrow_enable_info, planning_group);
 
     // Get the interactive marker
     visualization_msgs::msg::InteractiveMarker int_marker;
@@ -434,20 +423,20 @@ Eigen::Matrix4d InteractiveMarkerManager::get_frame_pose()
     return frame_pose;
 }
 
-void InteractiveMarkerManager::publish_transform_()
+void InteractiveMarkerManager::publish_transform_(const std::string& parent_frame, const std::string& child_frame, const Eigen::Vector3d& translation)
 {
     // Create the transform message
     geometry_msgs::msg::TransformStamped transform_stamped;
 
     // Set header details
-    transform_stamped.header.stamp = this->now();
-    transform_stamped.header.frame_id = ee_frame_name_;
-    transform_stamped.child_frame_id = tool_frame_name_;
+    transform_stamped.header.stamp = rclcpp::Time(0);// static valid-for-all-time
+    transform_stamped.header.frame_id = parent_frame;
+    transform_stamped.child_frame_id = child_frame;
 
     // Set translation (x, y, z)
-    transform_stamped.transform.translation.x = ee_to_tool_offset_[0];
-    transform_stamped.transform.translation.y = ee_to_tool_offset_[1];
-    transform_stamped.transform.translation.z = ee_to_tool_offset_[2];
+    transform_stamped.transform.translation.x = translation[0];
+    transform_stamped.transform.translation.y = translation[1];
+    transform_stamped.transform.translation.z = translation[2];
 
     // We assume orientation same as ee_frame_
     transform_stamped.transform.rotation.x = 0.0;
@@ -456,6 +445,6 @@ void InteractiveMarkerManager::publish_transform_()
     transform_stamped.transform.rotation.w = 1.0;
 
     // Publish the transform
-    tf_broadcaster_->sendTransform(transform_stamped);
+    tf_static_broadcaster_->sendTransform(transform_stamped);
 }
 } // namespace interactive_marker_manager

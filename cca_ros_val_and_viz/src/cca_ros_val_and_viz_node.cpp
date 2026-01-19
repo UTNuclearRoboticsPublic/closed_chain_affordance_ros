@@ -30,8 +30,11 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 #include <fmt/core.h>
+#include <iomanip>
+#include <sstream>  
+#include <string>  
 #include <rclcpp/rclcpp.hpp>
-#include <cca_ros_msgs/srv/cca_ros_viz.hpp>
+#include <cca_ros_msgs/srv/cca_ros_val_and_viz.hpp>
 
 // MoveIt
 #include <moveit/kinematic_constraints/utils.h>
@@ -41,32 +44,34 @@
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
+// Custom utility headers
+#include <ros_cpp_util/ros_cpp_util.hpp>
+
 using namespace std::chrono_literals;
-class CcaRosVizServer : public rclcpp::Node
+class CcaRosValAndVizServer : public rclcpp::Node
 {
   public:
-    explicit CcaRosVizServer(const rclcpp::NodeOptions &options)
-        : Node("cca_ros_viz_server_node", options), node_logger_(this->get_logger())
+    explicit CcaRosValAndVizServer(const rclcpp::NodeOptions &options)
+        : Node("cca_ros_val_and_viz", options), node_logger_(this->get_logger()), val_and_viz_ss_name_("/cca_ros_val_and_viz") 
     {
 
         // Extract parameters
         // robot_description and robot_description_semantic automatically extracted during runtime
-        planning_group_ = this->declare_parameter("planning_group", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-        rviz_fixed_frame_ = this->declare_parameter("rviz_fixed_frame", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
-        joint_states_topic_ = this->declare_parameter("joint_states_topic", rclcpp::ParameterType::PARAMETER_STRING).get<std::string>();
+        rviz_fixed_frame_ = ros_cpp_util::get_required_str_param(this, "rviz_fixed_frame");
+        joint_states_topic_ = ros_cpp_util::get_required_str_param(this, "cca_joint_states_topic");
 
         // Create and advertise planning and visualization service
-        srv_ = this->create_service<cca_ros_msgs::srv::CcaRosViz>(
-            "/cca_ros_viz_server", std::bind(&CcaRosVizServer::cca_ros_viz_server_callback_, this,
+        srv_ = this->create_service<cca_ros_msgs::srv::CcaRosValAndViz>(
+            val_and_viz_ss_name_, std::bind(&CcaRosValAndVizServer::cca_ros_viz_server_callback_, this,
                                              std::placeholders::_1, std::placeholders::_2));
 
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
             this->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path", 1);
-        RCLCPP_INFO_STREAM(node_logger_, "/cca_ros_viz service server is active");
+        RCLCPP_INFO_STREAM(node_logger_, val_and_viz_ss_name_ <<" service is active");
     }
 
-    ~CcaRosVizServer()
+    ~CcaRosValAndVizServer()
     {
         // Cleanup spinner thread
         if (spinner_thread_.joinable())
@@ -84,11 +89,10 @@ class CcaRosVizServer : public rclcpp::Node
         robot_model_loader::RobotModelLoaderPtr robot_model_loader =
             std::make_shared<robot_model_loader::RobotModelLoader>(node_handle);
         psm_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(node_handle, robot_model_loader);
-        moveit::core::RobotModelPtr robot_model = robot_model_loader->getModel();
+        robot_model_ = robot_model_loader->getModel();
         robot_state_ = std::make_shared<moveit::core::RobotState>(
             planning_scene_monitor::LockedPlanningSceneRO(psm_)
                 ->getCurrentState()); // planning scene is locked while reading robot
-        joint_model_group_ = robot_model->getJointModelGroup(planning_group_);
         psm_->startSceneMonitor();
         psm_->startWorldGeometryMonitor(); // listens to world geometry, collision objects and (optionally) octomap
                                            // changes
@@ -100,9 +104,12 @@ class CcaRosVizServer : public rclcpp::Node
         psm_->startPublishingPlanningScene(planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
 
         rviz_visual_tools_.reset(
-            new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, "/cca_ee_cartesian_trajectory", node_handle));
-        rviz_visual_tools_->loadMarkerPub();
-        rviz_visual_tools_->enableBatchPublishing();
+            new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, val_and_viz_ss_name_, node_handle));
+        rviz_visual_tools_->loadMarkerPub(); 	    // Initialize publisher
+        rviz_visual_tools_->setLifetime(0.0);       // Publish markers with zero timestamp to avoid future extrapolation
+        rviz_visual_tools_->enableFrameLocking();   // Keep markers fixed in the RViz frame to bypass TF transforms
+        rviz_visual_tools_->enableBatchPublishing();// Batch publishing for efficiency
+
     }
 
   private:
@@ -111,18 +118,52 @@ class CcaRosVizServer : public rclcpp::Node
     std::thread spinner_thread_; // To spin the node in a separate thread
 
     rclcpp::Logger node_logger_;                                       // logger associated with the node
-    rclcpp::Service<cca_ros_msgs::srv::CcaRosViz>::SharedPtr srv_; // joint traj plan and visualization service
+    rclcpp::Service<cca_ros_msgs::srv::CcaRosValAndViz>::SharedPtr srv_; // joint traj plan and visualization service
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
 
     planning_scene_monitor::PlanningSceneMonitorPtr psm_;
     moveit::core::RobotStatePtr robot_state_;
+    moveit::core::RobotModelPtr robot_model_;
     moveit::core::JointModelGroup *joint_model_group_;
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
 
-    std::string planning_group_;
+    std::string val_and_viz_ss_name_;
     std::string rviz_fixed_frame_;
     std::string joint_states_topic_;
+
+    std::string get_joint_limit_violation_log_(const moveit::core::RobotState& state, const std::map<std::string, moveit::core::VariableBounds>& joint_limit_map) {
+        const int JOINT_NAME_WIDTH = 30;
+        const int VALUE_WIDTH = 15;
+        const int LIMIT_WIDTH = 15;
+        const int TOTAL_WIDTH = JOINT_NAME_WIDTH + VALUE_WIDTH + LIMIT_WIDTH + LIMIT_WIDTH;
+        const int FLOAT_PRECISION = 4;
+        
+        std::stringstream error_msg;
+        error_msg << std::fixed << std::setprecision(FLOAT_PRECISION);
+        error_msg << "Offending joints:\n";
+        error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << "Joint name" 
+                  << std::setw(VALUE_WIDTH) << "Value" 
+                  << std::setw(LIMIT_WIDTH) << "Min Limit" 
+                  << std::setw(LIMIT_WIDTH) << "Max Limit" << "\n";
+        error_msg << std::string(TOTAL_WIDTH, '-') << "\n";
+        
+        for (const auto& [joint_name, bounds] : joint_limit_map) {
+            const moveit::core::JointModel* joint_model = 
+                state.getRobotModel()->getJointModel(joint_name);
+            
+            if (joint_model && !state.satisfiesBounds(joint_model)) {
+                const double value = state.getVariablePosition(joint_name);
+                
+                error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << joint_name
+                          << std::setw(VALUE_WIDTH) << value
+                          << std::setw(LIMIT_WIDTH) << bounds.min_position_
+                          << std::setw(LIMIT_WIDTH) << bounds.max_position_ << "\n";
+            }
+        }
+        
+        return error_msg.str();
+    }
 
     // Note, T_w_r is HTM from world frame, usually the root frame of the urdf to the service request reference frame
     Eigen::Isometry3d transform_pose_to_world_frame(const Eigen::Isometry3d &T_w_r,
@@ -205,20 +246,14 @@ class CcaRosVizServer : public rclcpp::Node
     }
 
 
-    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Request> serv_req,
-                                      std::shared_ptr<cca_ros_msgs::srv::CcaRosViz::Response> serv_res)
+    void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosValAndViz::Request> serv_req,
+                                      std::shared_ptr<cca_ros_msgs::srv::CcaRosValAndViz::Response> serv_res)
     {
 
         serv_res->success = false;// start as false
 
-        bool has_sub = rviz_visual_tools_->waitForMarkerSub(0.25);
-        if (!has_sub)
-            RCLCPP_INFO(node_logger_, "/rviz_visual_tools does not have a subscriber. Visualizations may be lost. "
-                                      "Ensure /rviz_visual_tools is "
-                                      "specified as topic under MarkerArray in Rviz. ");
         // Clear messages
         rviz_visual_tools_->deleteAllMarkers();
-
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
@@ -226,27 +261,39 @@ class CcaRosVizServer : public rclcpp::Node
         // frame
         Eigen::Isometry3d T_w_r = robot_state_->getGlobalLinkTransform(serv_req->ref_frame);
 
-        if (!(serv_req->aff_screw_axis).empty()) // If affordance screw is specified, draw it
-        {
+        // Validate affordance info sizes
+        if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
+	    serv_req->aff_screw_axes.size() != serv_req->aff_ref_poses.size())
+	{
+	    RCLCPP_ERROR(node_logger_,
+			 "Mismatch in the size of affordance screw axes, locations, and reference pose vectors");
+	    return;
+	}
+
+        // Draw affordance screw axes and optionally, aff ref frames
+        for (size_t task_idx = 0; task_idx < serv_req->aff_screw_axes.size(); ++task_idx){
+            const auto aff_screw_axis = serv_req->aff_screw_axes.at(task_idx);
+	    const auto aff_location = serv_req->aff_locations.at(task_idx);
+            const auto aff_ref_pose_msg = serv_req->aff_ref_poses.at(task_idx);
 
             // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance screw
             // axis wrt to the x-axis.
             Eigen::Quaterniond aff_screw_quat;
             aff_screw_quat.setFromTwoVectors(Eigen::Vector3d::UnitX(),
-                                             Eigen::Vector3d((serv_req->aff_screw_axis).data()));
+                                             Eigen::Vector3d(aff_screw_axis.x, aff_screw_axis.y, aff_screw_axis.z));
 
             // Fill out the pose
             Eigen::Isometry3d aff_screw_pose;
             aff_screw_pose.linear() = aff_screw_quat.toRotationMatrix();
-            aff_screw_pose.translation() = Eigen::Vector3d((serv_req->aff_location).data());
+            aff_screw_pose.translation() = Eigen::Vector3d(aff_location.x, aff_location.y, aff_location.z);
 
             // Translate the pose to planning frame
             aff_screw_pose = T_w_r * aff_screw_pose;
 
             // If affordance ref frame is specified, draw it
-            if (this->is_pose_specified(serv_req->aff_ref_pose))
+            if (this->is_pose_specified(aff_ref_pose_msg))
             {
-                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, serv_req->aff_ref_pose);
+                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, aff_ref_pose_msg);
 
                 rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
             }
@@ -254,13 +301,27 @@ class CcaRosVizServer : public rclcpp::Node
             // Publish
             rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
             rviz_visual_tools_->trigger();
+	}
+
+        // Get the joint model group for the requested planning group
+        joint_model_group_ = robot_model_->getJointModelGroup(serv_req->planning_group);
+
+	// Capture joint names for the planning group
+	std::vector<std::string> joint_names = joint_model_group_->getVariableNames();
+
+        // Capture joint limits so we could log joint-limit violations later
+        std::map<std::string, moveit::core::VariableBounds> joint_limit_map;
+        for (const std::string& joint_name : joint_names) {
+            joint_limit_map[joint_name] = 
+                robot_model_->getVariableBounds(joint_name);
         }
 
 	// (Re)order trajectory to match MoveIt planning group order
-	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_model_group_->getVariableNames());
+	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_names);
 
-	long total_viol_check_duration = 0; // for joint limits and collision checking
+        std::chrono::microseconds total_viol_check_duration{0}; // for joint limits and collision checking
 
+	size_t pt_index = 0;
         for (const auto &point : ordered_group_traj.points)
         {
             // Copy the joint trajectory point to a std::vector<double> type
@@ -293,7 +354,7 @@ class CcaRosVizServer : public rclcpp::Node
 
 		// Capture how long it took to check for violations
 		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
-		long point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+		auto point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 		total_viol_check_duration += point_duration;
 
 		// Log violation
@@ -313,8 +374,8 @@ class CcaRosVizServer : public rclcpp::Node
 		        oss << goal_positions[k];
 		    }
 
-		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point: [%s]",
-		    	     violation_type.c_str(), oss.str().c_str());
+		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point[%zu]: [%s]",
+		    	     violation_type.c_str(), pt_index, oss.str().c_str());
 
 		    // If self-collision occurs, print the contacts
 		    if (self_collision_violation){
@@ -326,10 +387,17 @@ class CcaRosVizServer : public rclcpp::Node
 		    
 		    }
 
+		    // If joint-limit violation occurs, print the offending joints and info
+		    if (joint_limit_violation){	
+                            const std::string jl_err_log = get_joint_limit_violation_log_(goal_state, joint_limit_map);  
+			    RCLCPP_ERROR(node_logger_, jl_err_log.c_str());
+		    }
+
 		    return;
 
 		}
             }
+	    ++pt_index;
         }
 
 	// Since no joint‐limit or self‐collision violation, now visualize the trajectory
@@ -357,8 +425,8 @@ class CcaRosVizServer : public rclcpp::Node
 	rviz_visual_tools_->trigger();  // only once after batching
 
         RCLCPP_INFO(node_logger_, "Successfully visualized requested joint trajectory");
-	// RCLCPP_INFO(node_logger_, "Total constraint violation checking time for trajectory: %ld microseconds", total_viol_check_duration); For experiment purposes
         serv_res->success = true;
+        serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
     }
 };
 
@@ -366,7 +434,7 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
-    auto node = std::make_shared<CcaRosVizServer>(node_options);
+    auto node = std::make_shared<CcaRosValAndVizServer>(node_options);
     node->initialize();
 
     while (rclcpp::ok())

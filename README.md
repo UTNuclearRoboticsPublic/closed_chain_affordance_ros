@@ -6,16 +6,15 @@ This repository provides robot-agnostic ROS2 packages that interface the [Closed
 - `C++20`
 - `ROS Humble`
 
-## Core Dependencies
-
-- `affordance_util` and `cc_affordance_planner` packages from the [Closed-Chain Affordance repository](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
-
-### Optional Notable Dependencies
+## Dependencies
+#### Core Dependency:
+- **CCA planner** - Install from [here.](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance.git)
+#### ROS Dependencies
 - `moveit`: For self-collision checking
 - `moveit_visual_tools`: For visualization of joint movement
 - `behaviortree_cpp`: To utilize the CCA Behavior Tree action node
   
-With ROS sourced, you may install the optional dependencies with:
+With ROS sourced, you may install the ROS dependencies with:
  ```bash
 sudo apt install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-behaviortree-cpp
 ```

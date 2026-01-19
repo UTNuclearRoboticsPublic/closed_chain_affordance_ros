@@ -13,8 +13,10 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <qlist.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // CCA headers
 #include <cc_affordance_planner/cc_affordance_planner.hpp>
@@ -22,7 +24,7 @@
 #include <cca_ros/cca_ros.hpp>
 #include <cca_ros_action/cca_ros_action.hpp>
 
-// ROS headers
+// Standard ROS headers
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rviz_common/panel.hpp>
@@ -42,7 +44,7 @@
 #include <QWidget>
 
 // Local headers
-#include "cca_ros_viz/interactive_marker_manager.hpp"
+#include "cca_ros_rviz_plugin/interactive_marker_manager.hpp"
 
 namespace cca_ros_rviz_plugin
 {
@@ -187,6 +189,11 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
     void cancel_exe_button_clicked_();
 
     /**
+    * @brief Handle planning group selection change
+    */
+    void planning_group_selected_();
+
+    /**
      * @brief Handle planning mode selection change
      *
      * Updates the UI when user selects a different planning mode.
@@ -258,6 +265,9 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
         {QString("Affordance Control"), CcaType::AFFORDANCE_CONTROL},
         {QString("Affordance and EE Orientation Control"), CcaType::AFFORDANCE_AND_EE_ORIENTATION_CONTROL}};
 
+    QStringList planning_groups_; ///< List of available planning groups
+    std::string current_planning_group_; ///< Currently selected planning group
+
     const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
         {QString("Affordance"), cc_affordance_planner::PlanningType::AFFORDANCE},
         {QString("Cartesian Goal"), cc_affordance_planner::PlanningType::CARTESIAN_GOAL},
@@ -275,8 +285,11 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
 
     // State flags
     bool new_settings_applied_ = false; ///< Flag to track if advanced settings have been applied
+    bool arrow_marker_visible_ = false;  ///< Flag to track visibility of arrow marker
+    bool frame_marker_visible_ = false;  ///< Flag to track visibility of frame marker
 
     // UI components - main controls
+    QComboBoxAndLabel planning_group_bl_; ///< Planning group selection
     QComboBoxAndLabel mode_bl_;        ///< Planning mode selection
     QComboBoxAndLabel motion_type_bl_; ///< Motion type selection
     QComboBoxAndLabel axis_bl_;        ///< Axis selection
@@ -435,6 +448,26 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
      * @param goal_index The selected goal index
      */
     void update_execution_buttons_state_(int goal_index);
+
+    /**
+    * @brief Draws the arrow interactive marker and sets its visibility flag
+    */
+    void draw_arrow_im_();
+
+    /**
+    * @brief Draws the frame interactive marker and sets its visibility flag
+    */
+    void draw_frame_im_();
+
+    /**
+    * @brief Hides the arrow interactive marker and updates its visibility flag
+    */
+    void hide_arrow_im_();
+
+    /**
+    * @brief Hides the frame interactive marker and updates its visibility flag
+    */
+    void hide_frame_im_();
 };
 
 } // namespace cca_ros_rviz_plugin

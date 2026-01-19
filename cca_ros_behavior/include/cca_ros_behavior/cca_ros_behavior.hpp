@@ -43,6 +43,8 @@ class CcaRosAction : public BT::StatefulActionNode
      * This action node requires one of the following input ports:
      * - "cca_planning_request" or "cca_planning_requests", both of which contain task description(s), optional planner
      * configuration(s), start state, and a shared pointer for monitoring status.
+     * The action node provides the following output port:
+     * - "cca_planning_response", shared pointer to the planning response from CcaRos.
      *
      * @return A list of input ports used by the action node.
      */
@@ -73,7 +75,7 @@ class CcaRosAction : public BT::StatefulActionNode
     std::jthread spinner_thread_;                                    /**< Thread to spin the node. */
     std::shared_ptr<cca_ros::Status> status_{nullptr};              /**< To check the status of the CCA action. */
     std::chrono::time_point<std::chrono::steady_clock> start_time_; /**< To monitor the timeout. */
-    static constexpr int timeout_ = 60; /**< Timeout duration for the CCA action (in seconds). */
+    static constexpr int timeout_ = 20; /**< Timeout duration for the CCA action (in seconds). */
 };
 } // namespace cca_ros_behavior
 

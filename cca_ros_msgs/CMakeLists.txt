@@ -20,17 +20,19 @@ set(msg_files
   "msg/MotionType.msg"
   "msg/PlannerConfig.msg"
   "msg/ScrewInfo.msg"
-  "msg/ScrewLocationMethod.msg"
+  "msg/PoseSpecificationMethod.msg"
   "msg/ScrewType.msg"
   "msg/TaskDescription.msg"
   "msg/UpdateMethod.msg"
   "msg/VirtualScrewOrder.msg"
   "msg/PlanningRequest.msg"
   "msg/EeOrientationConstraint.msg"
+  "msg/ScrewInfoFrom.msg"
+  "msg/PoseFrom.msg"
 )
 
 set(srv_files
-  "srv/CcaRosViz.srv"
+  "srv/CcaRosValAndViz.srv"
 )
 
 set(action_files

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>cca_ros_viz</name>
+  <name>cca_ros_val_and_viz</name>
   <version>0.0.0</version>
   <description>Houses ROS visualization code for CCA including the RVIZ plugin</description>
   <maintainer email="jpanthi@utexas.edu">crasun</maintainer>

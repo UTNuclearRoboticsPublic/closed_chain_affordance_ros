@@ -1,4 +1,4 @@
-#include "cca_ros_viz/cca_ros_rviz_plugin.hpp"
+#include "cca_ros_rviz_plugin/cca_ros_rviz_plugin.hpp"
 #include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 
 namespace cca_ros_rviz_plugin
@@ -6,6 +6,14 @@ namespace cca_ros_rviz_plugin
 CcaRosRvizPlugin::CcaRosRvizPlugin(QWidget *parent)
     : rviz_common::Panel(parent), interactive_marker_manager::InteractiveMarkerManager("cca_ros_rviz_plugin")
 {
+    // Populate planning groups combo box options from InteractiveMarkerManager
+    // We need this to the create_cca_ig_tab with planning group options
+    for (const auto &g : this->cca_planning_groups_) {
+        planning_groups_ << QString::fromStdString(g);
+    }
+    current_planning_group_ = this->default_planning_group_; // Start with default planning group from InteractiveMarkerManager
+
+    // Now create the UI
     auto *tab_widget = new QTabWidget(this);
 
     tab_widget->addTab(this->create_cca_ig_tab_(), "CCA Planning");
@@ -38,6 +46,8 @@ QWidget *CcaRosRvizPlugin::create_cca_ig_tab_()
     auto *cca_ig_tab_widget = new QWidget();
     auto *main_layout = new QVBoxLayout(cca_ig_tab_widget);
 
+    main_layout->addLayout(
+        this->create_combo_box_layout_("Planning Group:", planning_group_bl_, planning_groups_));
     main_layout->addLayout(
         this->create_combo_box_layout_("Planning Type:", mode_bl_, this->get_map_keys_(planning_type_map_)));
     auto *dynamic_content_layout = new QVBoxLayout;
@@ -116,12 +126,13 @@ void CcaRosRvizPlugin::update_ui_state_()
     motion_type_bl_.combo_box->setCurrentText("");
 
     // Hide markers
-    this->hide_im(this->arrow_marker_name_);
-    this->hide_im(this->frame_marker_name_);
+    hide_arrow_im_();
+    hide_frame_im_();
 }
 
 void CcaRosRvizPlugin::connect_signals_()
 {
+    connect(planning_group_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(planning_group_selected_()));
     connect(mode_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(mode_selected_()));
     connect(motion_type_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(motion_type_selected_()));
     connect(goal_bl_.combo_box, SIGNAL(currentIndexChanged(int)), this, SLOT(goal_selected_(int)));
@@ -135,14 +146,28 @@ void CcaRosRvizPlugin::connect_signals_()
 }
 
 // Slot function implementations follow
+void CcaRosRvizPlugin::planning_group_selected_()
+{
+    current_planning_group_ = planning_group_bl_.combo_box->currentText().toStdString();
+
+    // Update interactive markers to be in the new planning group frames
+    if (arrow_marker_visible_){
+       draw_arrow_im_();
+    }
+
+    if (frame_marker_visible_){
+       draw_frame_im_();
+    }
+}
+
 void CcaRosRvizPlugin::mode_selected_()
 {
     // Disable all execution buttons
     set_execute_buttons_enabled_(false);
 
     // Hide the markers
-    this->hide_im(this->arrow_marker_name_);
-    this->hide_im(this->frame_marker_name_);
+    hide_arrow_im_();
+    hide_frame_im_();
 
     // Check if a mode is selected
     bool mode_selected = mode_bl_.combo_box->currentIndex() != -1;
@@ -165,11 +190,7 @@ void CcaRosRvizPlugin::mode_selected_()
     else if (selected_mode == "Cartesian Goal"){ 
         
 	// We only need the frame marker
-        interactive_marker_manager::ImControlEnableInfo frame_enable_info;
-        frame_enable_info.marker_name = this->frame_marker_name_;
-        frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
-        frame_enable_info.reset = false;
-        this->enable_im_controls(frame_enable_info);
+        draw_frame_im_();
 
 	// Enable buttons for planning, executing, etc.
         set_execute_buttons_enabled_(true);
@@ -202,26 +223,18 @@ void CcaRosRvizPlugin::motion_type_selected_()
     if (motion_type == "Translation" || motion_type == "Rotation" || motion_type == "Screw")
     {
         // Enable arrow marker controls
-        interactive_marker_manager::ImControlEnableInfo arrow_enable_info;
-        arrow_enable_info.marker_name = this->arrow_marker_name_;
-        arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
-        arrow_enable_info.reset = false;
-        this->enable_im_controls(arrow_enable_info);
+            draw_arrow_im_();
 
 	// If approach motion, enable frame marker controls
 	if (mode_bl_.combo_box->currentText() == "Approach"){
-            interactive_marker_manager::ImControlEnableInfo frame_enable_info;
-            frame_enable_info.marker_name = this->frame_marker_name_;
-            frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
-            frame_enable_info.reset = false;
-            this->enable_im_controls(frame_enable_info);
+            draw_frame_im_();
 	}
     }
     else
     {
 	// Hide markers
-        this->hide_im(this->arrow_marker_name_);
-        this->hide_im(this->frame_marker_name_);
+        hide_arrow_im_();
+	hide_frame_im_();
     }
 
     // Show pitch controls for Screw motion type
@@ -273,7 +286,7 @@ void CcaRosRvizPlugin::axis_option_selected_(QString axis)
     goal_bl_.combo_box->addItems(rotation_goals_);
 
     // Draw the appropriate interactive marker
-    this->draw_ee_or_control_im(axis.toStdString());
+    this->draw_ee_or_control_im(axis.toStdString(), current_planning_group_);
 }
 void CcaRosRvizPlugin::plan_button_clicked_()
 {
@@ -282,7 +295,6 @@ void CcaRosRvizPlugin::plan_button_clicked_()
 
     // Fill out planning request and send it to the server
     auto req = build_planning_request_();
-    req.visualize_trajectory = true;
     req.execute_trajectory = false;
     ccaRosActionClient->send_goal(req);
 }
@@ -294,7 +306,6 @@ void CcaRosRvizPlugin::plan_exe_button_clicked_()
 
     // Fill out planning request and send it to the server
     auto req = build_planning_request_();
-    req.visualize_trajectory = true;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
 }
@@ -306,7 +317,6 @@ void CcaRosRvizPlugin::exe_button_clicked_()
 
     // Fill out planning request and send it to the server
     auto req = build_planning_request_();
-    req.visualize_trajectory = false;
     req.execute_trajectory = true;
     ccaRosActionClient->send_goal(req);
 }
@@ -378,6 +388,9 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
 
     cca_ros::PlanningRequest req;
 
+    // Set planning group
+    req.planning_group = current_planning_group_;
+
     // Deduce planning type
     const auto planning_type = planning_type_map_.at(mode_bl_.combo_box->currentText());
     req.task_description = cc_affordance_planner::TaskDescription(planning_type);
@@ -428,7 +441,10 @@ cca_ros::PlanningRequest CcaRosRvizPlugin::build_planning_request_()
     // If APPROACH or CARTESIAN_GOAL planning type, get the pose of the affordance start frame
     if ((planning_type == cc_affordance_planner::PlanningType::APPROACH) || (planning_type == cc_affordance_planner::PlanningType::CARTESIAN_GOAL)){
 
-        req.task_description.goal.grasp_pose = this->get_frame_pose();
+	req.task_description.canonical_pose_from.method = affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;
+        const std::string tool_frame_name = this->planning_group_frame_info_map_.at(current_planning_group_).tool_frame;
+	req.task_description.canonical_pose_from.frame_name = tool_frame_name;
+        req.task_description.canonical_pose_from.post_transform = this->get_frame_pose(); // The frame pose is in the tool frame
 
     }
 
@@ -607,6 +623,41 @@ void CcaRosRvizPlugin::update_execution_buttons_state_(int goal_index)
     }
 
     set_execute_buttons_enabled_(enable_buttons);
+}
+
+// Interactive marker helper functions follow
+void CcaRosRvizPlugin::draw_arrow_im_(){
+
+    interactive_marker_manager::ImControlEnableInfo arrow_enable_info;
+    arrow_enable_info.marker_name = this->arrow_marker_name_;
+    arrow_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
+    arrow_enable_info.reset = true;
+
+    this->enable_im_controls(arrow_enable_info, current_planning_group_);
+    arrow_marker_visible_ = true;
+}
+
+void CcaRosRvizPlugin::draw_frame_im_(){
+
+    interactive_marker_manager::ImControlEnableInfo frame_enable_info;
+    frame_enable_info.marker_name = this->frame_marker_name_;
+    frame_enable_info.enable = interactive_marker_manager::ImControlEnable::ALL;
+    frame_enable_info.reset = false;
+    frame_enable_info.in_tool_frame = true;
+
+    this->enable_im_controls(frame_enable_info, current_planning_group_);
+
+    frame_marker_visible_ = true;
+}
+
+void CcaRosRvizPlugin::hide_arrow_im_(){
+    this->hide_im(this->arrow_marker_name_, current_planning_group_);
+    arrow_marker_visible_ = false;
+}
+
+void CcaRosRvizPlugin::hide_frame_im_(){
+    this->hide_im(this->frame_marker_name_, current_planning_group_);
+    frame_marker_visible_ = false;
 }
 
 // Planning request building helper functions follow

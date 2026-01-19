@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 //      Title     : cca_ros_behavior_util.hpp
-//      Project   : cca_ros_behavior
-//      Created   : Spring 2025
+//      Project   : cca_ros_behavior_util
+//      Created   : Fall 2025
 //      Author    : Janak Panthi (Crasun Jans)
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <cca_ros/cca_ros.hpp>
 
-namespace cca_ros_behavior
+namespace cca_ros_behavior_util
 {
 
 /**
@@ -128,7 +128,7 @@ template <typename EnumType> class EnumToReq : public EnumToType<EnumType, cca_r
  *
  * @tparam EnumType Enum input type.
  */
-template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, cca_ros::PlanningRequests>
+template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, std::vector<cca_ros::PlanningRequest>>
 {
   public:
 
@@ -138,11 +138,11 @@ template <typename EnumType> class EnumToReqs : public EnumToType<EnumType, cca_
      * @param name The node's unique name in the Behavior Tree.
      * @param config Node configuration including ports.
      */
-    inline EnumToReqs(const std::string &name, const BT::NodeConfig &config) : EnumToType<EnumType, cca_ros::PlanningRequests>(name, config){}
+    inline EnumToReqs(const std::string &name, const BT::NodeConfig &config) : EnumToType<EnumType, std::vector<cca_ros::PlanningRequest>>(name, config){}
 
 };
 
-} // namespace cca_ros_behavior
+} // namespace cca_ros_behavior_util
 
 #endif // CCA_ROS_BEHAVIOR_UTIL_HPP
 
