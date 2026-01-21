@@ -76,12 +76,12 @@ To plan without a physical robot, simply provide `joint_states` and TF data.
 
 #### Programmatic Trajectory Planning
 
-1. Launch trajectory visualization server:
+1. Launch trajectory validation and visualization server:
    ```bash
-   ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py
+   ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py launch_rviz:=true
    ```
 
-2. Run the planner for defined tasks:
+2. Run the planner for tasks defined in `cca_<robot>_node.cpp`:
    ```bash
    ros2 launch cca_<robot> cca_<robot>.launch.py
    ```
@@ -95,7 +95,7 @@ To plan without a physical robot, simply provide `joint_states` and TF data.
 
 2. Launch Rviz with the interactive planning plugin:
    ```bash
-   ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py
+   ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py launch_rviz:=true
    ```
 
 ## Author
