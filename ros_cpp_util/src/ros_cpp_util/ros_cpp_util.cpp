@@ -106,7 +106,9 @@ std::vector<JointTrajPoint> get_ordered_joint_traj(const trajectory_msgs::msg::J
         }
 
         // Retrieve timestamp as well and push it into the result vector
-        ordered_traj_point.timestamp = point.time_from_start.sec;
+        ordered_traj_point.timestamp = 
+            static_cast<uint64_t>(point.time_from_start.sec) * 1000000000ULL + 
+            static_cast<uint64_t>(point.time_from_start.nanosec);
         ordered_traj.push_back(ordered_traj_point);
     }
 
