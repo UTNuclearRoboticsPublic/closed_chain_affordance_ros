@@ -98,6 +98,13 @@ To plan without a physical robot, simply provide `joint_states` and TF data.
    ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py launch_rviz:=true
    ```
 
+### Usage
+There are four ways to interact with the CCA planner through ROS2:
+1. **Programmatic Planning and Execution**: Directly call the CCA planner from within a ROS2 node (e.g., `cca_<robot>_node.cpp`).
+2. **Action Server**: Use the CCA action server to send task goals and receive planned trajectories.
+3. **Behavior Tree Integration**: Use the CCA planner as a node within a Behavior Tree for more complex task sequences.
+4. **Rviz Plugin**: Utilize the Rviz plugin for interactive task definition and planning.
+
 ## Author
 
 Janak Panthi (aka Crasun Jans)
