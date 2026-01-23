@@ -39,9 +39,19 @@ An additional `cca_<robot>` package containing robot-specific information is req
 - [Boston Dynamics Spot robot](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_spot.git)
 - [Kinova Gen3 7DoF arm](https://github.com/UTNuclearRoboticsPublic/closed_chain_affordance_kinova_gen3_7dof.git)
 
-## Rviz CCA Planning Plugin
 
-A user-friendly Rviz plugin is also available and enables visual trajectory planning and execution by simply dragging interactive markers and specifying task types and goals. Launch instructions are provided in the [Interactive Rviz Plugin Planning](#interactive-rviz-plugin-planning) section.
+## Usage
+There are four ways to interact with the CCA planner through ROS2:
+1. **Programmatic Planning and Execution**: Directly call the CCA planner from within a ROS2 node (e.g., `cca_<robot>_node.cpp`).
+2. **Behavior Tree Integration**: Use the CCA planner as a node within a Behavior Tree. See `cca_ros_behavior` package for details. Xml usage is as follows:
+    ```xml
+    <!-- for a single request, req, a shared ptr to a planning request -->
+    <CcaRosAction cca_planning_request="{req}"/>
+    <!-- or for multiple requests, reqs, a shared ptr to a vector of planning requests -->
+    <CcaRosAction cca_planning_requests="{reqs}"/>
+    ```
+3. **Action Server**: Use the CCA action server to send planning requests and receive planned trajectories. See `cca_ros_action` package for details.
+4. **Rviz Plugin**: A user-friendly Rviz plugin is also available and enables visual trajectory planning and execution by simply dragging interactive markers and specifying task types and goals. Launch instructions are provided in the [Interactive Rviz Plugin Planning](#interactive-rviz-plugin-planning) section.
 
 ## Implementing the Framework on a New Robot
 
@@ -97,13 +107,6 @@ To plan without a physical robot, simply provide `joint_states` and TF data.
    ```bash
    ros2 launch cca_<robot> cca_<robot>_val_and_viz.launch.py launch_rviz:=true
    ```
-
-### Usage
-There are four ways to interact with the CCA planner through ROS2:
-1. **Programmatic Planning and Execution**: Directly call the CCA planner from within a ROS2 node (e.g., `cca_<robot>_node.cpp`).
-2. **Action Server**: Use the CCA action server to send task goals and receive planned trajectories.
-3. **Behavior Tree Integration**: Use the CCA planner as a node within a Behavior Tree for more complex task sequences.
-4. **Rviz Plugin**: Utilize the Rviz plugin for interactive task definition and planning.
 
 ## Author
 
