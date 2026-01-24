@@ -118,9 +118,9 @@ A typical request is structured as follows:
 ```cpp
 cca_ros::PlanningRequest req;
 req.task_description = // See examples below in the "Task Description" section
-req.planning_group = // Name of the planning group for which to plan
+req.planning_group = // Name of the planning group for which to plan, for example "arm"
 req.execute_trajectory = true; // Set to true to execute the trajectory on the robot (default: false)
-req.time_step = // Time interval (in seconds) between consecutive trajectory points
+req.time_step = // Time interval (in seconds) between consecutive trajectory points, for example req.time_step.robot = 0.1;
 ```
 
 #### Optional / Advanced Settings
