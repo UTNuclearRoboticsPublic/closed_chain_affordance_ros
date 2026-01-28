@@ -295,7 +295,6 @@ task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
 task_description.goal.affordance = M_PI / 2.0; // Set desired goal for the affordance
 ```
 
-#### Cartesian Goal Planning Task
 We want to do a 90-degree rotation about the z axis of some frame B defined in relation to some frame A
 ```cpp
 // Affordance info from -- Gets axis and location 
@@ -316,6 +315,7 @@ task_description.affordance_info.type = affordance_util::ScrewType::ROTATION;
 task_description.goal.affordance = M_PI / 2.0; // Set desired goal for the affordance
 ```
 
+#### Cartesian Goal Planning Task
 We want to plan to a cartesian pose offset from some frame
 ```cpp
 // Task instatiation
