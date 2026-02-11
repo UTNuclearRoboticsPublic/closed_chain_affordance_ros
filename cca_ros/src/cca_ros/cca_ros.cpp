@@ -513,22 +513,23 @@ cca_ros::ExecutionActionClients CcaRos::initialize_action_clients_(const cca_ros
     // Function output
     cca_ros::ExecutionActionClients ex_clients;
 
-    // If robot and gripper execution server is available, that's all we need.
+    // If robot and gripper execution server is available, initialize it
     if (!ex_as_names.robot_and_gripper.empty())
     {
         ex_clients.robot_and_gripper =
             rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot_and_gripper);
-        return ex_clients;
     }
 
-    // Else initialize robot client
-    ex_clients.robot =
-        rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot);
+    // If robot-only execution server is available, initialize it
+    if (!ex_as_names.robot.empty())
+    {
+        ex_clients.robot =
+            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot);
+    }
 
-    // Initialize gripper client in addition to the robot client if that is available
+    // If gripper-only execution server is available, initialize it
     if (!ex_as_names.gripper.empty())
     {
-        // Only initialize if the gripper as name is provided
         ex_clients.gripper =
             rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.gripper);
     }
