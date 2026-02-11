@@ -331,8 +331,6 @@ class CcaRosValAndVizServer : public rclcpp::Node
             // Set the planning goal state to that trajectory point
             moveit::core::RobotState goal_state(current_state); // start from current state to preserve unplanned joints
             goal_state.setJointGroupPositions(joint_model_group_, planning_end_state);
-            moveit_msgs::msg::Constraints joint_goal =
-                kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group_);
 
             // Acquire read-only lock on the planning scene before doing anything
             {
