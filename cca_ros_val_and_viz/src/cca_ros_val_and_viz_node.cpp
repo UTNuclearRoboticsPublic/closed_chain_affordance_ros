@@ -350,7 +350,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
 		// Check and store violation check
 		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group_);
-		psm_->getPlanningScene()->checkSelfCollision(collision_request, collision_result, goal_state);
+		lscene->checkSelfCollision(collision_request, collision_result, goal_state);
 		bool self_collision_violation = collision_result.collision;
 
 		// Capture how long it took to check for violations
