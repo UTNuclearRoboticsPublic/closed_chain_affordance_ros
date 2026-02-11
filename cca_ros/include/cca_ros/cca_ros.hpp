@@ -136,6 +136,7 @@ struct PlanningRequest
         KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()}; /**< Initial kinematic state.
                                                                                       */
     bool execute_trajectory = false; /**< Whether to execute the planned trajectory. */
+    bool execute_partial_trajectory = false; /**< Whether to execute partially planned trajectory. */
     TrajectoryTimeStep time_step;    /**< Time steps for the trajectory. */
 };
 
@@ -283,7 +284,7 @@ class CcaRos : public rclcpp::Node
     constexpr static std::chrono::seconds joint_states_read_timeout_{5}; /**< Timeout for reading joint states. */ 
     constexpr static std::chrono::seconds val_and_viz_ss_avail_wait_{1}; /**< How long to wait for the validation service to be available. */ 
     constexpr static std::chrono::seconds ex_as_avail_wait_{1}; /**< How long to wait for the execution action servers to be available. */ 
-    constexpr double traj_completion_threshold_ = 0.5; /**< Completion threshold for partial trajectory execution. Planner needs to generate at least 50%. */
+    constexpr static double traj_completion_threshold_ = 0.5; /**< Completion threshold for partial trajectory execution. Planner needs to generate at least 50%. */
     constexpr static double start_state_tolerance_ = 1e-1; /**< Tolerance for start state deviation check during execution. */
     std::shared_ptr<Status> status_{nullptr};                 /**< Current status of planning and execution. */
     std::shared_ptr<Status> robot_result_status_ = {
