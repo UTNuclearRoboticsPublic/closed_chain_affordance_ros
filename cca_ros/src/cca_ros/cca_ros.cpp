@@ -89,6 +89,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     // Extract execution action server names and clients for this planning group
     const cca_ros::PlanningRequest& first_req = planning_requests.front();
     const bool execute_trajectory = first_req.execute_trajectory; // All requests have the same value due to validation
+    const bool execute_partial_trajectory = first_req.execute_partial_trajectory; // All requests have the same value due to validation
     ex_as_names_ = planning_group_info_map_.at(first_req.planning_group).ex_as_names; // Need this for create_goal_msg_ as well as execute_
     ex_clients_ = planning_group_info_map_.at(first_req.planning_group).ex_clients; // Might as well extract here too although only needed in execute_
 
@@ -380,29 +381,28 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     planning_response.result.joint_trajectory = (includes_gripper_trajectory) ? final_goal_msg.robot_and_gripper : final_goal_msg.robot;
 
     // For single original task, check if aggregated trajectory is partial and allow small deviation
-    if (single_planning_request && is_partial) {
-        const int traj_size_difference = 
-            planning_requests.front().task_description.trajectory_density - 
-            static_cast<int>(planner_result_final.joint_trajectory.size());
+    if (single_planning_request && is_partial && execute_partial_trajectory) {
+        const double traj_completion_ratio = static_cast<double>(planner_result_final.joint_trajectory.size()) / 
+            static_cast<double>(planning_requests.front().task_description.trajectory_density);
         const double affordance_limit = 
             std::copysign(planner_result_final.joint_trajectory.back().tail(1)(0), 
                          planning_requests.front().task_description.goal.affordance);
-
-        if (std::abs(traj_size_difference) <= partial_traj_failure_threshold_) {
-            RCLCPP_WARN(node_logger_,
-                "Trajectory description: PARTIAL with %d points less than FULL. "
-                "Could be due to affordance reaching limit at %f. Try "
-                "readjusting the task to this limit. Will allow execution of trajectory, but do so with caution.",
-                traj_size_difference, affordance_limit);
-        } else {
+        
+        if (traj_completion_ratio < traj_completion_threshold_) {
             RCLCPP_ERROR(node_logger_,
-                "Trajectory description: PARTIAL. Could be due to affordance reaching limit at %f. Try "
-                "readjusting the task to this limit.", affordance_limit);
+                "Trajectory description: PARTIAL. Generated %.0f%% of the trajectory (below threshold). "
+                "Could be due to affordance reaching limit at %f.",
+                traj_completion_ratio * 100, affordance_limit);
             *status_ = Status::FAILED;
             return cca_ros::PlanningResponse();
         }
+        
+        RCLCPP_WARN(node_logger_,
+            "Trajectory description: PARTIAL. Generated %.0f%% of the trajectory. "
+            "Task description is set to execute partial trajectory. Forwarding to validation service. "
+            "Partial trajectory could be due to affordance reaching limit at %f",
+            traj_completion_ratio * 100, affordance_limit);
     }
-
     // Compute cartesian trajectory for the tool
     const std::vector<geometry_msgs::msg::Pose> cartesian_trajectory = 
         this->compute_cartesian_trajectory_(planner_result_final.joint_trajectory);
@@ -411,7 +411,37 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     auto validation_response = this->validate_and_visualize_(
         final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_val_and_viz);
     
-    if (!validation_response->success) {
+    if (validation_response->success) {
+        RCLCPP_INFO(node_logger_, "%s validation service succeeded", val_and_viz_ss_name_.c_str());
+    }
+    else if (single_planning_request && execute_partial_trajectory) {
+        // Try partial execution
+        const size_t valid_end_index = static_cast<size_t>(validation_response->valid_end_index);
+        const double traj_completion_ratio = (static_cast<double>(valid_end_index) + 1.0) / 
+                                              static_cast<double>(planning_requests.front().task_description.trajectory_density);
+        
+        if (traj_completion_ratio < traj_completion_threshold_) {
+            RCLCPP_ERROR(node_logger_, 
+                "%s validation service failed and partial trajectory completion ratio (%.2f) below threshold (%.2f). "
+		"Trajectory likely violates self-collision or joint limit constraints. Check server for more info."
+		, val_and_viz_ss_name_.c_str(), traj_completion_ratio, traj_completion_threshold_);
+            *status_ = Status::FAILED;
+            return planning_response;
+        }
+        
+        // Execute partial trajectory
+        RCLCPP_WARN(node_logger_, 
+            "%s validation service failed full trajectory validation. Executing partially validated trajectory.", 
+            val_and_viz_ss_name_.c_str());
+        const size_t partial_traj_size = valid_end_index + 1; // +1 since we want to include the valid end index itself
+        final_goal_msg.robot.trajectory.points.resize(partial_traj_size);
+        if (includes_gripper_trajectory) {
+            final_goal_msg.gripper.trajectory.points.resize(partial_traj_size);
+            final_goal_msg.robot_and_gripper.trajectory.points.resize(partial_traj_size);
+        }
+    }
+    else {
+        // Validation failed and partial execution not allowed
         RCLCPP_ERROR(node_logger_, 
             "%s validation service failed. Trajectory likely violates self-collision or joint limit constraints. "
             "Check server for more info.", val_and_viz_ss_name_.c_str());
@@ -567,6 +597,7 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
     const bool robot_only_trajectory = !gripper_goal_specified;
     const bool execute_trajectory = reqs.front().execute_trajectory;
+    const bool execute_partial_trajectory = reqs.front().execute_partial_trajectory;
     const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
     const bool robot_ex_as_exists = !ex_as_names.robot.empty();
     const bool gripper_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
@@ -633,6 +664,16 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
             throw std::invalid_argument(
                 index_log + "task_description.canonical_pose_from: method FROM_FRAME_NAME requires frame_name, but is empty");
         }
+    }
+
+    // Require execute_trajectory to be true to be able to execute partial trajectory
+    if (execute_partial_trajectory && !execute_trajectory) {
+	throw std::invalid_argument("execute_partial_trajectory is set to true but execute_trajectory is false. execute_partial_trajectory can only be true if execute_trajectory is also true.");
+    }
+
+    // Ensure execute_partial_trajectory is used only for single planning request. It is not supported for multiple planning requests for safety and complexity reasons. 
+    if (execute_partial_trajectory && !single_planning_request) {
+	throw std::invalid_argument("execute_partial_trajectory is supported only for a single planning request");
     }
 }
 

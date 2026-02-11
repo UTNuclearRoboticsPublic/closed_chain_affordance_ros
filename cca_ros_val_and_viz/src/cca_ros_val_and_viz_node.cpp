@@ -436,9 +436,15 @@ class CcaRosValAndVizServer : public rclcpp::Node
 	    rviz_visual_tools_->trigger();  // only once after batching
         }
 
-	// Set success based on whether violation was found
+	// Set response
 	if (violation_found) {
 	    RCLCPP_WARN(node_logger_, "Visualized trajectory up to violation point (first %zu points)", first_violation_index);
+            // Index of the last valid point in the trajectory
+            if (first_violation_index > 0) {
+                serv_res->valid_end_index = static_cast<uint32_t>(first_violation_index - 1);
+            } else {
+                serv_res->valid_end_index = 0;
+            }
 	    serv_res->success = false;
 	} else {
 	    RCLCPP_INFO(node_logger_, "Successfully validated and visualized requested joint trajectory");
