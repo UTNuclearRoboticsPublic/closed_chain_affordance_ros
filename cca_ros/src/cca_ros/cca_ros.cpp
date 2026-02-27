@@ -90,6 +90,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     const cca_ros::PlanningRequest& first_req = planning_requests.front();
     const bool execute_trajectory = first_req.execute_trajectory; // All requests have the same value due to validation
     const bool execute_partial_trajectory = first_req.execute_partial_trajectory; // All requests have the same value due to validation
+    const std::chrono::seconds& execution_timeout = first_req.execution_timeout; // All requests have the same value due to validation
     ex_as_names_ = planning_group_info_map_.at(first_req.planning_group).ex_as_names; // Need this for create_goal_msg_ as well as execute_
     ex_clients_ = planning_group_info_map_.at(first_req.planning_group).ex_clients; // Might as well extract here too although only needed in execute_
 
@@ -454,7 +455,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     if (execute_trajectory) {
 
-        if (!this->execute_(final_goal_msg, includes_gripper_trajectory)) {
+        if (!this->execute_(final_goal_msg, includes_gripper_trajectory, execution_timeout)) {
             RCLCPP_ERROR(node_logger_, 
                 "Validated trajectory execution failed. See robot server side for more info.");
             *status_ = Status::FAILED;
@@ -598,6 +599,7 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     const bool robot_only_trajectory = !gripper_goal_specified;
     const bool execute_trajectory = reqs.front().execute_trajectory;
     const bool execute_partial_trajectory = reqs.front().execute_partial_trajectory;
+    const std::chrono::seconds& execution_timeout = reqs.front().execution_timeout;
     const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
     const bool robot_ex_as_exists = !ex_as_names.robot.empty();
     const bool gripper_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
@@ -642,6 +644,11 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
                 throw std::invalid_argument(
                     index_log + "Inconsistent execute trajectory specification. All tasks must either be executed together or none of them.");
             }
+            // Ensure all tasks have the same execution timeout
+	    if (req.execution_timeout != execution_timeout) {
+		throw std::invalid_argument(
+		    index_log + "Inconsistent execution timeout specification. All tasks must have the same execution timeout, although this timeout is applied for the entire trajectory.");
+	    }
         }
         
         // Validate frame_name is supplied if asked to lookup screw_info from frame name
@@ -879,7 +886,7 @@ cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_vis
 
 }
 
-bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory){
+bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_trajectory, const std::chrono::seconds& execution_timeout){
 
     // Setup goal options for sending trajectory goals
     auto robot_send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
@@ -895,7 +902,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
         {
             // Start a thread to check result status
             robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
 
 	    // Execute combined trajectory for robot and gripper
             return this->send_execution_goal_(ex_clients_.robot_and_gripper, robot_send_goal_options,
@@ -914,7 +921,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
             // Start a thread to check result status
             robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
             gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
     
             // Execute trajectories for both robot and gripper
             return (this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
@@ -927,7 +934,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     {
         // Start a thread to check result status
         robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-        result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory);});
+        result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
 
         // Execute only robot trajectory
         return this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
@@ -1072,7 +1079,7 @@ Status CcaRos::analyze_as_result_(const rclcpp_action::ResultCode &result_code, 
     return result_status;
 }
 
-void CcaRos::check_execution_result_status_(std::stop_token st, bool includes_gripper_trajectory)
+void CcaRos::check_execution_result_status_(std::stop_token st, bool includes_gripper_trajectory, const std::chrono::seconds& execution_timeout)
 {
    // Record start time for timeout tracking
     auto start = std::chrono::steady_clock::now();
@@ -1090,7 +1097,7 @@ void CcaRos::check_execution_result_status_(std::stop_token st, bool includes_gr
     while (!st.stop_requested() && rclcpp::ok())
     {
         // --- TIMEOUT ---
-        if (std::chrono::steady_clock::now() - start > execution_result_timeout_)
+        if (std::chrono::steady_clock::now() - start > execution_timeout)
         {
             RCLCPP_ERROR(node_logger_, "Timed out waiting for execution result on action server(s): %s", execution_as_name.c_str());
             RCLCPP_ERROR(node_logger_, "Sending cancel request and exiting.");

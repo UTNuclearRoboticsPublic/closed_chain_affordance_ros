@@ -137,6 +137,7 @@ struct PlanningRequest
                                                                                       */
     bool execute_trajectory = false; /**< Whether to execute the planned trajectory. */
     bool execute_partial_trajectory = false; /**< Whether to execute partially planned trajectory. */
+    std::chrono::seconds execution_timeout{60}; /**< Timeout for trajectory execution. CcaRos returns failure sends a cancel request to the trajectory execution server if this timeout is exceeded. */ 
     TrajectoryTimeStep time_step;    /**< Time steps for the trajectory. */
 };
 
@@ -280,7 +281,6 @@ class CcaRos : public rclcpp::Node
   private:
     std::unordered_map<std::string, cca_ros::PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
-    constexpr static std::chrono::seconds execution_result_timeout_{20}; /**< Timeout for execution result checking. */ 
     constexpr static std::chrono::seconds joint_states_read_timeout_{5}; /**< Timeout for reading joint states. */ 
     constexpr static std::chrono::seconds val_and_viz_ss_avail_wait_{1}; /**< How long to wait for the validation service to be available. */ 
     constexpr static std::chrono::seconds ex_as_avail_wait_{1}; /**< How long to wait for the execution action servers to be available. */ 
@@ -362,9 +362,10 @@ class CcaRos : public rclcpp::Node
      * @param goal_msg Goal messages for robot, gripper, and combined
      * trajectories.
      * @param includes_gripper_trajectory Whether gripper trajectory is included.
+     * @param execution_timeout Timeout for trajectory execution. If the trajectory execution server does not return a result within this timeout, CcaRos will send a cancel request and return FAILURE status.
      * @return True if execution succeeds, false otherwise.
      */
-    bool execute_(const cca_ros::GoalMsg &goal_msg, bool includes_gripper_trajectory);
+    bool execute_(const cca_ros::GoalMsg &goal_msg, bool includes_gripper_trajectory, const std::chrono::seconds& execution_timeout);
 
     /**
      * @brief Sends an execution goal to the specified action server.
@@ -420,8 +421,9 @@ class CcaRos : public rclcpp::Node
      * updates the node status.
      * @param st Stop token to handle thread cancellation.
      * @param includes_gripper_trajectory Whether gripper trajectory is included in the current task.
+     * @param execution_timeout Timeout for waiting for execution results before canceling execution request and returning FAILURE.
      */
-    void check_execution_result_status_(std::stop_token st, bool includes_gripper_trajectory);
+    void check_execution_result_status_(std::stop_token st, bool includes_gripper_trajectory, const std::chrono::seconds& execution_timeout);
 
     /**
      * @brief Creates goal messages for robot, gripper, and combined trajectories.
