@@ -34,43 +34,48 @@ BT::NodeStatus CcaRosAction::onStart()
     if (req.has_value() == reqs.has_value())
     {
         throw BT::RuntimeError(
-            "Error: Either both or none of the [cca_planning_request] or [cca_planning_requests] ports have value."
+            "Error: Either both or none of the [cca_planning_request] or [cca_planning_requests] ports have value. "
             "Please specify one and only one.");
     }
 
-    // Assign the final request based on available input. One of them is available at this point.
-    using RequestVariant = std::variant<PlanningRequestPtr, PlanningRequestsPtr>;
-    auto cca_req_variant = req.has_value() ? RequestVariant(req.value())   // Use the single request if provided
-                                           : RequestVariant(reqs.value()); // Otherwise, use multiple requests
+    // Process based on which input is available
+    cca_ros::PlanningResponse response;
 
-    // Lambda to process the requests
-    auto process_request = [this](const auto &cca_req) -> BT::NodeStatus {
+    if (req.has_value())
+    {
+        timeout_ = req.value()->execution_timeout;
+        response = node_->plan(*req.value());
+    }
+    else // reqs.has_value()
+    {
+        timeout_ = reqs.value()->front().execution_timeout;
+        response = node_->plan(*reqs.value());
+    }
 
-        // Run the CCA planner and retrieve response
-	cca_ros::PlanningResponse response = node_->plan(*cca_req);
-        const auto response_ptr = std::make_shared<cca_ros::PlanningResponse>(response);
-        setOutput("cca_planning_response", response_ptr); // Set the output port with the response regardless of success or failure
-        status_ = response.status;
-        if (!response.result.success)
-        {
-            return BT::NodeStatus::FAILURE; // Return failure if planning fails
-        }
+    // Record start time to monitor timeout
+    start_time_ = std::chrono::steady_clock::now();
 
-        // Record start time to monitor timeout
-        start_time_ = std::chrono::steady_clock::now();
+    // Put response in output port regardless of success or failure
+    const auto response_ptr = std::make_shared<cca_ros::PlanningResponse>(response);
+    setOutput("cca_planning_response", response_ptr);
 
-        return BT::NodeStatus::RUNNING; // Return running status if planning succeeds
-    };
+    // Store a pointer to the status for monitoring in onRunning
+    status_ = response.status;
 
-    // Use std::visit to handle both types
-    return std::visit([this, &process_request](auto &cca_req) { return process_request(cca_req); }, cca_req_variant);
+    // Return failure if planning fails
+    if (!response.result.success)
+    {
+        return BT::NodeStatus::FAILURE;
+    }
+
+    return BT::NodeStatus::RUNNING; // Return running status if planning succeeds
 }
 
 BT::NodeStatus CcaRosAction::onRunning()
 {
     // Check if the CCA action has timed out
     auto current_time = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time_).count() > timeout_)
+    if (std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time_) > timeout_)
     {
         RCLCPP_ERROR(node_->get_logger(), "Timed out waiting for CCA action request to complete.");
         return BT::NodeStatus::FAILURE;
@@ -81,6 +86,11 @@ BT::NodeStatus CcaRosAction::onRunning()
     {
         RCLCPP_INFO(node_->get_logger(), "CCA action successfully completed");
         return BT::NodeStatus::SUCCESS;
+    }
+    else if (*status_ == cca_ros::Status::FAILED)
+    {
+        RCLCPP_ERROR(node_->get_logger(), "CCA action may have been canceled or aborted.");
+        return BT::NodeStatus::FAILURE;
     }
     else if (*status_ == cca_ros::Status::UNKNOWN)
     {

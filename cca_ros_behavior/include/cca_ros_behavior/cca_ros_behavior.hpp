@@ -75,7 +75,6 @@ class CcaRosAction : public BT::StatefulActionNode
     std::jthread spinner_thread_;                                    /**< Thread to spin the node. */
     std::shared_ptr<cca_ros::Status> status_{nullptr};              /**< To check the status of the CCA action. */
     std::chrono::time_point<std::chrono::steady_clock> start_time_; /**< To monitor the timeout. */
-    static constexpr int timeout_ = 20; /**< Timeout duration for the CCA action (in seconds). */
 };
 } // namespace cca_ros_behavior
 
