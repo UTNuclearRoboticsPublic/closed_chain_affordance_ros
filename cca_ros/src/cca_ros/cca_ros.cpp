@@ -902,7 +902,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
         {
             // Start a thread to check result status
             robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory, execution_timeout](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
 
 	    // Execute combined trajectory for robot and gripper
             return this->send_execution_goal_(ex_clients_.robot_and_gripper, robot_send_goal_options,
@@ -921,7 +921,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
             // Start a thread to check result status
             robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
             gripper_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-            result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
+            result_status_thread_ = std::jthread([this, includes_gripper_trajectory, execution_timeout](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
     
             // Execute trajectories for both robot and gripper
             return (this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
@@ -934,7 +934,7 @@ bool CcaRos::execute_(const cca_ros::GoalMsg& goal_msg, bool includes_gripper_tr
     {
         // Start a thread to check result status
         robot_result_status_ = std::make_shared<cca_ros::Status>(cca_ros::Status::PROCESSING);
-        result_status_thread_ = std::jthread([this, includes_gripper_trajectory](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
+        result_status_thread_ = std::jthread([this, includes_gripper_trajectory, execution_timeout](std::stop_token st) {this->check_execution_result_status_(st, includes_gripper_trajectory, execution_timeout);});
 
         // Execute only robot trajectory
         return this->send_execution_goal_(ex_clients_.robot, robot_send_goal_options,
