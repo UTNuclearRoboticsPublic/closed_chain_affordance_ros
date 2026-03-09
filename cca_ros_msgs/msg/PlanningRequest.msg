@@ -1,3 +1,4 @@
+string planning_group
 cca_ros_msgs/PlannerConfig planner_config
 cca_ros_msgs/TaskDescription task_description
 cca_ros_msgs/KinematicState start_state

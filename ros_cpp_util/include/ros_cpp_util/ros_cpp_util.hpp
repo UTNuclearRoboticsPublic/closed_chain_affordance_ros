@@ -40,7 +40,6 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <tf2_ros/buffer.h>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <unordered_map>
 
@@ -83,7 +82,7 @@ std::string get_filepath_inside_pkg(const std::string &package_name, const std::
 struct JointTrajPoint
 {
     Eigen::VectorXd positions;
-    int timestamp; // In seconds
+    uint64_t timestamp; // In nanoseconds
 };
 
 /**
@@ -123,20 +122,6 @@ JointTrajPoint get_ordered_joint_states(const sensor_msgs::msg::JointState::Cons
                                         const std::vector<std::string> &joint_name_order);
 
 /**
- * @brief Given a space frame name, body frame name, and tf buffer, returns the transformation of the body frame with
- * respect to the space frame.
- *
- * @param space_frame std::string containing space_frame name
- * @param body_frame std::string containing body_frame name
- * @param tf_buffer tf2_ros::Buffer containing an empty buffer
- * @param timeout_secs optional double containing lookup timeout in seconds. Default value is 0.3
- *
- * @return Eigen::Isometry3d containing the transformation of the body frame wrt to space frame
- */
-Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &body_frame, tf2_ros::Buffer &tf_buffer,
-                          double timeout_secs = 0.3);
-
-/**
  * @brief Given a bare differential joint trajectory (i.e. just a vector of differential joint trajectory points from a
  * reference point), reference trajectory point, joint names, and desired time step between trajectory points, returns
  * a ROS follow_joint_trajectory message
@@ -146,13 +131,74 @@ Eigen::Isometry3d get_htm(const std::string &space_frame, const std::string &bod
  * @param config_offset Eigen::VectorXd containing reference trajectory point
  * @param joint_names std::vector<std::string> containing joint names. Ensure the order of the joint names matches the
  * order of joint positions
- * @param time_step Optional double containing time step. Default is 0.05
+ * @param time_step Double containing time delta between consecutive points
  *
  * @return control_msgs::FollowJointTrajectoryGoal containing ready-to-use ROS follow_joint_trajectory message
  */
 control_msgs::action::FollowJointTrajectory_Goal follow_joint_trajectory_msg_builder(
     const std::vector<Eigen::VectorXd> &bare_trajectory, const Eigen::VectorXd &config_offset,
-    const std::vector<std::string> &joint_names, const double &time_step = 0.05);
+    const std::vector<std::string> &joint_names, const double &time_step);
+
+/**
+ * @brief Stitches multiple joint trajectories into one continuous trajectory with updated time stamps.
+ *
+ * Given a vector of individual ROS `JointTrajectory` messages (typically generated sequentially),
+ * this function merges them into a single `JointTrajectory`, ensuring that:
+ *   - Joint names match across all input trajectories
+ *   - Time offsets are adjusted to produce a smooth, continuous timeline
+ *
+ * @param trajectories Vector of `trajectory_msgs::msg::JointTrajectory` to be stitched together. 
+ *        Each trajectory must have the same joint name ordering.
+ *
+ * @return A single `trajectory_msgs::msg::JointTrajectory` representing the time-continuous
+ *         stitched result. If input vector is empty, returns an empty trajectory.
+ *
+ * @throws std::runtime_error if joint names do not match across input trajectories.
+ */
+trajectory_msgs::msg::JointTrajectory stitch_trajectories(const std::vector<trajectory_msgs::msg::JointTrajectory>& trajectories);
+
+/**
+* @brief Retrieves a required string parameter from the ROS node. Throws an exception if the parameter is not found.
+*
+* @param node pointer to the ROS node
+* @param key name of the parameter
+*
+* @return the string value of the parameter
+*/
+std::string get_required_str_param(rclcpp::Node* node, const std::string& key);
+
+/**
+* @brief Retrieves a required string array parameter from the ROS node. Throws an exception if the parameter is not found.
+*
+* @param node pointer to the ROS node
+* @param key name of the parameter
+*
+* @return the string array value of the parameter
+*/
+std::vector<std::string> get_required_str_array_param(rclcpp::Node* node, const std::string& key);
+
+/**
+* @brief Retrieves a required double array parameter from the ROS node. Throws an exception if the parameter is not found.
+*
+* @param node pointer to the ROS node
+* @param key name of the parameter
+*
+* @return the double array value of the parameter
+*/
+std::vector<double> get_required_double_array_param(rclcpp::Node* node, const std::string& key);
 } // namespace ros_cpp_util
+
+// Helpers restricted to this file
+namespace {
+/**
+* @brief Logs an error and throws an exception when parameter retrieval fails.
+*
+* @param node pointer to the ROS node
+* @param key name of the parameter
+* @param expected_type expected type of the parameter
+* @param got boolean indicating if the parameter was retrieved
+*/
+[[noreturn]] void log_and_throw_param_retrieval_failure(const rclcpp::Node* node, const std::string& key, const std::string& expected_type, bool got); 
+}
 
 #endif // ROS_CPP_UTIL_HPP_
