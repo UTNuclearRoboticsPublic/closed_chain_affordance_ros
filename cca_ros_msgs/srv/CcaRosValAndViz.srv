@@ -9,4 +9,5 @@ string ref_frame # reference frame for EE FK computation
 ---
 # Result
 bool success # whether planning and visualization was successful
+uint32 valid_end_index # index of the last valid point in the trajectory
 int64 validation_time_usecs # amount of microseconds taken to validate self-collision and joint limits

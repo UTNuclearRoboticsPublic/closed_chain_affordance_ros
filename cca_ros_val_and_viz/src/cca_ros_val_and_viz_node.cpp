@@ -196,7 +196,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
     // Reorders the trajectory to match a given joint name order (e.g., for a planning group or the full robot)
     trajectory_msgs::msg::JointTrajectory reorder_trajectory_(
         const trajectory_msgs::msg::JointTrajectory &input_traj,
-        const std::vector<std::string> &target_joint_names)
+        const std::vector<std::string> &target_joint_names, 
+	const moveit::core::RobotState& current_state)
     {
         trajectory_msgs::msg::JointTrajectory ordered_traj;
         ordered_traj.header = input_traj.header;
@@ -207,13 +208,6 @@ class CcaRosValAndVizServer : public rclcpp::Node
         for (size_t i = 0; i < input_traj.joint_names.size(); ++i)
         {
     	name_to_index[input_traj.joint_names[i]] = i;
-        }
-    
-        // Pull a fresh robot state
-        moveit::core::RobotState fresh_state(*robot_state_);
-        {
-    	planning_scene_monitor::LockedPlanningSceneRO scene(psm_);
-    	fresh_state = scene->getCurrentState();
         }
     
         // Reorder each point according to target_joint_names
@@ -233,9 +227,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
     	    }
     	    else
     	    {
-    		new_point.positions[i] = fresh_state.getVariablePosition(name);
-    		// RCLCPP_ERROR(node_logger_, "Joint '%s' missing in trajectory point. Using current robot state.",
-    		// 	     name.c_str());
+    		new_point.positions[i] = current_state.getVariablePosition(name);
     	    }
     	}
     
@@ -257,9 +249,16 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
+        // Get fresh robot state
+        moveit::core::RobotState current_state(*robot_state_);
+        {
+            planning_scene_monitor::LockedPlanningSceneRO scene(psm_);
+            current_state = scene->getCurrentState();
+        }
+
         // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request reference
         // frame
-        Eigen::Isometry3d T_w_r = robot_state_->getGlobalLinkTransform(serv_req->ref_frame);
+        Eigen::Isometry3d T_w_r = current_state.getGlobalLinkTransform(serv_req->ref_frame);
 
         // Validate affordance info sizes
         if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
@@ -317,21 +316,21 @@ class CcaRosValAndVizServer : public rclcpp::Node
         }
 
 	// (Re)order trajectory to match MoveIt planning group order
-	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_names);
+	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_names, current_state);
 
         std::chrono::microseconds total_viol_check_duration{0}; // for joint limits and collision checking
 
 	size_t pt_index = 0;
+	size_t first_violation_index = ordered_group_traj.points.size(); // Initialize to full trajectory length
+	bool violation_found = false;
         for (const auto &point : ordered_group_traj.points)
         {
             // Copy the joint trajectory point to a std::vector<double> type
             std::vector<double> planning_end_state(point.positions.begin(), point.positions.end());
 
             // Set the planning goal state to that trajectory point
-            moveit::core::RobotState goal_state(*robot_state_);
+            moveit::core::RobotState goal_state(current_state); // start from current state to preserve unplanned joints
             goal_state.setJointGroupPositions(joint_model_group_, planning_end_state);
-            moveit_msgs::msg::Constraints joint_goal =
-                kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group_);
 
             // Acquire read-only lock on the planning scene before doing anything
             {
@@ -349,7 +348,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
 		// Check and store violation check
 		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group_);
-		psm_->getPlanningScene()->checkSelfCollision(collision_request, collision_result, goal_state);
+		lscene->checkSelfCollision(collision_request, collision_result, goal_state);
 		bool self_collision_violation = collision_result.collision;
 
 		// Capture how long it took to check for violations
@@ -393,39 +392,64 @@ class CcaRosValAndVizServer : public rclcpp::Node
 			    RCLCPP_ERROR(node_logger_, jl_err_log.c_str());
 		    }
 
-		    return;
+		    // Mark violation found and store the index, then break
+		    violation_found = true;
+		    first_violation_index = pt_index;
+		    break; 
 
 		}
             }
 	    ++pt_index;
         }
 
-	// Since no joint‐limit or self‐collision violation, now visualize the trajectory
 	// Transform the trajectory to the full robot trajectory for visualization, i.e. by adding the current state of the unplanned joints
-	trajectory_msgs::msg::JointTrajectory ordered_robot_traj = reorder_trajectory_(serv_req->joint_traj, robot_state_->getVariableNames());
+	trajectory_msgs::msg::JointTrajectory ordered_robot_traj = reorder_trajectory_(serv_req->joint_traj, current_state.getVariableNames(), current_state);
 
-	moveit_msgs::msg::DisplayTrajectory display_trajectory;
-
-	// Set start state 
-	display_trajectory.trajectory_start.joint_state.name     = ordered_robot_traj.joint_names;
-	display_trajectory.trajectory_start.joint_state.position = ordered_robot_traj.points.front().positions;
-
-	// Fill out the trajectory
-	auto &robot_traj = display_trajectory.trajectory.emplace_back();
-	robot_traj.joint_trajectory = ordered_robot_traj;
-
-	// Publish the joint trajectory
-	moveit_planned_path_pub_->publish(display_trajectory);
-
-        // Publish the tool trajectory
-	for (const auto& pose : serv_req->cartesian_traj)
-	{
-	    rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
+	// Truncate trajectories for visualization if violation was found
+	trajectory_msgs::msg::JointTrajectory viz_joint_traj = ordered_robot_traj;
+        auto viz_cart_traj = serv_req->cartesian_traj; 
+	if (violation_found && first_violation_index > 0) {
+            // Keep only the points up to (but not including) the violation point for visualization
+	    viz_joint_traj.points.resize(first_violation_index);
+            viz_cart_traj.resize(first_violation_index);
 	}
-	rviz_visual_tools_->trigger();  // only once after batching
 
-        RCLCPP_INFO(node_logger_, "Successfully visualized requested joint trajectory");
-        serv_res->success = true;
+	if (!viz_joint_traj.points.empty()) {
+	    moveit_msgs::msg::DisplayTrajectory display_trajectory;
+
+	    // Set start state 
+	    display_trajectory.trajectory_start.joint_state.name     = viz_joint_traj.joint_names;
+	    display_trajectory.trajectory_start.joint_state.position = viz_joint_traj.points.front().positions;
+
+	    // Fill out the trajectory
+	    auto &robot_traj = display_trajectory.trajectory.emplace_back();
+	    robot_traj.joint_trajectory = viz_joint_traj;
+
+	    // Publish the joint trajectory
+	    moveit_planned_path_pub_->publish(display_trajectory);
+
+            // Publish the tool trajectory
+	    for (const auto& pose : viz_cart_traj)
+	    {
+	        rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
+	    }
+	    rviz_visual_tools_->trigger();  // only once after batching
+        }
+
+	// Set response
+	if (violation_found) {
+	    RCLCPP_WARN(node_logger_, "Visualized trajectory up to violation point (first %zu points)", first_violation_index);
+            // Index of the last valid point in the trajectory
+            if (first_violation_index > 0) {
+                serv_res->valid_end_index = static_cast<uint32_t>(first_violation_index - 1);
+            } else {
+                serv_res->valid_end_index = 0;
+            }
+	    serv_res->success = false;
+	} else {
+	    RCLCPP_INFO(node_logger_, "Successfully validated and visualized requested joint trajectory");
+	    serv_res->success = true;
+	}
         serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
     }
 };
