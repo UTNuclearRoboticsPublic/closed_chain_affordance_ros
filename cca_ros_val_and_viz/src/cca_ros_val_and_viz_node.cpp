@@ -336,7 +336,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
             {
                 planning_scene_monitor::LockedPlanningSceneRO lscene(psm_);
 
-		// Check for joint limit and self-collision violation
+		// Check for joint limit and collision violation
 		auto start_time = std::chrono::high_resolution_clock::now(); // start time for this point in traj
 
 		// Set up collision requests and results
@@ -349,7 +349,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 		// Check and store violation check
 		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group_);
 		lscene->checkCollision(collision_request, collision_result, goal_state);
-		bool self_collision_violation = collision_result.collision;
+		bool collision_violation = collision_result.collision;
 
 		// Capture how long it took to check for violations
 		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
@@ -357,11 +357,11 @@ class CcaRosValAndVizServer : public rclcpp::Node
 		total_viol_check_duration += point_duration;
 
 		// Log violation
-		if (joint_limit_violation || self_collision_violation) {
+		if (joint_limit_violation || collision_violation) {
 
 		    std::string violation_type =
-                    (joint_limit_violation && self_collision_violation) ? "Joint Limit Violation & Self-Collision" :
-                    joint_limit_violation ? "Joint Limit Violation" : "Self-Collision";
+                    (joint_limit_violation && collision_violation) ? "Joint Limit Violation & Collision" :
+                    joint_limit_violation ? "Joint Limit Violation" : "Collision";
 
 		    
 		    const double* goal_positions = goal_state.getVariablePositions();
@@ -376,8 +376,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
 		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point[%zu]: [%s]",
 		    	     violation_type.c_str(), pt_index, oss.str().c_str());
 
-		    // If self-collision occurs, print the contacts
-		    if (self_collision_violation){
+		    // If collision occurs, print the contacts
+		    if (collision_violation){
 			    collision_detection::CollisionResult::ContactMap::const_iterator it;
 			    for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it)
 			    {
@@ -458,6 +458,7 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
+    node_options.automatically_declare_parameters_from_overrides(true); // Useful to extract params from sensors_3d.yaml where we don't know sensor names beforehand
     auto node = std::make_shared<CcaRosValAndVizServer>(node_options);
     node->initialize();
 
