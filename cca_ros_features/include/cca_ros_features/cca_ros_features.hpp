@@ -8,12 +8,14 @@
 #ifndef CCA_ROS_FEATURES_HPP_
 #define CCA_ROS_FEATURES_HPP_
 
-#include <cca_ros/cca_ros.hpp>
+#include <Eigen/Geometry>
 #include <affordance_util/affordance_util.hpp>
+#include <cca_ros/cca_ros.hpp>
 #include <chrono>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <optional>
+#include <tf2_eigen/tf2_eigen.hpp>
 
 namespace cca_ros_features
 {

@@ -1,3 +1,10 @@
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : cca_ros_features.cpp
+//      Project   : cca_ros_features
+//      Created   : 2026
+//      Author    : Crasun Jans
+///////////////////////////////////////////////////////////////////////////////
+
 #include "cca_ros_features/cca_ros_features.hpp"
 
 namespace cca_ros_features
@@ -12,8 +19,7 @@ std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
     int arm_start_index_in_wbc_traj,
     int arm_num_joints)
 {
-
- // Set canonical_pose_from base for all planning requests
+    // Set canonical_pose_from base for all planning requests
     const std::string &grasp_pose_frame_id = grasp_poses.header.frame_id;
     affordance_util::PoseFrom canonical_pose_from_base;
     canonical_pose_from_base.method = affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;

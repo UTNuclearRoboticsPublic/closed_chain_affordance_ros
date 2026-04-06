@@ -3,13 +3,14 @@
 <package format="3">
   <name>cca_ros_behavior_features</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>cca_ros_features functions wrapped as BehaviorTree.CPP nodes</description>
   <maintainer email="jpanthi@utexas.edu">cjans-admin</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>behaviortree_cpp</depend>
   <depend>cca_ros_features</depend>
 
   <test_depend>ament_lint_auto</test_depend>

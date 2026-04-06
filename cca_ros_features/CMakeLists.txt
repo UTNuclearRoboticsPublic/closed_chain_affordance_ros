@@ -19,19 +19,26 @@ find_package(tf2_eigen REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(affordance_util REQUIRED)
 
-include_directories(
-  include
-  ${rclcpp_INCLUDE_DIRS}
-  ${Eigen3_INCLUDE_DIRS}
-)
-
 add_library(${PROJECT_NAME} SHARED
-  src/${PROJECT_NAME}/${PROJECT_NAME}.cpp
+  src/${PROJECT_NAME}.cpp
 )
 
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp PUBLIC cca_ros PUBLIC geometry_msgs PUBLIC tf2_eigen)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC affordance_util::affordance_util PUBLIC Eigen3::Eigen)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC
+  rclcpp
+  cca_ros
+  geometry_msgs
+  tf2_eigen
+)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  affordance_util::affordance_util
+  Eigen3::Eigen
+)
 
 ament_export_dependencies(rclcpp cca_ros geometry_msgs tf2_eigen affordance_util Eigen3)
 

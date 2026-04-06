@@ -3,7 +3,7 @@
 <package format="3">
   <name>cca_ros_features</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Higher-level feature library built on cca_ros (e.g. getAffordativeGraspPose)</description>
   <maintainer email="jpanthi@utexas.edu">cjans-admin</maintainer>
   <license>TODO: License declaration</license>
 

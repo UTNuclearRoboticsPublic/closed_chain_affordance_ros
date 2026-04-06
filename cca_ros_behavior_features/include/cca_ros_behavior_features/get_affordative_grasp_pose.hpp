@@ -1,61 +1,58 @@
-#ifndef GET_AFFORDATIVE_GRASP_POSE_HPP
-#define GET_AFFORDATIVE_GRASP_POSE_HPP
+///////////////////////////////////////////////////////////////////////////////
+//      Title     : get_affordative_grasp_pose.hpp
+//      Project   : cca_ros_behavior_features
+//      Created   : 2026
+//      Author    : Crasun Jans
+///////////////////////////////////////////////////////////////////////////////
 
-#include "rclcpp/rclcpp.hpp"
-#include <Eigen/Core>
-#include <affordance_util/affordance_util.hpp>
-#include <atomic>
+#ifndef GET_AFFORDATIVE_GRASP_POSE_HPP_
+#define GET_AFFORDATIVE_GRASP_POSE_HPP_
+
 #include <behaviortree_cpp/action_node.h>
-#include <cc_affordance_planner/cc_affordance_planner.hpp>
-#include <cc_affordance_planner/cc_affordance_planner_interface.hpp>
 #include <cca_ros/cca_ros.hpp>
+#include <cca_ros_features/cca_ros_features.hpp>
 #include <chrono>
-#include <condition_variable>
+#include <future>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
-#include <mutex>
-#include <tf2_eigen/tf2_eigen.hpp>
-#include <thread>
-#include <vector>
-#include <cca_ros_features/cca_ros_features.hpp>
+#include <optional>
+#include <rclcpp/rclcpp.hpp>
+
+namespace cca_ros_behavior_features
+{
 
 /**
  * @brief Behavior Tree action node that finds the first affordative grasp pose
  *        from a set of candidate grasp poses by planning in parallel.
  *
  * For each candidate grasp pose, a dedicated CcaRos planner is spawned in its
- * own thread. Each thread attempts to plan a full grasp sequence consisting of:
+ * own thread and attempts to plan a full grasp sequence:
  *   1. A whole-body controller (WBC) approach
- *   2. An arm approach
+ *   2. An arm approach (seeded from the WBC end state)
  *   3. An arm grab
  *
- * The node returns the first affordative grasp pose, i.e. the first grasp pose for which all three plans succeed,
- * or FAILURE if no candidate pose yields a valid plan.
+ * The node returns the first affordative grasp pose — i.e. the first candidate
+ * for which all three plans succeed — or FAILURE if no candidate yields a valid
+ * plan within the timeout.
  *
- * Notable assumptions: Both wbc and arm planning requests contain gripper goals
+ * @note Both WBC and arm planning requests are assumed to contain gripper goals.
+ * @note The rclcpp::Node::SharedPtr is read from the blackboard key @c "node".
  *
  * @par BT Ports
- * | Direction | Name                    | Type                                          | Description |
- * |-----------|-------------------------|-----------------------------------------------|--------------------------------------------------|
- * | Input     | wbc_approach_req        | std::shared_ptr<CcaRos::PlanningRequest>      | Planning request for the WBC
- * approach motion     | | Input     | arm_approach_req        | std::shared_ptr<CcaRos::PlanningRequest>      |
- * Planning request for the arm approach motion     | | Input     | arm_grab_req            |
- * std::shared_ptr<CcaRos::PlanningRequest>      | Planning request for the arm grab motion         | | Input     |
- * grasp_poses             | std::shared_ptr<geometry_msgs::msg::PoseArray>| Array of candidate grasp poses to evaluate
- * | | Output    | affordative_grasp_pose  | std::shared_ptr<geometry_msgs::msg::PoseStamped> | First grasp pose for
- * which all plans succeeded|
- *
- * @inherits BT::SyncActionNode
- * @inherits rclcpp::Node
+ * | Direction | Name                   | Type                                             | Description                                      |
+ * |-----------|------------------------|--------------------------------------------------|--------------------------------------------------|
+ * | Input     | wbc_approach_req       | std::shared_ptr<cca_ros::PlanningRequest>        | Planning request for the WBC approach motion     |
+ * | Input     | arm_approach_req       | std::shared_ptr<cca_ros::PlanningRequest>        | Planning request for the arm approach motion     |
+ * | Input     | arm_grab_req           | std::shared_ptr<cca_ros::PlanningRequest>        | Planning request for the arm grab motion         |
+ * | Input     | grasp_poses            | std::shared_ptr<geometry_msgs::msg::PoseArray>   | Array of candidate grasp poses to evaluate       |
+ * | Output    | affordative_grasp_pose | std::shared_ptr<geometry_msgs::msg::PoseStamped> | First grasp pose for which all plans succeeded   |
  */
-namespace cca_ros_behavior_features
-{
-class GetAffordativeGraspPose : public BT::SyncActionNode, public rclcpp::Node
+class GetAffordativeGraspPose : public BT::StatefulActionNode
 {
   public:
     /**
      * @brief Construct a GetAffordativeGraspPose node.
-     * @param name  The name of the node, used for both the BT node and the ROS 2 node.
+     * @param name   Name of the BT node.
      * @param config BT node configuration containing the blackboard and port mappings.
      */
     GetAffordativeGraspPose(const std::string &name, const BT::NodeConfig &config);
@@ -67,24 +64,37 @@ class GetAffordativeGraspPose : public BT::SyncActionNode, public rclcpp::Node
     static BT::PortsList providedPorts();
 
     /**
-     * @brief Executes the node logic.
+     * @brief Reads input ports, validates them, and launches the parallel planning search asynchronously.
      *
-     * Reads all input ports, spawns one planning thread per candidate grasp pose,
-     * and waits for the first successful full plan or for all threads to complete.
-     *
-     * @return BT::NodeStatus::SUCCESS if an affordative grasp pose is found.
-     * @return BT::NodeStatus::FAILURE if any input port is missing or no valid plan is found.
+     * @throws BT::RuntimeError if any required input port is missing or invalid.
+     * @return BT::NodeStatus::RUNNING after launching the async planning task.
      */
-    BT::NodeStatus tick() override;
+    BT::NodeStatus onStart() override;
+
+    /**
+     * @brief Polls the async planning task for completion on each BT tick.
+     *
+     * @return BT::NodeStatus::RUNNING while planning is in progress.
+     * @return BT::NodeStatus::SUCCESS if an affordative grasp pose was found; sets the output port.
+     * @return BT::NodeStatus::FAILURE if no valid plan was found within the timeout.
+     */
+    BT::NodeStatus onRunning() override;
+
+    /**
+     * @brief Waits for the async planning task to finish before releasing resources.
+     */
+    void onHalted() override;
 
   private:
-    const std::chrono::milliseconds timeout_{
-        100}; ///< Maximum time to wait for planning threads to find an affordative grasp pose
-    static constexpr int arm_start_index_in_wbc_traj =
-        3; ///< Starting index of arm joints in the whole-body trajectory (first three are for the base)
-    static constexpr int arm_num_joints = 6; ///< Number of arm joints
+    rclcpp::Node::SharedPtr node_; ///< ROS 2 node obtained from the blackboard key "node"
+    std::future<std::optional<geometry_msgs::msg::PoseStamped>> result_future_; ///< Async planning result
+
+    static constexpr std::chrono::milliseconds timeout_{100}; ///< Maximum time to wait for any planning thread
+    static constexpr int arm_start_index_in_wbc_traj_ =
+        3; ///< Starting index of arm joints in the WBC trajectory (first three joints are for the base)
+    static constexpr int arm_num_joints_ = 6; ///< Number of arm joints
 };
 
 } // namespace cca_ros_behavior_features
 
-#endif // GET_AFFORDATIVE_GRASP_POSE_HPP
+#endif // GET_AFFORDATIVE_GRASP_POSE_HPP_
