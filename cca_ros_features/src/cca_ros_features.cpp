@@ -14,7 +14,7 @@ std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
 {
 
  // Set canonical_pose_from base for all planning requests
-    const std::string &grasp_pose_frame_id = grasp_poses->header.frame_id;
+    const std::string &grasp_pose_frame_id = grasp_poses.header.frame_id;
     affordance_util::PoseFrom canonical_pose_from_base;
     canonical_pose_from_base.method = affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;
     canonical_pose_from_base.frame_name = grasp_pose_frame_id;
@@ -36,10 +36,10 @@ std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
     // Create a planner per grasp pose
     // NOTE: geometry_msgs::msg::Pose has no hash, so we use index-based storage
     std::vector<std::pair<geometry_msgs::msg::Pose, std::shared_ptr<cca_ros::CcaRos>>> grasp_pose_to_planners;
-    for (size_t i = 0; i < grasp_poses->poses.size(); ++i)
+    for (size_t i = 0; i < grasp_poses.poses.size(); ++i)
     {
         auto planner = std::make_shared<cca_ros::CcaRos>("cca_ros_" + std::to_string(i), rclcpp::NodeOptions());
-        grasp_pose_to_planners.emplace_back(grasp_poses->poses[i], planner);
+        grasp_pose_to_planners.emplace_back(grasp_poses.poses[i], planner);
     }
 
     const size_t total_threads = grasp_pose_to_planners.size();
@@ -69,12 +69,12 @@ std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
         affordance_info_from.post_transform = grasp_pose_eigen.matrix();
 
         // Plan WBC approach
-        auto wbc_approach_req = *wbc_approach_req_ptr;
-        wbc_approach_req.execute_trajectory = false;
-        wbc_approach_req.task_description.affordance_info_from = affordance_info_from;
-        wbc_approach_req.task_description.canonical_pose_from = canonical_pose_from;
+        auto wbc_approach_req_l = wbc_approach_req;
+        wbc_approach_req_l.execute_trajectory = false;
+        wbc_approach_req_l.task_description.affordance_info_from = affordance_info_from;
+        wbc_approach_req_l.task_description.canonical_pose_from = canonical_pose_from;
         rclcpp::spin_some(planner); // We wanna read current state here
-        auto wbc_approach_response = planner->plan(wbc_approach_req);
+        auto wbc_approach_response = planner->plan(wbc_approach_req_l);
         if (!wbc_approach_response.result.success || stop_token.stop_requested())
         {
             std::lock_guard<std::mutex> lock(result_mutex);
@@ -84,24 +84,24 @@ std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
         }
 
         // Update arm approach request, seeding start state from WBC result
-        auto arm_approach_req = *arm_approach_req_ptr;
-        arm_approach_req.execute_trajectory = false;
-        arm_approach_req.task_description.affordance_info_from = affordance_info_from;
-        arm_approach_req.task_description.canonical_pose_from = canonical_pose_from;
+        auto arm_approach_req_l = arm_approach_req;
+        arm_approach_req_l.execute_trajectory = false;
+        arm_approach_req_l.task_description.affordance_info_from = affordance_info_from;
+        arm_approach_req_l.task_description.canonical_pose_from = canonical_pose_from;
         const Eigen::VectorXd &wbc_traj_end_point = wbc_approach_response.result.cca_result.joint_trajectory.back();
         const Eigen::VectorXd &arm_start_state =
             wbc_traj_end_point.segment(arm_start_index_in_wbc_traj, arm_num_joints);
         const double gripper_start_state = wbc_traj_end_point(arm_start_index_in_wbc_traj + arm_num_joints);
-        arm_approach_req.start_state.robot = arm_start_state;
-        arm_approach_req.start_state.gripper = gripper_start_state;
+        arm_approach_req_l.start_state.robot = arm_start_state;
+        arm_approach_req_l.start_state.gripper = gripper_start_state;
 
         // Disable execution for arm grab request
-        auto arm_grab_req = *arm_grab_req_ptr;
-        arm_grab_req.execute_trajectory = false;
-        arm_grab_req.task_description.affordance_info_from = affordance_info_from;
+        auto arm_grab_req_l = arm_grab_req;
+        arm_grab_req_l.execute_trajectory = false;
+        arm_grab_req_l.task_description.affordance_info_from = affordance_info_from;
 
         // Plan arm requests
-        std::vector<cca_ros::PlanningRequest> arm_reqs = {arm_approach_req, arm_grab_req};
+        std::vector<cca_ros::PlanningRequest> arm_reqs = {arm_approach_req_l, arm_grab_req_l};
         auto arm_response = planner->plan(arm_reqs);
         if (!arm_response.result.success || stop_token.stop_requested())
         {
@@ -136,7 +136,7 @@ std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
     // Wait for first success, all threads to finish, or timeout
     {
         std::unique_lock<std::mutex> lock(result_mutex);
-        result_cv.wait_for(lock, timeout_,
+        result_cv.wait_for(lock, timeout,
                            [&]() { return found_successful_plan || completed_threads == total_threads; });
     }
 
