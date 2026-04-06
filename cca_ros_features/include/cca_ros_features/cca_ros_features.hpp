@@ -9,6 +9,7 @@
 #define CCA_ROS_FEATURES_HPP_
 
 #include <cca_ros/cca_ros.hpp>
+#include <affordance_util/affordance_util.hpp>
 #include <chrono>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
