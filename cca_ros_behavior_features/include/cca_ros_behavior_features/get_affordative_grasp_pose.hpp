@@ -48,7 +48,7 @@
  * @inherits BT::SyncActionNode
  * @inherits rclcpp::Node
  */
-namespace chair_manipulation
+namespace cca_ros_behavior_features
 {
 class GetAffordativeGraspPose : public BT::SyncActionNode, public rclcpp::Node
 {
@@ -85,6 +85,6 @@ class GetAffordativeGraspPose : public BT::SyncActionNode, public rclcpp::Node
     static constexpr int arm_num_joints = 6; ///< Number of arm joints
 };
 
-} // namespace chair_manipulation
+} // namespace cca_ros_behavior_features
 
 #endif // GET_AFFORDATIVE_GRASP_POSE_HPP
