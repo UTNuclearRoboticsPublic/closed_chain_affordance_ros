@@ -8,42 +8,53 @@
 #ifndef CCA_ROS_FEATURES_HPP_
 #define CCA_ROS_FEATURES_HPP_
 
-#include <Eigen/Geometry>
-#include <affordance_util/affordance_util.hpp>
 #include <cca_ros/cca_ros.hpp>
 #include <chrono>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <optional>
-#include <tf2_eigen/tf2_eigen.hpp>
+#include <unordered_map>
 
 namespace cca_ros_features
 {
 
 /**
+ * @brief Plans a sequence of requests spanning multiple planning groups
+ * sequentially. Requests with the same consecutive planning group are batched
+ * into one plan() call. Start state is chained between segments using joint
+ * names from the previous segment's trajectory end point.
+ *
+ * Note: The caller is responsible for spinning the underlying ROS node.
+ *
+ * @param planner Shared pointer to the CcaRos planner.
+ * @param requests Sequence of planning requests, potentially spanning multiple planning groups.
+ * @return true if all segments planned successfully, false otherwise.
+ */
+bool is_plannable(
+    std::shared_ptr<cca_ros::CcaRos> planner,
+    const std::vector<cca_ros::PlanningRequest> &requests);
+
+/**
  * @brief Finds the first affordative grasp pose from a set of candidates by
  * planning in parallel. For each candidate grasp pose, a dedicated CcaRos
- * planner is spawned in its own thread and attempts to plan a full grasp
- * sequence: a WBC approach, an arm approach (seeded from the WBC end state),
- * and an arm grab.
+ * planner is spawned in its own thread and attempts to plan a full sequence
+ * of approach requests followed by a grab request.
  *
- * @param wbc_approach_req Planning request for the WBC approach motion.
- * @param arm_approach_req Planning request for the arm approach motion.
- * @param arm_grab_req Planning request for the arm grab motion.
+ * Note: The caller is responsible for spinning the underlying ROS nodes.
+ *
+ * @param node ROS node used for logging.
+ * @param approach_reqs Sequence of planning requests of type APPROACH, potentially spanning multiple planning groups.
+ * @param grab_req Planning request for the grab motion.
  * @param grasp_poses Array of candidate grasp poses to evaluate.
  * @param timeout Maximum time to wait across all planning threads.
- * @param arm_start_index_in_wbc_traj Starting index of arm joints in the WBC trajectory.
- * @param arm_num_joints Number of arm joints.
  * @return The first affordative grasp pose stamped, or std::nullopt if none found.
  */
-std::optional<geometry_msgs::msg::PoseStamped> getAffordativeGraspPose(
-    const cca_ros::PlanningRequest &wbc_approach_req,
-    const cca_ros::PlanningRequest &arm_approach_req,
-    const cca_ros::PlanningRequest &arm_grab_req,
+std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
+    std::shared_ptr<rclcpp::Node> node,
+    const std::vector<cca_ros::PlanningRequest> &approach_reqs,
+    const cca_ros::PlanningRequest &grab_req,
     const geometry_msgs::msg::PoseArray &grasp_poses,
-    std::chrono::milliseconds timeout,
-    int arm_start_index_in_wbc_traj,
-    int arm_num_joints);
+    std::chrono::milliseconds timeout);
 
 } // namespace cca_ros_features
 
