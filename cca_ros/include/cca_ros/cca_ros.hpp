@@ -177,7 +177,7 @@ struct GoalMsg
  * This class manages the process of planning, visualizing, and executing
  * trajectories for robot affordances using closed-chain kinematics.
  */
-class CcaRos : public rclcpp::Node
+class CcaRos 
 {
   public:
     // Type aliases
@@ -285,6 +285,7 @@ class CcaRos : public rclcpp::Node
     static std::unordered_map<std::string, PlanningGroupInfo> get_planning_group_info_map(rclcpp::Node* node_ptr);
 
   private:
+    rclcpp::Node::SharedPtr node_; /**< Shared pointer to the ROS node. */
     std::unordered_map<std::string, cca_ros::PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
     constexpr static std::chrono::seconds joint_states_read_timeout_{5}; /**< Timeout for reading joint states. */ 

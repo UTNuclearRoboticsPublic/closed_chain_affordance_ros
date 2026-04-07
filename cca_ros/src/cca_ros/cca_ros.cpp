@@ -18,11 +18,11 @@ CcaRos::CcaRos(std::shared_ptr<rclcpp::Node> node)
 {
 
     // --- Required params (throw if absent) ---
-    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(node_, "cca_joint_states_topic");
-    const std::string robot_name = ros_cpp_util::get_required_str_param(node_, "cca_robot");
+    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(node_.get(), "cca_joint_states_topic");
+    const std::string robot_name = ros_cpp_util::get_required_str_param(node_.get(), "cca_robot");
 
     // Extract robot configuration and action-server names for various planning groups
-    planning_group_info_map_ = CcaRos::get_planning_group_info_map(node_);
+    planning_group_info_map_ = CcaRos::get_planning_group_info_map(node_.get());
 
     // Initialize execution action clients for each planning group
     for (auto& [pg_name, pg_info] : planning_group_info_map_) {
@@ -32,13 +32,13 @@ CcaRos::CcaRos(std::shared_ptr<rclcpp::Node> node)
     // Initialize service/action clients and subscribers
     val_and_viz_client_ = node_->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
     joint_states_sub_ = node_->create_subscription<JointState>(
-        joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, node_, std::placeholders::_1));
+        joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
 
     // Setup TF buffer to task info lookup from TF tree
     tf_buffer_   = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
-    RCLCPP_INFO(node_logger_, "Initialized %s node for %s", node_name.c_str(), robot_name.c_str());
+    RCLCPP_INFO(node_logger_, "Initialized %s node for %s", node_->get_name(), robot_name.c_str());
 }
 
 // Destructor for CcaRos, cleans up.
