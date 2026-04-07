@@ -193,6 +193,12 @@ class CcaRos : public rclcpp::Node
     explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options);
 
     /**
+     * @brief Constructs a CcaRos node.
+     * @param node Shared pointer to an existing ROS node.
+     */
+    explicit CcaRos(std::shared_ptr<rclcpp::Node> node);
+
+    /**
      * @brief Destructs a CcaRos node.
      */
     ~CcaRos();

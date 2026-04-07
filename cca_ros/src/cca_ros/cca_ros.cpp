@@ -6,19 +6,23 @@
 namespace cca_ros
 {
 
-// Constructor for CcaRos, initializes the node and sets up required parameters and clients.
 CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
-    : Node(node_name, node_options),
-      node_logger_(this->get_logger()),   // Logger for the node
+    : CcaRos(std::make_shared<rclcpp::Node>(node_name, node_options))
+{}
+
+// Constructor for CcaRos, initializes the node and sets up required parameters and clients.
+CcaRos::CcaRos(std::shared_ptr<rclcpp::Node> node)
+    : node_(node),
+      node_logger_(node->get_logger()),   // Logger for the node
       val_and_viz_ss_name_("/cca_ros_val_and_viz") // Validation and visualization service name
 {
 
     // --- Required params (throw if absent) ---
-    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(this, "cca_joint_states_topic");
-    const std::string robot_name = ros_cpp_util::get_required_str_param(this, "cca_robot");
+    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(node_, "cca_joint_states_topic");
+    const std::string robot_name = ros_cpp_util::get_required_str_param(node_, "cca_robot");
 
     // Extract robot configuration and action-server names for various planning groups
-    planning_group_info_map_ = CcaRos::get_planning_group_info_map(this);
+    planning_group_info_map_ = CcaRos::get_planning_group_info_map(node_);
 
     // Initialize execution action clients for each planning group
     for (auto& [pg_name, pg_info] : planning_group_info_map_) {
@@ -26,12 +30,12 @@ CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_opt
     }
 
     // Initialize service/action clients and subscribers
-    val_and_viz_client_ = this->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
-    joint_states_sub_ = this->create_subscription<JointState>(
-        joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
+    val_and_viz_client_ = node_->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
+    joint_states_sub_ = node_->create_subscription<JointState>(
+        joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, node_, std::placeholders::_1));
 
     // Setup TF buffer to task info lookup from TF tree
-    tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_buffer_   = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     RCLCPP_INFO(node_logger_, "Initialized %s node for %s", node_name.c_str(), robot_name.c_str());
@@ -548,21 +552,21 @@ cca_ros::ExecutionActionClients CcaRos::initialize_action_clients_(const cca_ros
     if (!ex_as_names.robot_and_gripper.empty())
     {
         ex_clients.robot_and_gripper =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot_and_gripper);
+            rclcpp_action::create_client<FollowJointTrajectory>(node_, ex_as_names.robot_and_gripper);
     }
 
     // If robot-only execution server is available, initialize it
     if (!ex_as_names.robot.empty())
     {
         ex_clients.robot =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot);
+            rclcpp_action::create_client<FollowJointTrajectory>(node_, ex_as_names.robot);
     }
 
     // If gripper-only execution server is available, initialize it
     if (!ex_as_names.gripper.empty())
     {
         ex_clients.gripper =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.gripper);
+            rclcpp_action::create_client<FollowJointTrajectory>(node_, ex_as_names.gripper);
     }
 
     return ex_clients;
@@ -699,7 +703,7 @@ KinematicState CcaRos::read_joint_states_()
     robot_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
     gripper_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
 
-    auto start_time = this->now();
+    auto start_time = node_->now();
     rclcpp::Rate loop_rate(10); // 10 Hz loop rate
 
     while (rclcpp::ok())
@@ -711,7 +715,7 @@ KinematicState CcaRos::read_joint_states_()
         }
 
         // Check for timeout
-        if ((this->now() - start_time) > rclcpp::Duration(joint_states_read_timeout_))
+        if ((node_->now() - start_time) > rclcpp::Duration(joint_states_read_timeout_))
         {
             throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
         }
