@@ -300,6 +300,8 @@ class CcaRos : public rclcpp::Node
     std::jthread result_status_thread_; /**< Thread to check the status of robot
                                            and gripper trajectory results. */
     std::mutex status_mutex_;           /**< Mutex to protect access to status_. */
+    std::mutex joint_states_mutex_;      /**< Mutex to protect access to joint states. */
+    std::condition_variable joint_states_cv_; /**< Condition variable to signal availability of joint states. */
     rclcpp::Logger node_logger_;        /**< Node-specific logger. */
     std::string val_and_viz_ss_name_;           /**< Name of the plan and visualization server. */
     ExecutionActionClients ex_clients_; /**< Action clients for trajectory execution. */

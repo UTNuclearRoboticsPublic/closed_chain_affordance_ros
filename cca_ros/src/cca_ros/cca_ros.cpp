@@ -691,37 +691,30 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 // Callback for joint_states topic.
 void CcaRos::joint_states_cb_(const JointState::SharedPtr msg)
 {
+    std::lock_guard<std::mutex> lock(joint_states_mutex_);
     robot_joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, robot_joint_names_);
     gripper_joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, gripper_joint_names_);
+    joint_states_cv_.notify_all();
 }
 
 // Retrieve robot joint states at the start of the affordance.
 KinematicState CcaRos::read_joint_states_()
 {
+    std::unique_lock<std::mutex> lock(joint_states_mutex_);
     robot_joint_states_.positions.conservativeResize(robot_joint_names_.size());
     gripper_joint_states_.positions.conservativeResize(gripper_joint_names_.size());
     robot_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
     gripper_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
 
-    auto start_time = node_->now();
-    rclcpp::Rate loop_rate(10); // 10 Hz loop rate
-
-    while (rclcpp::ok())
+    if (!joint_states_cv_.wait_for(
+            lock,
+            std::chrono::duration<double>(joint_states_read_timeout_),
+            [&]() {
+                return !robot_joint_states_.positions.hasNaN() &&
+                       !gripper_joint_states_.positions.hasNaN();
+            }))
     {
-        // Check joint states for NaN values
-        if (!robot_joint_states_.positions.hasNaN() && !gripper_joint_states_.positions.hasNaN())
-        {
-            break;
-        }
-
-        // Check for timeout
-        if ((node_->now() - start_time) > rclcpp::Duration(joint_states_read_timeout_))
-        {
-            throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
-        }
-
-        // Allow for callback processing and sleep
-        loop_rate.sleep();
+        throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
     }
 
     return KinematicState{robot_joint_states_.positions, gripper_joint_states_.positions[0]};
