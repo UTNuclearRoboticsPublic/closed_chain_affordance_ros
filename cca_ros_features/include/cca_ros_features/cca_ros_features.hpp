@@ -42,7 +42,7 @@ bool is_plannable(
  *
  * Note: The caller is responsible for spinning the underlying ROS nodes.
  *
- * @param node ROS node used for logging.
+ * @param context Shared CcaRosContext used for ROS infrastructure (logging, TF, joint states).
  * @param approach_reqs Sequence of planning requests of type APPROACH, potentially spanning multiple planning groups.
  * @param grab_req Planning request for the grab motion.
  * @param grasp_poses Array of candidate grasp poses to evaluate.
@@ -50,7 +50,7 @@ bool is_plannable(
  * @return The first affordative grasp pose stamped, or std::nullopt if none found.
  */
 std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
-    std::shared_ptr<rclcpp::Node> node,
+    std::shared_ptr<cca_ros::CcaRosContext> context,
     const std::vector<cca_ros::PlanningRequest> &approach_reqs,
     const cca_ros::PlanningRequest &grab_req,
     const geometry_msgs::msg::PoseArray &grasp_poses,
