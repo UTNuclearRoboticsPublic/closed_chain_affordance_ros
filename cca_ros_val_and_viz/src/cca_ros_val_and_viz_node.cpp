@@ -386,7 +386,9 @@ class CcaRosValAndVizServer : public rclcpp::Node
             viz_cart_traj.resize(first_violation_index);
 	}
 
-	if (!viz_joint_traj.points.empty()) {
+	const bool has_viz_traj = !viz_joint_traj.points.empty(); // Check if there's anything to visualize after truncation
+
+	if (has_viz_traj) {
 	    moveit_msgs::msg::DisplayTrajectory display_trajectory;
 
 	    // Set start state 
@@ -440,7 +442,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 	}
         
             // Publish the tool trajectory
-	if (!viz_joint_traj.points.empty()) {
+	if (has_viz_traj) {
 	        for (const auto& pose : viz_cart_traj)
 	        {
 	            rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
