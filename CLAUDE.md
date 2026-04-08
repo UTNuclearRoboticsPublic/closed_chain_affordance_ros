@@ -65,3 +65,21 @@ After planning, `CcaRos` calls the `/cca_ros_val_and_viz` service (MoveIt-based)
 - `onStart()` — called once; reads ports, allocates resources, dispatches async work; returns `RUNNING` or `FAILURE`
 - `onRunning()` — called every tick while `RUNNING`; checks progress; returns `RUNNING`, `SUCCESS`, or `FAILURE`
 - `onHalted()` — called on external halt; cancels pending async operations and releases resources
+
+### Diff Constraints
+When modifying existing files, keep the diff minimal and mechanical so it is easy to review. Only make changes required for the new functionality or bug fix—no unrelated edits.
+
+Preserve exactly (byte-for-byte unless absolutely necessary):
+- All comments and docstrings
+- All variable and function names
+- All error messages and log strings
+- All formatting and indentation (including blank lines and brace placement)
+
+Do not:
+- Reformat, re-indent, or "clean up" code
+- Rename symbols unless required for correctness
+- Add or remove blank lines unnecessarily
+- Introduce trailing whitespace
+
+If code is moved, it must appear identical in the new location.
+Formatting-only changes should never appear in the diff.
