@@ -87,20 +87,42 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
                 "All approach_reqs must have task_description.motion_type == cc_affordance_planner::MotionType::APPROACH");
             return std::nullopt;
         }
+        // Ensure approach reqs have canonical_pose_from and affordance_info_from set to FROM_FRAME_NAME
+        if (req.task_description.canonical_pose_from.method != affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME ||
+            req.task_description.affordance_info_from.method != affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME)
+        {
+            RCLCPP_ERROR(node->get_logger(),
+                "All approach_reqs must have task_description.canonical_pose_from and task_description.affordance_info_from set to method == FROM_FRAME_NAME");
+            return std::nullopt;
+        }
     }
 
-    // Set canonical_pose_from base for all planning requests
-    const std::string &grasp_pose_frame_id = grasp_poses.header.frame_id;
-    affordance_util::PoseFrom canonical_pose_from_base;
-    canonical_pose_from_base.method = affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;
-    canonical_pose_from_base.frame_name = grasp_pose_frame_id;
+    // Verify grab_req is indeed an affordance type
+    if (grab_req.task_description.motion_type != cc_affordance_planner::MotionType::AFFORDANCE)
+    {
+        RCLCPP_ERROR(node->get_logger(),
+            "grab_req must have task_description.motion_type == cc_affordance_planner::MotionType::AFFORDANCE");
+        return std::nullopt;
+    }
 
-    // Set affordance_info_from base for all planning requests
-    affordance_util::ScrewInfoFrom affordance_info_from_base;
-    affordance_info_from_base.method = affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME;
-    affordance_info_from_base.frame_name = grasp_pose_frame_id;
-    affordance_info_from_base.axis_in_final_pose =
-        affordance_util::axis_to_vec(affordance_util::Axis::X_MINUS); // Along the outward-facing normal of the grasp
+    // Ensure grab req has affordance_info_from set to FROM_FRAME_NAME
+    if (grab_req.task_description.affordance_info_from.method != affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME)
+    {
+        RCLCPP_ERROR(node->get_logger(),
+            "grab_req must have task_description.affordance_info_from set to method == FROM_FRAME_NAME");
+        return std::nullopt;
+    }
+
+    // Ensure affordance_info_from has axis_in_final_pose set
+    if (grab_req.task_description.affordance_info_from.axis_in_final_pose.hasNaN())
+    {
+        RCLCPP_ERROR(node->get_logger(),
+            "grab_req must have task_description.affordance_info_from.axis_in_final_pose set to a valid axis. Affordance axis is defined relative to the grasp pose.");
+        return std::nullopt;
+    }
+
+    // Extract grasp pose frame id
+    const std::string &grasp_pose_frame_id = grasp_poses.header.frame_id;
 
     // Synchronization primitives for first-success detection
     std::mutex result_mutex;
@@ -110,12 +132,11 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     geometry_msgs::msg::Pose affordative_grasp_pose;
 
     // Create a planner per grasp pose
-    // NOTE: geometry_msgs::msg::Pose has no hash, so we use index-based storage
-    std::vector<std::pair<geometry_msgs::msg::Pose, std::shared_ptr<cca_ros::CcaRos>>> grasp_pose_to_planners;
+    using PlannerEntry = std::pair<geometry_msgs::msg::Pose, std::shared_ptr<cca_ros::CcaRos>>;
+    std::vector<PlannerEntry> grasp_pose_to_planners;
     for (size_t i = 0; i < grasp_poses.poses.size(); ++i)
     {
-        auto planner_node = std::make_shared<rclcpp::Node>("cca_ros_node_" + std::to_string(i));
-        auto planner = std::make_shared<cca_ros::CcaRos>(planner_node);
+        auto planner = std::make_shared<cca_ros::CcaRos>(node);
         grasp_pose_to_planners.emplace_back(grasp_poses.poses[i], planner);
     }
 
@@ -137,29 +158,24 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         Eigen::Isometry3d grasp_pose_eigen;
         tf2::fromMsg(grasp_pose, grasp_pose_eigen);
 
-        // Set canonical pose info
-        affordance_util::PoseFrom canonical_pose_from = canonical_pose_from_base;
-        canonical_pose_from.post_transform = grasp_pose_eigen.matrix();
-
-        // Set affordance info -- affordance is defined relative to the grasp pose
-        affordance_util::ScrewInfoFrom affordance_info_from = affordance_info_from_base;
-        affordance_info_from.post_transform = grasp_pose_eigen.matrix();
-
         // Fill in grasp pose info for all approach requests
         std::vector<cca_ros::PlanningRequest> reqs;
         for (const auto &req : approach_reqs)
         {
             auto req_l = req;
             req_l.execute_trajectory = false;
-            req_l.task_description.affordance_info_from = affordance_info_from;
-            req_l.task_description.canonical_pose_from = canonical_pose_from;
+            req_l.task_description.affordance_info_from.frame_name = grasp_pose_frame_id;
+            req_l.task_description.affordance_info_from.post_transform = grasp_pose_eigen.matrix();
+            req_l.task_description.canonical_pose_from.frame_name = grasp_pose_frame_id;
+            req_l.task_description.canonical_pose_from.post_transform = grasp_pose_eigen.matrix();
             reqs.push_back(req_l);
         }
 
         // Fill in affordance info for grab request (grab affordance is defined relative to the grasp pose)
         auto grab_req_l = grab_req;
         grab_req_l.execute_trajectory = false;
-        grab_req_l.task_description.affordance_info_from = affordance_info_from;
+        grab_req_l.task_description.affordance_info_from.frame_name = grasp_pose_frame_id;
+        grab_req_l.task_description.affordance_info_from.post_transform = grasp_pose_eigen.matrix();
         reqs.push_back(grab_req_l);
 
         // Check if these requests are plannable with this grasp pose
