@@ -135,6 +135,7 @@ struct PlanningRequest
     KinematicState start_state =
         KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()}; /**< Initial kinematic state.
                                                                                       */
+    bool visualize_trajectory = true; /**< Whether to visualize the planned trajectory. */
     bool execute_trajectory = false; /**< Whether to execute the planned trajectory. */
     bool execute_partial_trajectory = false; /**< Whether to execute partially planned trajectory. */
     std::chrono::seconds execution_timeout{60}; /**< Timeout for trajectory execution. CcaRos returns failure sends a cancel request to the trajectory execution server if this timeout is exceeded. */ 
@@ -405,11 +406,12 @@ class CcaRos
      * @param goal FollowJointTrajectory goal for the trajectory.
      * @param cartesian_trajectory Corresponding Cartesian trajectory.
      * @param task_descriptions Descriptions of tasks for visualization.
+     * @param visualize_trajectory Whether to visualize the trajectory.
      * @return Shared pointer to the visualization service response.
      */
     cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr validate_and_visualize_(
         const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
-        const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions);
+        const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions, bool visualize_trajectory);
 
     /**
      * @brief Executes the planned trajectory.

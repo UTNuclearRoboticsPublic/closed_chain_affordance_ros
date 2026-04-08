@@ -403,7 +403,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 	    moveit_planned_path_pub_->publish(display_trajectory);
          }
 
-        {
+        if (serv_req->visualize){
         std::lock_guard<std::mutex> viz_lock(viz_mutex_);
 
         // Clear messages

@@ -6,6 +6,7 @@ geometry_msgs/Vector3[] aff_screw_axes # vector of screw axes
 geometry_msgs/Point[] aff_locations # locations of the corresponding screw axes
 geometry_msgs/Pose[] aff_ref_poses # Reference poses for approach motion, corresponding to the affordance zero
 string ref_frame # reference frame for EE FK computation
+bool visualize # whether to visualize the task markers and the trajectory in RViz
 ---
 # Result
 bool success # whether planning and visualization was successful

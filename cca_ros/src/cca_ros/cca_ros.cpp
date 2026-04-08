@@ -113,6 +113,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     // Extract execution action server names and clients for this planning group
     const cca_ros::PlanningRequest& first_req = planning_requests.front();
+    const bool visualize_trajectory = first_req.visualize_trajectory; // All requests have the same value due to validation
     const bool execute_trajectory = first_req.execute_trajectory; // All requests have the same value due to validation
     const bool execute_partial_trajectory = first_req.execute_partial_trajectory; // All requests have the same value due to validation
     const std::chrono::seconds& execution_timeout = first_req.execution_timeout; // All requests have the same value due to validation
@@ -435,7 +436,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     
     // Validate and visualize the complete trajectory
     auto validation_response = this->validate_and_visualize_(
-        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_val_and_viz);
+        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_val_and_viz, visualize_trajectory);
     
     if (validation_response->success) {
         RCLCPP_INFO(node_logger_, "%s validation service succeeded", val_and_viz_ss_name_.c_str());
@@ -622,6 +623,7 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     const bool single_planning_request = reqs.size() == 1;
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
     const bool robot_only_trajectory = !gripper_goal_specified;
+    const bool visualize_trajectory = reqs.front().visualize_trajectory;
     const bool execute_trajectory = reqs.front().execute_trajectory;
     const bool execute_partial_trajectory = reqs.front().execute_partial_trajectory;
     const std::chrono::seconds& execution_timeout = reqs.front().execution_timeout;
@@ -662,6 +664,12 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
             if (req.planning_group != planning_group) {
                 throw std::invalid_argument(
                     index_log + "Inconsistent planning group specification. All tasks must have the same planning group");
+            }
+
+            // Ensure all tasks either ask to visualize or don't
+            if (req.visualize_trajectory != visualize_trajectory) {
+                throw std::invalid_argument(
+                    index_log + "Inconsistent visualize trajectory specification. All tasks must either be visualized together or none of them.");
             }
 
             // Ensure all tasks either ask to execute or don't
@@ -818,7 +826,7 @@ cca_ros::GoalMsg CcaRos::create_goal_msg_(
 }
 
 // Validates and visualizes a given trajectory
-cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions){
+cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions, bool visualize_trajectory){
 
     // Create visualization request
     auto val_and_viz_serv_req = std::make_shared<CcaRosValAndViz::Request>();
@@ -826,6 +834,7 @@ cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_vis
     val_and_viz_serv_req->joint_traj = goal.trajectory;
     val_and_viz_serv_req->cartesian_traj = cartesian_trajectory;
     val_and_viz_serv_req->ref_frame = ref_frame_;
+    val_and_viz_serv_req->visualize = visualize_trajectory;
 
     // Sentinel affordance reference pose (identity)
     geometry_msgs::msg::Pose aff_ref_pose_sentinel;
