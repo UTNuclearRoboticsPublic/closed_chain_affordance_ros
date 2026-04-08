@@ -31,8 +31,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 #include <fmt/core.h>
 #include <iomanip>
-#include <sstream>  
-#include <string>  
+#include <mutex>
+#include <sstream>
+#include <string>
 #include <rclcpp/rclcpp.hpp>
 #include <cca_ros_msgs/srv/cca_ros_val_and_viz.hpp>
 
@@ -61,9 +62,11 @@ class CcaRosValAndVizServer : public rclcpp::Node
         joint_states_topic_ = ros_cpp_util::get_required_str_param(this, "cca_joint_states_topic");
 
         // Create and advertise planning and visualization service
+        reentrant_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
         srv_ = this->create_service<cca_ros_msgs::srv::CcaRosValAndViz>(
             val_and_viz_ss_name_, std::bind(&CcaRosValAndVizServer::cca_ros_viz_server_callback_, this,
-                                             std::placeholders::_1, std::placeholders::_2));
+                                             std::placeholders::_1, std::placeholders::_2),
+            rmw_qos_profile_services_default, reentrant_cb_group_);
 
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
@@ -83,7 +86,11 @@ class CcaRosValAndVizServer : public rclcpp::Node
     {
         // Spin node in a separate thread so we can start reading robot state
         node_handle = this->shared_from_this();
-        spinner_thread_ = std::thread([this]() { rclcpp::spin(node_handle); });
+        spinner_thread_ = std::thread([this]() {
+            rclcpp::executors::MultiThreadedExecutor executor;
+            executor.add_node(node_handle);
+            executor.spin();
+        });
 
         // Initialize planning parameters
         robot_model_loader::RobotModelLoaderPtr robot_model_loader =
@@ -118,6 +125,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
     std::thread spinner_thread_; // To spin the node in a separate thread
 
     rclcpp::Logger node_logger_;                                       // logger associated with the node
+    rclcpp::CallbackGroup::SharedPtr reentrant_cb_group_;              // allows parallel service callbacks
     rclcpp::Service<cca_ros_msgs::srv::CcaRosValAndViz>::SharedPtr srv_; // joint traj plan and visualization service
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
@@ -125,8 +133,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
     planning_scene_monitor::PlanningSceneMonitorPtr psm_;
     moveit::core::RobotStatePtr robot_state_;
     moveit::core::RobotModelPtr robot_model_;
-    moveit::core::JointModelGroup *joint_model_group_;
     rviz_visual_tools::RvizVisualToolsPtr rviz_visual_tools_;
+    std::mutex viz_mutex_; // serializes rviz_visual_tools_ access across parallel callbacks
 
     std::string val_and_viz_ss_name_;
     std::string rviz_fixed_frame_;
@@ -244,8 +252,11 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
         serv_res->success = false;// start as false
 
+        {
+            std::lock_guard<std::mutex> viz_lock(viz_mutex_);
         // Clear messages
         rviz_visual_tools_->deleteAllMarkers();
+	}
 
         RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
 
@@ -270,6 +281,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
 	}
 
         // Draw affordance screw axes and optionally, aff ref frames
+        {
+            std::lock_guard<std::mutex> viz_lock(viz_mutex_);
         for (size_t task_idx = 0; task_idx < serv_req->aff_screw_axes.size(); ++task_idx){
             const auto aff_screw_axis = serv_req->aff_screw_axes.at(task_idx);
 	    const auto aff_location = serv_req->aff_locations.at(task_idx);
@@ -302,8 +315,10 @@ class CcaRosValAndVizServer : public rclcpp::Node
             rviz_visual_tools_->trigger();
 	}
 
+        }
+
         // Get the joint model group for the requested planning group
-        joint_model_group_ = robot_model_->getJointModelGroup(serv_req->planning_group);
+        moveit::core::JointModelGroup *joint_model_group_ = robot_model_->getJointModelGroup(serv_req->planning_group);
 
 	// Capture joint names for the planning group
 	std::vector<std::string> joint_names = joint_model_group_->getVariableNames();
@@ -429,11 +444,14 @@ class CcaRosValAndVizServer : public rclcpp::Node
 	    moveit_planned_path_pub_->publish(display_trajectory);
 
             // Publish the tool trajectory
-	    for (const auto& pose : viz_cart_traj)
-	    {
-	        rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
-	    }
-	    rviz_visual_tools_->trigger();  // only once after batching
+            {
+                std::lock_guard<std::mutex> viz_lock(viz_mutex_);
+	        for (const auto& pose : viz_cart_traj)
+	        {
+	            rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
+	        }
+	        rviz_visual_tools_->trigger();  // only once after batching
+            }
         }
 
 	// Set response
