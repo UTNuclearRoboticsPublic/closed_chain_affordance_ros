@@ -42,6 +42,7 @@ class CcaRosActionServer : public cca_ros::CcaRos
     explicit CcaRosActionServer(const std::string &node_name, const rclcpp::NodeOptions &node_options);
 
   private:
+    rclcpp::Logger node_logger_; ///< Logger 
     rclcpp_action::Server<CcaRosAction>::SharedPtr action_server_; ///< Action server to execute CCA ROS action
 
     static constexpr int TIMEOUT_SECS_ = 60; ///< Timeout in seconds before aborting the goal due to inactivity
@@ -106,6 +107,7 @@ class CcaRosActionClient : public rclcpp::Node
     void cancel_goal();
 
   private:
+    rclcpp::Logger node_logger_; ///< Logger 
     rclcpp_action::Client<CcaRosAction>::SharedPtr
         action_client_; ///< Client for sending goals to the CCA ROS action server
     std::shared_future<GoalHandleCcaRosActionClient::SharedPtr> goal_future_; ///< Future representing the goal handle
