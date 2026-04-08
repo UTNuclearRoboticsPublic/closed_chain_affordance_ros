@@ -192,6 +192,22 @@ class CcaRosContext
      */
     explicit CcaRosContext(std::shared_ptr<rclcpp::Node> node);
 
+    /**
+    * @brief Returns the shared ROS node.
+    *
+    * @return Shared pointer to the ROS node.
+    */
+    std::shared_ptr<rclcpp::Node> get_node() const;
+
+    /**
+     * @brief Returns the joint names for a given planning group.
+     * @param planning_group Name of the planning group.
+     * @return Vector of joint names.
+     */
+    const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
+
+  private:
+    friend class CcaRos;
     rclcpp::Node::SharedPtr node_;                                               /**< Shared pointer to the ROS node. */
     std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. Read-only after construction. */
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                                 /**< TF2 buffer for transformation lookup. Thread-safe for concurrent reads. */
@@ -200,14 +216,6 @@ class CcaRosContext
     std::condition_variable joint_states_cv_;                                    /**< Condition variable to signal availability of joint states. */
     JointState::SharedPtr latest_joint_state_msg_{nullptr};                      /**< Latest received joint state message. */
 
-  /**
-   * @brief Returns the joint names for a given planning group.
-   * @param planning_group Name of the planning group.
-   * @return Vector of joint names.
-   */
-  const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
-
-  private:
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;               /**< Subscriber for joint states. */
 
     /**
@@ -358,6 +366,13 @@ class CcaRos
      * @return Vector of joint names.
      */
     const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
+
+    /**
+    * @brief Returns the shared ROS node.
+    *
+    * @return Shared pointer to the ROS node.
+    */
+    std::shared_ptr<rclcpp::Node> get_node() const;
 
   private:
     std::shared_ptr<CcaRosContext> context_; /**< Shared context owning ROS node, TF, joint states subscriber, and planning group info. */

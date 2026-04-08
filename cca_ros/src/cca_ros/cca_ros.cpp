@@ -33,6 +33,8 @@ const std::vector<std::string> &CcaRosContext::get_joint_names(const std::string
     return planning_group_info_map_.at(planning_group).robot_config.joint_names.robot;
 }
 
+std::shared_ptr<rclcpp::Node> CcaRosContext::get_node() const { return node_; }
+
 // Callback for joint_states topic — stores the latest raw message for copy-on-read by planners.
 void CcaRosContext::joint_states_cb_(const JointState::SharedPtr msg)
 {
@@ -64,6 +66,8 @@ CcaRos::CcaRos(std::shared_ptr<CcaRosContext> context)
     // Initialize validation and visualization service client
     val_and_viz_client_ = context_->node_->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
 }
+
+std::shared_ptr<rclcpp::Node> CcaRos::get_node() const { return context_->node_; }
 
 // Destructor for CcaRos, cleans up.
 CcaRos::~CcaRos()
