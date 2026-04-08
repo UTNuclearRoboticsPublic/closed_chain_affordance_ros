@@ -200,6 +200,13 @@ class CcaRosContext
     std::condition_variable joint_states_cv_;                                    /**< Condition variable to signal availability of joint states. */
     JointState::SharedPtr latest_joint_state_msg_{nullptr};                      /**< Latest received joint state message. */
 
+  /**
+   * @brief Returns the joint names for a given planning group.
+   * @param planning_group Name of the planning group.
+   * @return Vector of joint names.
+   */
+  const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
+
   private:
     rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;               /**< Subscriber for joint states. */
 
@@ -344,6 +351,13 @@ class CcaRos
      * @return Shared pointer to the CcaRosContext.
      */
     std::shared_ptr<CcaRosContext> get_context() const;
+
+    /**
+     * @brief Returns the joint names for a given planning group.
+     * @param planning_group Name of the planning group.
+     * @return Vector of joint names.
+     */
+    const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
 
   private:
     std::shared_ptr<CcaRosContext> context_; /**< Shared context owning ROS node, TF, joint states subscriber, and planning group info. */

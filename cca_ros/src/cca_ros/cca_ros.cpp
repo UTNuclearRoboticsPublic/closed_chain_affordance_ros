@@ -28,6 +28,11 @@ CcaRosContext::CcaRosContext(std::shared_ptr<rclcpp::Node> node)
     RCLCPP_INFO(node_->get_logger(), "Initialized %s node for %s", node_->get_name(), robot_name.c_str());
 }
 
+const std::vector<std::string> &CcaRosContext::get_joint_names(const std::string &planning_group) const
+{
+    return planning_group_info_map_.at(planning_group).robot_config.joint_names.robot;
+}
+
 // Callback for joint_states topic — stores the latest raw message for copy-on-read by planners.
 void CcaRosContext::joint_states_cb_(const JointState::SharedPtr msg)
 {
@@ -71,6 +76,11 @@ CcaRos::~CcaRos()
 std::shared_ptr<CcaRosContext> CcaRos::get_context() const
 {
     return context_;
+}
+
+const std::vector<std::string> &CcaRos::get_joint_names(const std::string &planning_group) const
+{
+    return context_->get_joint_names(planning_group);
 }
 
 cca_ros::PlanningResponse CcaRos::plan(const cca_ros::PlanningRequest &planning_request) {
