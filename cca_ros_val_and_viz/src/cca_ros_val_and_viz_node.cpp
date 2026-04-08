@@ -275,10 +275,10 @@ class CcaRosValAndVizServer : public rclcpp::Node
 	}
 
         // Get the joint model group for the requested planning group
-        moveit::core::JointModelGroup *joint_model_group_ = robot_model_->getJointModelGroup(serv_req->planning_group);
+        moveit::core::JointModelGroup *joint_model_group = robot_model_->getJointModelGroup(serv_req->planning_group);
 
 	// Capture joint names for the planning group
-	std::vector<std::string> joint_names = joint_model_group_->getVariableNames();
+	std::vector<std::string> joint_names = joint_model_group->getVariableNames();
 
         // Capture joint limits so we could log joint-limit violations later
         std::map<std::string, moveit::core::VariableBounds> joint_limit_map;
@@ -302,7 +302,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
             // Set the planning goal state to that trajectory point
             moveit::core::RobotState goal_state(current_state); // start from current state to preserve unplanned joints
-            goal_state.setJointGroupPositions(joint_model_group_, planning_end_state);
+            goal_state.setJointGroupPositions(joint_model_group, planning_end_state);
 
             // Acquire read-only lock on the planning scene before doing anything
             {
@@ -319,7 +319,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
 		collision_result.clear();
 
 		// Check and store violation check
-		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group_);
+		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group);
 		lscene->checkCollision(collision_request, collision_result, goal_state);
 		bool collision_violation = collision_result.collision;
 
