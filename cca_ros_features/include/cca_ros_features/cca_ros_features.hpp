@@ -28,11 +28,12 @@ namespace cca_ros_features
  *
  * @param planner Shared pointer to the CcaRos planner.
  * @param requests Sequence of planning requests, potentially spanning multiple planning groups.
+ * @param stop_token Optional stop token to allow cooperative cancellation of planning. 
  * @return true if all segments planned successfully, false otherwise.
  */
 bool is_plannable(
     std::shared_ptr<cca_ros::CcaRos> planner,
-    const std::vector<cca_ros::PlanningRequest> &requests);
+    const std::vector<cca_ros::PlanningRequest> &requests, std::stop_token stop_token = std::stop_token{});
 
 /**
  * @brief Finds the first affordative grasp pose from a set of candidates by

@@ -5,7 +5,7 @@ namespace cca_ros_features
 
 bool is_plannable(
     std::shared_ptr<cca_ros::CcaRos> planner,
-    const std::vector<cca_ros::PlanningRequest> &requests)
+    const std::vector<cca_ros::PlanningRequest> &requests, std::stop_token stop_token)
 {
     using PlanningSegment = std::vector<cca_ros::PlanningRequest>;
 
@@ -59,8 +59,14 @@ bool is_plannable(
                 extractStartState(prev_response, segment.front().planning_group);
         }
 
+	// Check for stop request before planning each segment
+	if (stop_token.stop_requested())
+	{
+	    return false;
+	}
+
         // Plan this segment
-        const auto response = planner->plan(segment);
+        const auto response = planner->plan(segment); // Note: plan() is blocking until a response is received. In the future, it may be desirable to have a plan_async() function in CcaRos that accepts a stop token, or have another mechanism to immediately interrupt. For now, since CCA planning is super quick anyways, this works for all practical purposes.
         if (!response.result.success)
         {
             return false;
@@ -78,12 +84,15 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     const geometry_msgs::msg::PoseArray &grasp_poses,
     std::chrono::milliseconds timeout)
 {
+
+    auto node_logger = context->get_node()->get_logger();
+
     // Verify approach_reqs are indeed approach types
     for (const auto &req : approach_reqs)
     {
         if (req.task_description.motion_type != cc_affordance_planner::MotionType::APPROACH)
         {
-            RCLCPP_ERROR(context->node_->get_logger(),
+            RCLCPP_ERROR(node_logger,
                 "All approach_reqs must have task_description.motion_type == cc_affordance_planner::MotionType::APPROACH");
             return std::nullopt;
         }
@@ -91,7 +100,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         if (req.task_description.canonical_pose_from.method != affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME ||
             req.task_description.affordance_info_from.method != affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME)
         {
-            RCLCPP_ERROR(context->node_->get_logger(),
+            RCLCPP_ERROR(node_logger,
                 "All approach_reqs must have task_description.canonical_pose_from and task_description.affordance_info_from set to method == FROM_FRAME_NAME");
             return std::nullopt;
         }
@@ -100,7 +109,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     // Verify grab_req is indeed an affordance type
     if (grab_req.task_description.motion_type != cc_affordance_planner::MotionType::AFFORDANCE)
     {
-        RCLCPP_ERROR(context->node_->get_logger(),
+        RCLCPP_ERROR(node_logger,
             "grab_req must have task_description.motion_type == cc_affordance_planner::MotionType::AFFORDANCE");
         return std::nullopt;
     }
@@ -108,7 +117,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     // Ensure grab req has affordance_info_from set to FROM_FRAME_NAME
     if (grab_req.task_description.affordance_info_from.method != affordance_util::PoseSpecificationMethod::FROM_FRAME_NAME)
     {
-        RCLCPP_ERROR(context->node_->get_logger(),
+        RCLCPP_ERROR(node_logger,
             "grab_req must have task_description.affordance_info_from set to method == FROM_FRAME_NAME");
         return std::nullopt;
     }
@@ -116,7 +125,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     // Ensure affordance_info_from has axis_in_final_pose set
     if (grab_req.task_description.affordance_info_from.axis_in_final_pose.hasNaN())
     {
-        RCLCPP_ERROR(context->node_->get_logger(),
+        RCLCPP_ERROR(node_logger,
             "grab_req must have task_description.affordance_info_from.axis_in_final_pose set to a valid axis. Affordance axis is defined relative to the grasp pose.");
         return std::nullopt;
     }
@@ -181,7 +190,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         reqs.push_back(grab_req_l);
 
         // Check if these requests are plannable with this grasp pose
-        if (!is_plannable(planner, reqs) || stop_token.stop_requested())
+        if (!is_plannable(planner, reqs, stop_token))
         {
             std::lock_guard<std::mutex> lock(result_mutex);
             completed_threads++;
