@@ -26,7 +26,13 @@ BT::PortsList GetAffordativeGraspPose::providedPorts()
 
 BT::NodeStatus GetAffordativeGraspPose::onStart()
 {
-    node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
+    if (!cca_ros_context_)
+    {
+        node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
+        cca_ros_context_ = std::make_shared<cca_ros::CcaRosContext>(node_);
+    }
+
+    stop_source_ = std::stop_source{};
 
     using ReqPtr = std::shared_ptr<cca_ros::PlanningRequest>;
     using PoseArrayPtr = std::shared_ptr<geometry_msgs::msg::PoseArray>;
@@ -51,10 +57,11 @@ BT::NodeStatus GetAffordativeGraspPose::onStart()
     auto arm_req = arm_approach_req_exp.value();
     auto grab_req = arm_grab_req_exp.value();
     auto poses = grasp_poses_exp.value();
+    const auto approach_reqs = std::vector<cca_ros::PlanningRequest>{*wbc_req, *arm_req};
 
-    result_future_ = std::async(std::launch::async, [wbc_req, arm_req, grab_req, poses, this]() {
-        return cca_ros_features::getAffordativeGraspPose(*wbc_req, *arm_req, *grab_req, *poses, timeout_,
-                                                         arm_start_index_in_wbc_traj_, arm_num_joints_);
+    result_future_ = std::async(std::launch::async, [approach_reqs, grab_req, poses, this]() {
+        return cca_ros_features::get_affordative_grasp_pose(
+            cca_ros_context_, approach_reqs, *grab_req, *poses, timeout_, stop_source_.get_token());
     });
 
     return BT::NodeStatus::RUNNING;
@@ -80,6 +87,7 @@ BT::NodeStatus GetAffordativeGraspPose::onRunning()
 
 void GetAffordativeGraspPose::onHalted()
 {
+    stop_source_.request_stop();
     if (result_future_.valid())
         result_future_.wait();
 }

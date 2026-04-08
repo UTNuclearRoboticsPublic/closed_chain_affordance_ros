@@ -87,12 +87,10 @@ class GetAffordativeGraspPose : public BT::StatefulActionNode
 
   private:
     rclcpp::Node::SharedPtr node_; ///< ROS 2 node obtained from the blackboard key "node"
+    std::shared_ptr<cca_ros::CcaRosContext> cca_ros_context_; ///< Context for CCA ROS
     std::future<std::optional<geometry_msgs::msg::PoseStamped>> result_future_; ///< Async planning result
-
     static constexpr std::chrono::milliseconds timeout_{100}; ///< Maximum time to wait for any planning thread
-    static constexpr int arm_start_index_in_wbc_traj_ =
-        3; ///< Starting index of arm joints in the WBC trajectory (first three joints are for the base)
-    static constexpr int arm_num_joints_ = 6; ///< Number of arm joints
+    std::stop_source stop_source_; ///< Stop source to signal get_affordative_grasp_pose to halt
 };
 
 } // namespace cca_ros_behavior_features
