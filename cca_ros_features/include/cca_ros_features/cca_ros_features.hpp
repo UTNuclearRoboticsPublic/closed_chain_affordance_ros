@@ -28,7 +28,7 @@ namespace cca_ros_features
  *
  * @param planner Shared pointer to the CcaRos planner.
  * @param requests Sequence of planning requests, potentially spanning multiple planning groups.
- * @param stop_token Optional stop token to allow cooperative cancellation of planning. 
+ * @param stop_token Optional stop token to allow early cancellation.
  * @return true if all segments planned successfully, false otherwise.
  */
 bool is_plannable(
@@ -48,6 +48,7 @@ bool is_plannable(
  * @param grab_req Planning request for the grab motion.
  * @param grasp_poses Array of candidate grasp poses to evaluate.
  * @param timeout Maximum time to wait across all planning threads.
+ * @param stop_token Optional stop token to allow early cancellation.
  * @return The first affordative grasp pose stamped, or std::nullopt if none found.
  */
 std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
@@ -55,7 +56,8 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     const std::vector<cca_ros::PlanningRequest> &approach_reqs,
     const cca_ros::PlanningRequest &grab_req,
     const geometry_msgs::msg::PoseArray &grasp_poses,
-    std::chrono::milliseconds timeout);
+    std::chrono::milliseconds timeout,
+    std::stop_token stop_token = std::stop_token{});
 
 } // namespace cca_ros_features
 

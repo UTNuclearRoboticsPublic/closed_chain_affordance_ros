@@ -82,7 +82,8 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     const std::vector<cca_ros::PlanningRequest> &approach_reqs,
     const cca_ros::PlanningRequest &grab_req,
     const geometry_msgs::msg::PoseArray &grasp_poses,
-    std::chrono::milliseconds timeout)
+    std::chrono::milliseconds timeout,
+    std::stop_token stop_token)
 {
 
     auto node_logger = context->get_node()->get_logger();
@@ -130,6 +131,11 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         return std::nullopt;
     }
 
+    if (stop_token.stop_requested())
+    {
+        return std::nullopt;
+    }
+
     // Extract grasp pose frame id
     const std::string &grasp_pose_frame_id = grasp_poses.header.frame_id;
 
@@ -152,10 +158,10 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     const size_t total_threads = grasp_pose_to_planners.size();
 
     // Lambda to plan all requests for a given grasp pose and signal on first success
-    auto is_grasp_pose_affordative = [&](std::stop_token stop_token, std::shared_ptr<cca_ros::CcaRos> planner,
+    auto is_grasp_pose_affordative = [&](std::stop_token st, std::shared_ptr<cca_ros::CcaRos> planner,
                                          const geometry_msgs::msg::Pose &grasp_pose) {
         // Check for stop request before starting expensive planning
-        if (stop_token.stop_requested())
+        if (st.stop_requested())
         {
             std::lock_guard<std::mutex> lock(result_mutex);
             completed_threads++;
@@ -190,7 +196,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         reqs.push_back(grab_req_l);
 
         // Check if these requests are plannable with this grasp pose
-        if (!is_plannable(planner, reqs, stop_token))
+        if (!is_plannable(planner, reqs, st))
         {
             std::lock_guard<std::mutex> lock(result_mutex);
             completed_threads++;
@@ -215,8 +221,9 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     std::vector<std::jthread> planning_threads;
     for (const auto &[grasp_pose, planner] : grasp_pose_to_planners)
     {
-        planning_threads.emplace_back([planner, grasp_pose, &is_grasp_pose_affordative](std::stop_token st) {
-            is_grasp_pose_affordative(st, planner, grasp_pose);
+        planning_threads.emplace_back([planner, grasp_pose, &is_grasp_pose_affordative, stop_token](std::stop_token jthread_st) {
+            if (stop_token.stop_requested()){return;}
+            is_grasp_pose_affordative(jthread_st, planner, grasp_pose);
         });
     }
 
@@ -224,7 +231,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
     {
         std::unique_lock<std::mutex> lock(result_mutex);
         result_cv.wait_for(lock, timeout,
-                           [&]() { return found_successful_plan || completed_threads == total_threads; });
+                           [&]() { return found_successful_plan || completed_threads == total_threads || stop_token.stop_requested(); });
     }
 
     // Request stop on all threads (no-op if already finished)
