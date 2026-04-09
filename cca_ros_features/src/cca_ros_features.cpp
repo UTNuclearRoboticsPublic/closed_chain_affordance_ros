@@ -179,6 +179,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         {
             auto req_l = req;
             req_l.execute_trajectory = false;
+            req_l.execute_partial_trajectory = false;
             req_l.visualize_trajectory = false;
             req_l.task_description.affordance_info_from.frame_name = grasp_pose_frame_id;
             req_l.task_description.affordance_info_from.post_transform = grasp_pose_eigen.matrix();
@@ -190,6 +191,7 @@ std::optional<geometry_msgs::msg::PoseStamped> get_affordative_grasp_pose(
         // Fill in affordance info for grab request (grab affordance is defined relative to the grasp pose)
         auto grab_req_l = grab_req;
         grab_req_l.execute_trajectory = false;
+        grab_req_l.execute_partial_trajectory = false;
         grab_req_l.visualize_trajectory = false;
         grab_req_l.task_description.affordance_info_from.frame_name = grasp_pose_frame_id;
         grab_req_l.task_description.affordance_info_from.post_transform = grasp_pose_eigen.matrix();
