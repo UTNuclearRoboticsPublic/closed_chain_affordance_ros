@@ -32,9 +32,10 @@ BT::NodeStatus CcaRosAction::onStart()
             cca_ros_context_ = std::make_shared<cca_ros::CcaRosContext>(ros_node);
             config().blackboard->set("cca_ros_context", cca_ros_context_);
         }
-
-        cca_ros_ = std::make_shared<cca_ros::CcaRos>(cca_ros_context_);
     }
+  
+    // Create fresh CcaRos per execution to avoid member variable races if used under a Parallel node
+    cca_ros_ = std::make_shared<cca_ros::CcaRos>(cca_ros_context_);
 
     // Define type aliases for readability
     using PlanningRequestPtr = std::shared_ptr<cca_ros::PlanningRequest>;
