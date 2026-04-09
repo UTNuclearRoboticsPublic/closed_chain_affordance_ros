@@ -29,7 +29,16 @@ BT::NodeStatus GetAffordativeGraspPose::onStart()
     if (!cca_ros_context_)
     {
         node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
-        cca_ros_context_ = std::make_shared<cca_ros::CcaRosContext>(node_);
+        auto entry = config().blackboard->getAny("cca_ros_context");
+        if (entry && !entry->empty())
+        {
+            cca_ros_context_ = config().blackboard->get<std::shared_ptr<cca_ros::CcaRosContext>>("cca_ros_context");
+        }
+        else
+        {
+            cca_ros_context_ = std::make_shared<cca_ros::CcaRosContext>(node_);
+            config().blackboard->set("cca_ros_context", cca_ros_context_);
+        }
     }
 
     stop_source_ = std::stop_source{};
