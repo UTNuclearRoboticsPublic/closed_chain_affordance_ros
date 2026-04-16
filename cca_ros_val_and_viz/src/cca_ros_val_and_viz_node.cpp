@@ -29,13 +29,13 @@
 //          data of any kind.
 //
 ///////////////////////////////////////////////////////////////////////////////
+#include <cca_ros_msgs/srv/cca_ros_val_and_viz.hpp>
 #include <fmt/core.h>
 #include <iomanip>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <string>
-#include <rclcpp/rclcpp.hpp>
-#include <cca_ros_msgs/srv/cca_ros_val_and_viz.hpp>
 
 // MoveIt
 #include <moveit/kinematic_constraints/utils.h>
@@ -53,7 +53,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
 {
   public:
     explicit CcaRosValAndVizServer(const rclcpp::NodeOptions &options)
-        : Node("cca_ros_val_and_viz", options), node_logger_(this->get_logger()), val_and_viz_ss_name_("/cca_ros_val_and_viz") 
+        : Node("cca_ros_val_and_viz", options), node_logger_(this->get_logger()),
+          val_and_viz_ss_name_("/cca_ros_val_and_viz")
     {
 
         // Extract parameters
@@ -64,14 +65,15 @@ class CcaRosValAndVizServer : public rclcpp::Node
         // Create and advertise planning and visualization service
         reentrant_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
         srv_ = this->create_service<cca_ros_msgs::srv::CcaRosValAndViz>(
-            val_and_viz_ss_name_, std::bind(&CcaRosValAndVizServer::cca_ros_viz_server_callback_, this,
-                                             std::placeholders::_1, std::placeholders::_2),
+            val_and_viz_ss_name_,
+            std::bind(&CcaRosValAndVizServer::cca_ros_viz_server_callback_, this, std::placeholders::_1,
+                      std::placeholders::_2),
             rmw_qos_profile_services_default, reentrant_cb_group_);
 
         // Initialize the publisher to show moveit planned path
         moveit_planned_path_pub_ =
             this->create_publisher<moveit_msgs::msg::DisplayTrajectory>("/display_planned_path", 1);
-        RCLCPP_INFO_STREAM(node_logger_, val_and_viz_ss_name_ <<" service is active");
+        RCLCPP_INFO_STREAM(node_logger_, val_and_viz_ss_name_ << " service is active");
     }
 
     ~CcaRosValAndVizServer()
@@ -106,17 +108,17 @@ class CcaRosValAndVizServer : public rclcpp::Node
         psm_->startStateMonitor(
             joint_states_topic_); // listens to joint state updates and attached collision object changes
 
-        // Make the planning‐scene service available for diffs and publish the scene -- needed to reflect joint states correctly
+        // Make the planning‐scene service available for diffs and publish the scene -- needed to reflect joint states
+        // correctly
         psm_->providePlanningSceneService();
         psm_->startPublishingPlanningScene(planning_scene_monitor::PlanningSceneMonitor::UPDATE_SCENE);
 
         rviz_visual_tools_.reset(
             new rviz_visual_tools::RvizVisualTools(rviz_fixed_frame_, val_and_viz_ss_name_, node_handle));
-        rviz_visual_tools_->loadMarkerPub(); 	    // Initialize publisher
-        rviz_visual_tools_->setLifetime(0.0);       // Publish markers with zero timestamp to avoid future extrapolation
-        rviz_visual_tools_->enableFrameLocking();   // Keep markers fixed in the RViz frame to bypass TF transforms
-        rviz_visual_tools_->enableBatchPublishing();// Batch publishing for efficiency
-
+        rviz_visual_tools_->loadMarkerPub();      // Initialize publisher
+        rviz_visual_tools_->setLifetime(0.0);     // Publish markers with zero timestamp to avoid future extrapolation
+        rviz_visual_tools_->enableFrameLocking(); // Keep markers fixed in the RViz frame to bypass TF transforms
+        rviz_visual_tools_->enableBatchPublishing(); // Batch publishing for efficiency
     }
 
   private:
@@ -124,8 +126,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
     rclcpp::Node::SharedPtr node_handle;
     std::thread spinner_thread_; // To spin the node in a separate thread
 
-    rclcpp::Logger node_logger_;                                       // logger associated with the node
-    rclcpp::CallbackGroup::SharedPtr reentrant_cb_group_;              // allows parallel service callbacks
+    rclcpp::Logger node_logger_;                                         // logger associated with the node
+    rclcpp::CallbackGroup::SharedPtr reentrant_cb_group_;                // allows parallel service callbacks
     rclcpp::Service<cca_ros_msgs::srv::CcaRosValAndViz>::SharedPtr srv_; // joint traj plan and visualization service
     rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr
         moveit_planned_path_pub_; // publisher to show moveit planned path
@@ -140,36 +142,38 @@ class CcaRosValAndVizServer : public rclcpp::Node
     std::string rviz_fixed_frame_;
     std::string joint_states_topic_;
 
-    std::string get_joint_limit_violation_log_(const moveit::core::RobotState& state, const std::map<std::string, moveit::core::VariableBounds>& joint_limit_map) {
+    std::string get_joint_limit_violation_log_(
+        const moveit::core::RobotState &state,
+        const std::map<std::string, moveit::core::VariableBounds> &joint_limit_map)
+    {
         const int JOINT_NAME_WIDTH = 30;
         const int VALUE_WIDTH = 15;
         const int LIMIT_WIDTH = 15;
         const int TOTAL_WIDTH = JOINT_NAME_WIDTH + VALUE_WIDTH + LIMIT_WIDTH + LIMIT_WIDTH;
         const int FLOAT_PRECISION = 4;
-        
+
         std::stringstream error_msg;
         error_msg << std::fixed << std::setprecision(FLOAT_PRECISION);
         error_msg << "Offending joints:\n";
-        error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << "Joint name" 
-                  << std::setw(VALUE_WIDTH) << "Value" 
-                  << std::setw(LIMIT_WIDTH) << "Min Limit" 
-                  << std::setw(LIMIT_WIDTH) << "Max Limit" << "\n";
+        error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << "Joint name" << std::setw(VALUE_WIDTH) << "Value"
+                  << std::setw(LIMIT_WIDTH) << "Min Limit" << std::setw(LIMIT_WIDTH) << "Max Limit"
+                  << "\n";
         error_msg << std::string(TOTAL_WIDTH, '-') << "\n";
-        
-        for (const auto& [joint_name, bounds] : joint_limit_map) {
-            const moveit::core::JointModel* joint_model = 
-                state.getRobotModel()->getJointModel(joint_name);
-            
-            if (joint_model && !state.satisfiesBounds(joint_model)) {
+
+        for (const auto &[joint_name, bounds] : joint_limit_map)
+        {
+            const moveit::core::JointModel *joint_model = state.getRobotModel()->getJointModel(joint_name);
+
+            if (joint_model && !state.satisfiesBounds(joint_model))
+            {
                 const double value = state.getVariablePosition(joint_name);
-                
-                error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << joint_name
-                          << std::setw(VALUE_WIDTH) << value
-                          << std::setw(LIMIT_WIDTH) << bounds.min_position_
-                          << std::setw(LIMIT_WIDTH) << bounds.max_position_ << "\n";
+
+                error_msg << std::setw(JOINT_NAME_WIDTH) << std::left << joint_name << std::setw(VALUE_WIDTH) << value
+                          << std::setw(LIMIT_WIDTH) << bounds.min_position_ << std::setw(LIMIT_WIDTH)
+                          << bounds.max_position_ << "\n";
             }
         }
-        
+
         return error_msg.str();
     }
 
@@ -202,58 +206,57 @@ class CcaRosValAndVizServer : public rclcpp::Node
     }
 
     // Reorders the trajectory to match a given joint name order (e.g., for a planning group or the full robot)
-    trajectory_msgs::msg::JointTrajectory reorder_trajectory_(
-        const trajectory_msgs::msg::JointTrajectory &input_traj,
-        const std::vector<std::string> &target_joint_names, 
-	const moveit::core::RobotState& current_state)
+    trajectory_msgs::msg::JointTrajectory reorder_trajectory_(const trajectory_msgs::msg::JointTrajectory &input_traj,
+                                                              const std::vector<std::string> &target_joint_names,
+                                                              const moveit::core::RobotState &current_state)
     {
         trajectory_msgs::msg::JointTrajectory ordered_traj;
         ordered_traj.header = input_traj.header;
         ordered_traj.joint_names = target_joint_names;
-    
+
         // Build name → index map from input
         std::unordered_map<std::string, size_t> name_to_index;
         for (size_t i = 0; i < input_traj.joint_names.size(); ++i)
         {
-    	name_to_index[input_traj.joint_names[i]] = i;
+            name_to_index[input_traj.joint_names[i]] = i;
         }
-    
+
         // Reorder each point according to target_joint_names
         for (const auto &point : input_traj.points)
         {
-    	trajectory_msgs::msg::JointTrajectoryPoint new_point;
-    	new_point.time_from_start = point.time_from_start;
-    	new_point.positions.resize(target_joint_names.size());
-    
-    	for (size_t i = 0; i < target_joint_names.size(); ++i)
-    	{
-    	    const auto &name = target_joint_names[i];
-    	    auto it = name_to_index.find(name);
-    	    if (it != name_to_index.end())
-    	    {
-    		new_point.positions[i] = point.positions[it->second];
-    	    }
-    	    else
-    	    {
-    		new_point.positions[i] = current_state.getVariablePosition(name);
-    	    }
-    	}
-    
-    	ordered_traj.points.push_back(std::move(new_point));
+            trajectory_msgs::msg::JointTrajectoryPoint new_point;
+            new_point.time_from_start = point.time_from_start;
+            new_point.positions.resize(target_joint_names.size());
+
+            for (size_t i = 0; i < target_joint_names.size(); ++i)
+            {
+                const auto &name = target_joint_names[i];
+                auto it = name_to_index.find(name);
+                if (it != name_to_index.end())
+                {
+                    new_point.positions[i] = point.positions[it->second];
+                }
+                else
+                {
+                    new_point.positions[i] = current_state.getVariablePosition(name);
+                }
+            }
+
+            ordered_traj.points.push_back(std::move(new_point));
         }
-    
+
         return ordered_traj;
     }
-
 
     void cca_ros_viz_server_callback_(const std::shared_ptr<cca_ros_msgs::srv::CcaRosValAndViz::Request> serv_req,
                                       std::shared_ptr<cca_ros_msgs::srv::CcaRosValAndViz::Response> serv_res)
     {
 
-        serv_res->success = false;// start as false
+        serv_res->success = false; // start as false
 
-        RCLCPP_INFO(node_logger_, "Validating requested joint trajectory for planning group [%s] with reference frame [%s]",
-		    serv_req->planning_group.c_str(), serv_req->ref_frame.c_str());
+        RCLCPP_INFO(node_logger_,
+                    "Validating requested joint trajectory for planning group [%s] with reference frame [%s]",
+                    serv_req->planning_group.c_str(), serv_req->ref_frame.c_str());
 
         // Get fresh robot state
         moveit::core::RobotState current_state(*robot_state_);
@@ -265,24 +268,25 @@ class CcaRosValAndVizServer : public rclcpp::Node
         // Get the joint model group for the requested planning group
         moveit::core::JointModelGroup *joint_model_group = robot_model_->getJointModelGroup(serv_req->planning_group);
 
-	// Capture joint names for the planning group
-	std::vector<std::string> joint_names = joint_model_group->getVariableNames();
+        // Capture joint names for the planning group
+        std::vector<std::string> joint_names = joint_model_group->getVariableNames();
 
         // Capture joint limits so we could log joint-limit violations later
         std::map<std::string, moveit::core::VariableBounds> joint_limit_map;
-        for (const std::string& joint_name : joint_names) {
-            joint_limit_map[joint_name] = 
-                robot_model_->getVariableBounds(joint_name);
+        for (const std::string &joint_name : joint_names)
+        {
+            joint_limit_map[joint_name] = robot_model_->getVariableBounds(joint_name);
         }
 
-	// (Re)order trajectory to match MoveIt planning group order
-	trajectory_msgs::msg::JointTrajectory ordered_group_traj = reorder_trajectory_(serv_req->joint_traj, joint_names, current_state);
+        // (Re)order trajectory to match MoveIt planning group order
+        trajectory_msgs::msg::JointTrajectory ordered_group_traj =
+            reorder_trajectory_(serv_req->joint_traj, joint_names, current_state);
 
         std::chrono::microseconds total_viol_check_duration{0}; // for joint limits and collision checking
 
-	size_t pt_index = 0;
-	size_t first_violation_index = ordered_group_traj.points.size(); // Initialize to full trajectory length
-	bool violation_found = false;
+        size_t pt_index = 0;
+        size_t first_violation_index = ordered_group_traj.points.size(); // Initialize to full trajectory length
+        bool violation_found = false;
         for (const auto &point : ordered_group_traj.points)
         {
             // Copy the joint trajectory point to a std::vector<double> type
@@ -296,177 +300,198 @@ class CcaRosValAndVizServer : public rclcpp::Node
             {
                 planning_scene_monitor::LockedPlanningSceneRO lscene(psm_);
 
-		// Check for joint limit and collision violation
-		auto start_time = std::chrono::high_resolution_clock::now(); // start time for this point in traj
+                // Check for joint limit and collision violation
+                auto start_time = std::chrono::high_resolution_clock::now(); // start time for this point in traj
 
-		// Set up collision requests and results
-		collision_detection::CollisionRequest collision_request;
-		collision_request.contacts = true;
-		collision_request.max_contacts = 1000;
-		collision_detection::CollisionResult collision_result;
-		collision_result.clear();
+                // Set up collision requests and results
+                collision_detection::CollisionRequest collision_request;
+                collision_request.contacts = true;
+                collision_request.max_contacts = 1000;
+                collision_detection::CollisionResult collision_result;
+                collision_result.clear();
 
-		// Check and store violation check
-		bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group);
-		lscene->checkCollision(collision_request, collision_result, goal_state);
-		bool collision_violation = collision_result.collision;
+                // Check and store violation check
+                bool joint_limit_violation = !goal_state.satisfiesBounds(joint_model_group);
+                lscene->checkCollision(collision_request, collision_result, goal_state);
+                bool collision_violation = collision_result.collision;
 
-		// Capture how long it took to check for violations
-		auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
-		auto point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-		total_viol_check_duration += point_duration;
+                // Capture how long it took to check for violations
+                auto end_time = std::chrono::high_resolution_clock::now(); // stop time for this point in traj
+                auto point_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+                total_viol_check_duration += point_duration;
 
-		// Log violation
-		if (joint_limit_violation || collision_violation) {
+                // Log violation
+                if (joint_limit_violation || collision_violation)
+                {
 
-		    std::string violation_type =
-                    (joint_limit_violation && collision_violation) ? "Joint Limit Violation & Collision" :
-                    joint_limit_violation ? "Joint Limit Violation" : "Collision";
+                    std::string violation_type = (joint_limit_violation && collision_violation)
+                                                     ? "Joint Limit Violation & Collision"
+                                                 : joint_limit_violation ? "Joint Limit Violation"
+                                                                         : "Collision";
 
-		    
-		    const double* goal_positions = goal_state.getVariablePositions();
-		    size_t num_joints = goal_state.getVariableCount();  // Get the number of joint values
+                    const double *goal_positions = goal_state.getVariablePositions();
+                    size_t num_joints = goal_state.getVariableCount(); // Get the number of joint values
 
-		    std::ostringstream oss;
-		    for (size_t k = 0; k < num_joints; ++k) {
-		        if (k > 0) oss << ", ";
-		        oss << goal_positions[k];
-		    }
+                    std::ostringstream oss;
+                    for (size_t k = 0; k < num_joints; ++k)
+                    {
+                        if (k > 0)
+                            oss << ", ";
+                        oss << goal_positions[k];
+                    }
 
-		    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point[%zu]: [%s]",
-		    	     violation_type.c_str(), pt_index, oss.str().c_str());
+                    RCLCPP_ERROR(node_logger_, "Generated trajectory violates constraints [%s] at point[%zu]: [%s]",
+                                 violation_type.c_str(), pt_index, oss.str().c_str());
 
-		    // If collision occurs, print the contacts
-		    if (collision_violation){
-			    collision_detection::CollisionResult::ContactMap::const_iterator it;
-			    for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it)
-			    {
-			      RCLCPP_ERROR(node_logger_, "Contact between: %s and %s", it->first.first.c_str(), it->first.second.c_str());
-			    }
-		    
-		    }
+                    // If collision occurs, print the contacts
+                    if (collision_violation)
+                    {
+                        collision_detection::CollisionResult::ContactMap::const_iterator it;
+                        for (it = collision_result.contacts.begin(); it != collision_result.contacts.end(); ++it)
+                        {
+                            RCLCPP_ERROR(node_logger_, "Contact between: %s and %s", it->first.first.c_str(),
+                                         it->first.second.c_str());
+                        }
+                    }
 
-		    // If joint-limit violation occurs, print the offending joints and info
-		    if (joint_limit_violation){	
-                            const std::string jl_err_log = get_joint_limit_violation_log_(goal_state, joint_limit_map);  
-			    RCLCPP_ERROR(node_logger_, jl_err_log.c_str());
-		    }
+                    // If joint-limit violation occurs, print the offending joints and info
+                    if (joint_limit_violation)
+                    {
+                        const std::string jl_err_log = get_joint_limit_violation_log_(goal_state, joint_limit_map);
+                        RCLCPP_ERROR(node_logger_, jl_err_log.c_str());
+                    }
 
-		    // Mark violation found and store the index, then break
-		    violation_found = true;
-		    first_violation_index = pt_index;
-		    break; 
-
-		}
+                    // Mark violation found and store the index, then break
+                    violation_found = true;
+                    first_violation_index = pt_index;
+                    break;
+                }
             }
-	    ++pt_index;
+            ++pt_index;
         }
-        if (serv_req->visualize){
-        RCLCPP_INFO(node_logger_, "Visualizing requested joint trajectory");
 
-	// Transform the trajectory to the full robot trajectory for visualization, i.e. by adding the current state of the unplanned joints
-	trajectory_msgs::msg::JointTrajectory ordered_robot_traj = reorder_trajectory_(serv_req->joint_traj, current_state.getVariableNames(), current_state);
+	// Visualize the trajectory and affordances if requested, even if violation is found, but only up to the violation point
 
-	// Truncate trajectories for visualization if violation was found
-	trajectory_msgs::msg::JointTrajectory viz_joint_traj = ordered_robot_traj;
-        auto viz_cart_traj = serv_req->cartesian_traj; 
-	if (violation_found && first_violation_index > 0) {
-            // Keep only the points up to (but not including) the violation point for visualization
-	    viz_joint_traj.points.resize(first_violation_index);
-            viz_cart_traj.resize(first_violation_index);
-	}
+        if (serv_req->visualize)
+        {
+            RCLCPP_INFO(node_logger_, "Visualizing requested joint trajectory");
 
-	const bool has_viz_traj = !viz_joint_traj.points.empty(); // Check if there's anything to visualize after truncation
+            // Transform the trajectory to the full robot trajectory for visualization, i.e. by adding the current state
+            // of the unplanned joints
+            trajectory_msgs::msg::JointTrajectory ordered_robot_traj =
+                reorder_trajectory_(serv_req->joint_traj, current_state.getVariableNames(), current_state);
 
-        // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request reference
-        // frame
-        Eigen::Isometry3d T_w_r = current_state.getGlobalLinkTransform(serv_req->ref_frame);
-
-        // Validate affordance info sizes
-        if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
-	    serv_req->aff_screw_axes.size() != serv_req->aff_ref_poses.size())
-	{
-	    RCLCPP_ERROR(node_logger_,
-			 "Mismatch in the size of affordance screw axes, locations, and reference pose vectors");
-	    return;
-	}
-
-         {
-        std::lock_guard<std::mutex> viz_lock(viz_mutex_);
-
-        // Clear messages
-        rviz_visual_tools_->deleteAllMarkers();
-
-        // Draw affordance screw axes and optionally, aff ref frames
-        for (size_t task_idx = 0; task_idx < serv_req->aff_screw_axes.size(); ++task_idx){
-            const auto aff_screw_axis = serv_req->aff_screw_axes.at(task_idx);
-	    const auto aff_location = serv_req->aff_locations.at(task_idx);
-            const auto aff_ref_pose_msg = serv_req->aff_ref_poses.at(task_idx);
-
-            // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance screw
-            // axis wrt to the x-axis.
-            Eigen::Quaterniond aff_screw_quat;
-            aff_screw_quat.setFromTwoVectors(Eigen::Vector3d::UnitX(),
-                                             Eigen::Vector3d(aff_screw_axis.x, aff_screw_axis.y, aff_screw_axis.z));
-
-            // Fill out the pose
-            Eigen::Isometry3d aff_screw_pose;
-            aff_screw_pose.linear() = aff_screw_quat.toRotationMatrix();
-            aff_screw_pose.translation() = Eigen::Vector3d(aff_location.x, aff_location.y, aff_location.z);
-
-            // Translate the pose to planning frame
-            aff_screw_pose = T_w_r * aff_screw_pose;
-
-            // If affordance ref frame is specified, draw it
-            if (this->is_pose_specified(aff_ref_pose_msg))
+            // Truncate trajectories for visualization if violation was found
+            trajectory_msgs::msg::JointTrajectory viz_joint_traj = ordered_robot_traj;
+            auto viz_cart_traj = serv_req->cartesian_traj;
+            if (violation_found && first_violation_index > 0)
             {
-                Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, aff_ref_pose_msg);
-
-                rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
+                // Keep only the points up to (but not including) the violation point for visualization
+                viz_joint_traj.points.resize(first_violation_index);
+                viz_cart_traj.resize(first_violation_index);
             }
 
-            // Publish
-            rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
-	}
-        
-	if (has_viz_traj) {
-            // Publish the joint trajectory
-	    moveit_msgs::msg::DisplayTrajectory display_trajectory;
+            const bool has_viz_traj =
+                !viz_joint_traj.points.empty(); // Check if there's anything to visualize after truncation
 
-	    // Set start state 
-	    display_trajectory.trajectory_start.joint_state.name     = viz_joint_traj.joint_names;
-	    display_trajectory.trajectory_start.joint_state.position = viz_joint_traj.points.front().positions;
+            // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request
+            // reference frame
+            Eigen::Isometry3d T_w_r = current_state.getGlobalLinkTransform(serv_req->ref_frame);
 
-	    // Fill out the trajectory
-	    auto &robot_traj = display_trajectory.trajectory.emplace_back();
-	    robot_traj.joint_trajectory = viz_joint_traj;
-
-	    moveit_planned_path_pub_->publish(display_trajectory);
-                
-        // Publish the tool trajectory
-	        for (const auto& pose : viz_cart_traj)
-	        {
-	            rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
-	        }
+            // Validate affordance info sizes
+            if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
+                serv_req->aff_screw_axes.size() != serv_req->aff_ref_poses.size())
+            {
+                RCLCPP_ERROR(node_logger_,
+                             "Mismatch in the size of affordance screw axes, locations, and reference pose vectors");
+                return;
             }
-	        rviz_visual_tools_->trigger();  // only once after batching
-        }
+
+            {
+                std::lock_guard<std::mutex> viz_lock(viz_mutex_);
+
+                // Clear messages
+                rviz_visual_tools_->deleteAllMarkers();
+
+                // Draw affordance screw axes and optionally, aff ref frames
+                for (size_t task_idx = 0; task_idx < serv_req->aff_screw_axes.size(); ++task_idx)
+                {
+                    const auto aff_screw_axis = serv_req->aff_screw_axes.at(task_idx);
+                    const auto aff_location = serv_req->aff_locations.at(task_idx);
+                    const auto aff_ref_pose_msg = serv_req->aff_ref_poses.at(task_idx);
+
+                    // Rviz puts arrows along x-axis by default. So, get the quaternion representation of the affordance
+                    // screw axis wrt to the x-axis.
+                    Eigen::Quaterniond aff_screw_quat;
+                    aff_screw_quat.setFromTwoVectors(
+                        Eigen::Vector3d::UnitX(),
+                        Eigen::Vector3d(aff_screw_axis.x, aff_screw_axis.y, aff_screw_axis.z));
+
+                    // Fill out the pose
+                    Eigen::Isometry3d aff_screw_pose;
+                    aff_screw_pose.linear() = aff_screw_quat.toRotationMatrix();
+                    aff_screw_pose.translation() = Eigen::Vector3d(aff_location.x, aff_location.y, aff_location.z);
+
+                    // Translate the pose to planning frame
+                    aff_screw_pose = T_w_r * aff_screw_pose;
+
+                    // If affordance ref frame is specified, draw it
+                    if (this->is_pose_specified(aff_ref_pose_msg))
+                    {
+                        Eigen::Isometry3d aff_ref_pose = this->transform_pose_to_world_frame(T_w_r, aff_ref_pose_msg);
+
+                        rviz_visual_tools_->publishAxis(aff_ref_pose, rviz_visual_tools::Scales::LARGE);
+                    }
+
+                    // Publish
+                    rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
+                }
+
+                if (has_viz_traj)
+                {
+                    // Publish the joint trajectory
+                    moveit_msgs::msg::DisplayTrajectory display_trajectory;
+
+                    // Set start state
+                    display_trajectory.trajectory_start.joint_state.name = viz_joint_traj.joint_names;
+                    display_trajectory.trajectory_start.joint_state.position = viz_joint_traj.points.front().positions;
+
+                    // Fill out the trajectory
+                    auto &robot_traj = display_trajectory.trajectory.emplace_back();
+                    robot_traj.joint_trajectory = viz_joint_traj;
+
+                    moveit_planned_path_pub_->publish(display_trajectory);
+
+                    // Publish the tool trajectory
+                    for (const auto &pose : viz_cart_traj)
+                    {
+                        rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
+                    }
+                }
+                rviz_visual_tools_->trigger(); // only once after batching
+            }
         }
 
-	// Set response
-	if (violation_found) {
-	    RCLCPP_WARN(node_logger_, "Constraint violation at point index %zu", first_violation_index);
+        // Set response
+        if (violation_found)
+        {
+            RCLCPP_WARN(node_logger_, "Constraint violation at point index %zu", first_violation_index);
             // Index of the last valid point in the trajectory
-            if (first_violation_index > 0) {
+            if (first_violation_index > 0)
+            {
                 serv_res->valid_end_index = static_cast<uint32_t>(first_violation_index - 1);
-            } else {
+            }
+            else
+            {
                 serv_res->valid_end_index = 0;
             }
-	    serv_res->success = false;
-	} else {
-	    RCLCPP_INFO(node_logger_, "Successfully validated requested joint trajectory");
-	    serv_res->success = true;
-	}
+            serv_res->success = false;
+        }
+        else
+        {
+            RCLCPP_INFO(node_logger_, "Successfully validated requested joint trajectory");
+            serv_res->success = true;
+        }
         serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
     }
 };
@@ -475,7 +500,8 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
-    node_options.automatically_declare_parameters_from_overrides(true); // Useful to extract params from sensors_3d.yaml where we don't know sensor names beforehand
+    node_options.automatically_declare_parameters_from_overrides(
+        true); // Useful to extract params from sensors_3d.yaml where we don't know sensor names beforehand
     auto node = std::make_shared<CcaRosValAndVizServer>(node_options);
     node->initialize();
 
