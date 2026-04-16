@@ -21,8 +21,12 @@ BT::NodeStatus CcaRosAction::onStart()
     // Use existing context from blackboard if already set by caller or another CcaRosAction node
     if (!cca_ros_context_)
     {
-        auto entry = config().blackboard->getAnyLocked("cca_ros_context");
-        if (entry && !entry->empty())
+        const bool context_exists = [&]() {
+            auto entry = config().blackboard->getAnyLocked("cca_ros_context");
+            return entry && !entry->empty();
+        }(); // getAnyLocked holds a mutex lock on the blackboard entry, so we release it before accessing the value with get<> to avoid deadlocks
+
+        if (context_exists)
         {
             cca_ros_context_ = config().blackboard->get<std::shared_ptr<cca_ros::CcaRosContext>>("cca_ros_context");
         }
