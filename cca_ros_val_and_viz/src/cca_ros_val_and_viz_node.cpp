@@ -252,7 +252,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
         serv_res->success = false;// start as false
 
-        RCLCPP_INFO(node_logger_, "Planning and visualizing the trajectory");
+        RCLCPP_INFO(node_logger_, "Validating requested joint trajectory for planning group [%s] with reference frame [%s]",
+		    serv_req->planning_group.c_str(), serv_req->ref_frame.c_str());
 
         // Get fresh robot state
         moveit::core::RobotState current_state(*robot_state_);
@@ -260,19 +261,6 @@ class CcaRosValAndVizServer : public rclcpp::Node
             planning_scene_monitor::LockedPlanningSceneRO scene(psm_);
             current_state = scene->getCurrentState();
         }
-
-        // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request reference
-        // frame
-        Eigen::Isometry3d T_w_r = current_state.getGlobalLinkTransform(serv_req->ref_frame);
-
-        // Validate affordance info sizes
-        if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
-	    serv_req->aff_screw_axes.size() != serv_req->aff_ref_poses.size())
-	{
-	    RCLCPP_ERROR(node_logger_,
-			 "Mismatch in the size of affordance screw axes, locations, and reference pose vectors");
-	    return;
-	}
 
         // Get the joint model group for the requested planning group
         moveit::core::JointModelGroup *joint_model_group = robot_model_->getJointModelGroup(serv_req->planning_group);
@@ -373,6 +361,8 @@ class CcaRosValAndVizServer : public rclcpp::Node
             }
 	    ++pt_index;
         }
+        if (serv_req->visualize){
+        RCLCPP_INFO(node_logger_, "Visualizing requested joint trajectory");
 
 	// Transform the trajectory to the full robot trajectory for visualization, i.e. by adding the current state of the unplanned joints
 	trajectory_msgs::msg::JointTrajectory ordered_robot_traj = reorder_trajectory_(serv_req->joint_traj, current_state.getVariableNames(), current_state);
@@ -388,22 +378,20 @@ class CcaRosValAndVizServer : public rclcpp::Node
 
 	const bool has_viz_traj = !viz_joint_traj.points.empty(); // Check if there's anything to visualize after truncation
 
-	if (has_viz_traj) {
-	    moveit_msgs::msg::DisplayTrajectory display_trajectory;
+        // Capture T_w_r, the HTM from world frame, usually the root frame of the urdf to the service request reference
+        // frame
+        Eigen::Isometry3d T_w_r = current_state.getGlobalLinkTransform(serv_req->ref_frame);
 
-	    // Set start state 
-	    display_trajectory.trajectory_start.joint_state.name     = viz_joint_traj.joint_names;
-	    display_trajectory.trajectory_start.joint_state.position = viz_joint_traj.points.front().positions;
+        // Validate affordance info sizes
+        if (serv_req->aff_screw_axes.size() != serv_req->aff_locations.size() ||
+	    serv_req->aff_screw_axes.size() != serv_req->aff_ref_poses.size())
+	{
+	    RCLCPP_ERROR(node_logger_,
+			 "Mismatch in the size of affordance screw axes, locations, and reference pose vectors");
+	    return;
+	}
 
-	    // Fill out the trajectory
-	    auto &robot_traj = display_trajectory.trajectory.emplace_back();
-	    robot_traj.joint_trajectory = viz_joint_traj;
-
-	    // Publish the joint trajectory -- I understand this is thread-safe so, no mutex needed.
-	    moveit_planned_path_pub_->publish(display_trajectory);
-         }
-
-        if (serv_req->visualize){
+         {
         std::lock_guard<std::mutex> viz_lock(viz_mutex_);
 
         // Clear messages
@@ -441,8 +429,21 @@ class CcaRosValAndVizServer : public rclcpp::Node
             rviz_visual_tools_->publishArrow(aff_screw_pose, rviz_visual_tools::CYAN, rviz_visual_tools::LARGE);
 	}
         
-            // Publish the tool trajectory
 	if (has_viz_traj) {
+            // Publish the joint trajectory
+	    moveit_msgs::msg::DisplayTrajectory display_trajectory;
+
+	    // Set start state 
+	    display_trajectory.trajectory_start.joint_state.name     = viz_joint_traj.joint_names;
+	    display_trajectory.trajectory_start.joint_state.position = viz_joint_traj.points.front().positions;
+
+	    // Fill out the trajectory
+	    auto &robot_traj = display_trajectory.trajectory.emplace_back();
+	    robot_traj.joint_trajectory = viz_joint_traj;
+
+	    moveit_planned_path_pub_->publish(display_trajectory);
+                
+        // Publish the tool trajectory
 	        for (const auto& pose : viz_cart_traj)
 	        {
 	            rviz_visual_tools_->publishAxis(this->transform_pose_to_world_frame(T_w_r, pose));
@@ -450,10 +451,11 @@ class CcaRosValAndVizServer : public rclcpp::Node
             }
 	        rviz_visual_tools_->trigger();  // only once after batching
         }
+        }
 
 	// Set response
 	if (violation_found) {
-	    RCLCPP_WARN(node_logger_, "Visualized trajectory up to violation point (first %zu points)", first_violation_index);
+	    RCLCPP_WARN(node_logger_, "Constraint violation at point index %zu", first_violation_index);
             // Index of the last valid point in the trajectory
             if (first_violation_index > 0) {
                 serv_res->valid_end_index = static_cast<uint32_t>(first_violation_index - 1);
@@ -462,7 +464,7 @@ class CcaRosValAndVizServer : public rclcpp::Node
             }
 	    serv_res->success = false;
 	} else {
-	    RCLCPP_INFO(node_logger_, "Successfully validated and visualized requested joint trajectory");
+	    RCLCPP_INFO(node_logger_, "Successfully validated requested joint trajectory");
 	    serv_res->success = true;
 	}
         serv_res->validation_time_usecs = total_viol_check_duration.count(); // in microseconds
