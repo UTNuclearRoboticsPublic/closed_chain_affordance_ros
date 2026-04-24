@@ -1,3 +1,6 @@
+
+
+
 # CCA RViz Plugin
 
 This package provides the source code for the **CCA RViz Plugin**, which enables intuitive, interactive specification and planning of constrained manipulation tasks — lowering the barrier for non-expert users to work with constrained motion planning.
@@ -13,16 +16,29 @@ Given a screw axis, its motion type, and an affordative grasp pose, computes a j
 
 > *Example: Move to grasp the valve at its 90° position.*
 
+https://github.com/user-attachments/assets/37b8e0b6-4811-4697-87f7-adb890f1a5c5
+
 ### 2. Affordance
 Given a screw axis and its motion type, and assuming the robot is already grasping the object, computes a joint trajectory that executes the desired constrained motion along the screw axis.
 
-> *Example: Rotate a valve 90°, or pull a drawer open by 40 cm.*
+> *Example: Rotate a valve 180°, or pull a drawer open by 40 cm.*
+
+https://github.com/user-attachments/assets/7557b58b-5c65-4966-8dbc-f8f8744902ce
+
+#### Approach and affordance planning demonstration on real robot
+
+https://github.com/user-attachments/assets/bbd4796e-4a79-4b03-8980-ad6ccaf248c8
+
 
 ### 3. EE Orientation
 Given a screw axis located at the end-effector, computes a joint trajectory that reorients the EE in place by a desired angle.
 
+https://github.com/user-attachments/assets/cd856ea8-20f6-4f7e-a15a-2b85af197175
+
 ### 4. Pose Goal
 Given a desired end-effector target pose, computes a joint trajectory to reach that pose.
+
+https://github.com/user-attachments/assets/b5abf628-08f3-4f51-a0ac-8df07bd139d6
 
 ## References
 
