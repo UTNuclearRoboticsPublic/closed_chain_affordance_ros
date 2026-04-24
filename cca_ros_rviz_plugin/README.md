@@ -1,13 +1,10 @@
-
-
-
 # CCA RViz Plugin
 
-This package provides the source code for the **CCA RViz Plugin**, which enables intuitive, interactive specification and planning of constrained manipulation tasks — lowering the barrier for non-expert users to work with constrained motion planning.
+This package provides the source code for the **CCA RViz Plugin**, which enables intuitive, interactive specification and planning of constrained manipulation tasks, making real-world constrained manipulation accessible to non-expert users. Task examples include opening doors, turning valves, manipulating drawers, moving objects out of the way, and many more.
 
-The plugin is based on the **Closed-Chain Affordance (CCA) framework** (see [references](#references) below), which enables efficient planning of common constrained manipulation tasks by capturing the motions that objects afford to the robot (*task affordances*) compactly as a screw — a unified mathematical representation encompassing rotation, translation, and screw motion. Task examples include opening doors, turning valves, manipulating drawers, moving objects out of the way, and many more.
+The plugin is based on the **Closed-Chain Affordance (CCA) framework** (see [references](#references) below), which enables efficient planning of common manipulation tasks by capturing the motions that objects afford to the robot (*task affordances*) compactly as a screw — a unified mathematical representation encompassing rotation, translation, and screw motion. 
 
-The plugin exposes a visual interface in which users describe tasks interactively using an arrow defining the axis of task motion (i.e. the screw axis), the motion type (rotation, translation, or screw), and an **affordative grasp pose** — the grasp configuration that enables the intended task motion.
+The plugin exposes a visual interface in which users describe tasks interactively using an arrow defining the axis of task motion (i.e. the screw axis), the motion type (rotation, translation, or screw), and an affordative grasp pose — the grasp pose that enables the intended task motion. By incorporating real-world context, for instance, via point cloud data, users can seamlessly apply the plugin to real-world tasks, as demonstrated below.
 
 ## Planning Types
 
@@ -30,7 +27,7 @@ https://github.com/user-attachments/assets/7557b58b-5c65-4966-8dbc-f8f8744902ce
 https://github.com/user-attachments/assets/bbd4796e-4a79-4b03-8980-ad6ccaf248c8
 
 
-### 3. EE Orientation
+### 3. EE Orientation Only
 Given a screw axis located at the end-effector, computes a joint trajectory that reorients the EE in place by a desired angle.
 
 https://github.com/user-attachments/assets/cd856ea8-20f6-4f7e-a15a-2b85af197175
