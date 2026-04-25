@@ -12,8 +12,6 @@
 #include <behaviortree_cpp/action_node.h>
 #include <chrono>
 #include <string>
-#include <thread>
-#include <variant>
 
 namespace cca_ros_behavior
 {
@@ -32,10 +30,8 @@ class CcaRosAction : public BT::StatefulActionNode
      *
      * @param name The name of the action node.
      * @param config Configuration for the Behavior Tree node.
-     * @param node_options Node options for the ROS 2 node (default is empty).
      */
-    CcaRosAction(const std::string &name, const BT::NodeConfig &config,
-                 const rclcpp::NodeOptions &node_options = rclcpp::NodeOptions());
+    CcaRosAction(const std::string &name, const BT::NodeConfig &config);
 
     /**
      * @brief Returns the list of ports required by this action node.
@@ -71,7 +67,8 @@ class CcaRosAction : public BT::StatefulActionNode
     void onHalted() override;
 
   private:
-    std::shared_ptr<cca_ros::CcaRos> node_;                         /**< Node for ROS communication */
+    std::shared_ptr<cca_ros::CcaRos> cca_ros_;                         /**< Node for ROS communication */
+    std::shared_ptr<cca_ros::CcaRosContext> cca_ros_context_;                         /**< Node for ROS communication */
     std::jthread spinner_thread_;                                    /**< Thread to spin the node. */
     std::shared_ptr<cca_ros::Status> status_{nullptr};              /**< To check the status of the CCA action. */
     std::chrono::time_point<std::chrono::steady_clock> start_time_; /**< To monitor the timeout. */

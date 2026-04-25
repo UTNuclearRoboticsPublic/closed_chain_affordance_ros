@@ -2,7 +2,7 @@
 //      Title     : cca_ros_rviz_plugin.hpp
 //      Project   : cca_ros_rviz_plugin
 //      Created   : Spring 2025
-//      Author    : Janak Panthi (Crasun Jans) and John Lyle
+//      Author    : Janak Panthi (Crasun Jans)
 ///////////////////////////////////////////////////////////////////////////////
 
 #ifndef CCA_ROS_RVIZ_PLUGIN_HPP_
@@ -270,7 +270,7 @@ class CcaRosRvizPlugin : public rviz_common::Panel, public interactive_marker_ma
 
     const std::map<QString, cc_affordance_planner::PlanningType> planning_type_map_ = {
         {QString("Affordance"), cc_affordance_planner::PlanningType::AFFORDANCE},
-        {QString("Cartesian Goal"), cc_affordance_planner::PlanningType::CARTESIAN_GOAL},
+        {QString("Pose Goal"), cc_affordance_planner::PlanningType::CARTESIAN_GOAL},
         {QString("Approach"), cc_affordance_planner::PlanningType::APPROACH},
         {QString("EE Orientation Only"), cc_affordance_planner::PlanningType::EE_ORIENTATION_ONLY}};
 

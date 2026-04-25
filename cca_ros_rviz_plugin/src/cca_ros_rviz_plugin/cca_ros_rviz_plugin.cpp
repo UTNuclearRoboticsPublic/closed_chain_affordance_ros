@@ -187,7 +187,7 @@ void CcaRosRvizPlugin::mode_selected_()
         set_combo_box_controls_(axis_bl_, true);
         axis_bl_.combo_box->setCurrentText("");
     }
-    else if (selected_mode == "Cartesian Goal"){ 
+    else if (selected_mode == "Pose Goal"){ 
         
 	// We only need the frame marker
         draw_frame_im_();

@@ -3,31 +3,6 @@
 //      Project   : cca_ros
 //      Created   : Spring 2024
 //      Author    : Janak Panthi (Crasun Jans)
-//      Copyright : Copyright© The University of Texas at Austin, 2014-2026.
-//      All rights reserved.
-//
-//      All files within this directory are subject to the following, unless
-//      an alternative license is explicitly included within the text of
-//      each file.
-//
-//      This software and documentation constitute an unpublished work
-//      and contain valuable trade secrets and proprietary information
-//      belonging to the University. None of the foregoing material may be
-//      copied or duplicated or disclosed without the express, written
-//      permission of the University. THE UNIVERSITY EXPRESSLY DISCLAIMS ANY
-//      AND ALL WARRANTIES CONCERNING THIS SOFTWARE AND DOCUMENTATION,
-//      INCLUDING ANY WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-//      PARTICULAR PURPOSE, AND WARRANTIES OF PERFORMANCE, AND ANY WARRANTY
-//      THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF TRADE.
-//      NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO THE USE OF
-//      THE SOFTWARE OR DOCUMENTATION. Under no circumstances shall the
-//      University be liable for incidental, special, indirect, direct or
-//      consequential damages or loss of profits, interruption of business,
-//      or related expenses which may arise from use of software or
-//      documentation, including but not limited to those resulting from
-//      defects in software and/or documentation, or loss or inaccuracy of
-//      data of any kind.
-//
 ///////////////////////////////////////////////////////////////////////////////
 
 #ifndef CCA_ROS_HPP
@@ -135,6 +110,7 @@ struct PlanningRequest
     KinematicState start_state =
         KinematicState{Eigen::VectorXd(), std::numeric_limits<double>::quiet_NaN()}; /**< Initial kinematic state.
                                                                                       */
+    bool visualize_trajectory = true; /**< Whether to visualize the planned trajectory. */
     bool execute_trajectory = false; /**< Whether to execute the planned trajectory. */
     bool execute_partial_trajectory = false; /**< Whether to execute partially planned trajectory. */
     std::chrono::seconds execution_timeout{60}; /**< Timeout for trajectory execution. CcaRos returns failure sends a cancel request to the trajectory execution server if this timeout is exceeded. */ 
@@ -173,11 +149,63 @@ struct GoalMsg
 };
 
 /**
+ * @brief Class owning shared ROS infrastructure for use across parallel CcaRos planners.
+ *
+ * Owns the ROS node, joint states subscriber (with mutex and condition variable for
+ * thread-safe reads), TF buffer/listener, and the read-only planning group info map.
+ * Multiple CcaRos instances may share a single CcaRosContext to avoid duplicating
+ * subscribers, TF listeners, and parameter-load overhead.
+ */
+class CcaRosContext
+{
+  public:
+    using JointState = sensor_msgs::msg::JointState;
+
+    /**
+     * @brief Constructs a CcaRosContext from an existing ROS node.
+     * @param node Shared pointer to an existing ROS node.
+     */
+    explicit CcaRosContext(std::shared_ptr<rclcpp::Node> node);
+
+    /**
+    * @brief Returns the shared ROS node.
+    *
+    * @return Shared pointer to the ROS node.
+    */
+    std::shared_ptr<rclcpp::Node> get_node() const;
+
+    /**
+     * @brief Returns the joint names for a given planning group.
+     * @param planning_group Name of the planning group.
+     * @return Vector of joint names.
+     */
+    const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
+
+  private:
+    friend class CcaRos;
+    rclcpp::Node::SharedPtr node_;                                               /**< Shared pointer to the ROS node. */
+    std::unordered_map<std::string, PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. Read-only after construction. */
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                                 /**< TF2 buffer for transformation lookup. Thread-safe for concurrent reads. */
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};           /**< TF2 transform listener. */
+    std::mutex joint_states_mutex_;                                              /**< Mutex to protect access to joint states. */
+    std::condition_variable joint_states_cv_;                                    /**< Condition variable to signal availability of joint states. */
+    JointState::SharedPtr latest_joint_state_msg_{nullptr};                      /**< Latest received joint state message. */
+
+    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;               /**< Subscriber for joint states. */
+
+    /**
+     * @brief Callback function for processing joint state updates.
+     * @param msg Incoming joint state message.
+     */
+    void joint_states_cb_(const JointState::SharedPtr msg);
+};
+
+/**
  * @brief Class representing the CC Affordance Planner node in ROS.
  * This class manages the process of planning, visualizing, and executing
  * trajectories for robot affordances using closed-chain kinematics.
  */
-class CcaRos : public rclcpp::Node
+class CcaRos 
 {
   public:
     // Type aliases
@@ -191,6 +219,24 @@ class CcaRos : public rclcpp::Node
      * @param options Options for the node, e.g., parameter overrides.
      */
     explicit CcaRos(const std::string &node_name, const rclcpp::NodeOptions &options);
+
+    /**
+     * @brief Constructs a CcaRos node.
+     * @param node Shared pointer to an existing ROS node.
+     */
+    explicit CcaRos(std::shared_ptr<rclcpp::Node> node);
+
+    /**
+     * @brief Constructs a CcaRos node from a shared context.
+     *
+     * Use this constructor when creating multiple planners that should share
+     * the same ROS node, joint states subscriber, TF listener, and planning
+     * group info. Retrieve the context from the first planner via get_context()
+     * and pass it to subsequent planners.
+     *
+     * @param context Shared pointer to an existing CcaRosContext.
+     */
+    explicit CcaRos(std::shared_ptr<CcaRosContext> context);
 
     /**
      * @brief Destructs a CcaRos node.
@@ -278,8 +324,33 @@ class CcaRos : public rclcpp::Node
     */
     static std::unordered_map<std::string, PlanningGroupInfo> get_planning_group_info_map(rclcpp::Node* node_ptr);
 
+    /**
+     * @brief Returns the shared context owned by this planner.
+     *
+     * Use this to obtain the context after constructing the first planner with
+     * the node constructor, then pass it to subsequent planners to share
+     * infrastructure.
+     *
+     * @return Shared pointer to the CcaRosContext.
+     */
+    std::shared_ptr<CcaRosContext> get_context() const;
+
+    /**
+     * @brief Returns the joint names for a given planning group.
+     * @param planning_group Name of the planning group.
+     * @return Vector of joint names.
+     */
+    const std::vector<std::string> &get_joint_names(const std::string &planning_group) const;
+
+    /**
+    * @brief Returns the shared ROS node.
+    *
+    * @return Shared pointer to the ROS node.
+    */
+    std::shared_ptr<rclcpp::Node> get_node() const;
+
   private:
-    std::unordered_map<std::string, cca_ros::PlanningGroupInfo> planning_group_info_map_; /**< Mapping of planning group names to their information. */
+    std::shared_ptr<CcaRosContext> context_; /**< Shared context owning ROS node, TF, joint states subscriber, and planning group info. */
     constexpr static double tf_lookup_timeout_ = 1.5; /**< Wait until 1.5 secs for TF lookups */
     constexpr static std::chrono::seconds joint_states_read_timeout_{5}; /**< Timeout for reading joint states. */ 
     constexpr static std::chrono::seconds val_and_viz_ss_avail_wait_{1}; /**< How long to wait for the validation service to be available. */ 
@@ -298,9 +369,7 @@ class CcaRos : public rclcpp::Node
     std::string val_and_viz_ss_name_;           /**< Name of the plan and visualization server. */
     ExecutionActionClients ex_clients_; /**< Action clients for trajectory execution. */
     rclcpp::Client<CcaRosValAndViz>::SharedPtr val_and_viz_client_; /**< Client for visualizing the planned trajectory. */
-    rclcpp::Subscription<JointState>::SharedPtr joint_states_sub_;     /**< Subscriber for joint states. */
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;                       /**< TF2 buffer for transformation lookup. */
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr}; /**< TF2 transform listener. */
+    std::unordered_map<std::string, ExecutionActionClients> ex_clients_map_; /**< Per-planner execution action clients for each planning group. */
 
     // Robot ROS setup data
     cca_ros::ExecutionActionServerNames ex_as_names_; /**< Current action server names for execution. */
@@ -313,10 +382,6 @@ class CcaRos : public rclcpp::Node
     std::string ref_frame_;                        /**< Reference frame for transformations. */
     std::string tool_frame_;                       /**< Tool frame for the robot's end-effector. */
     std::string planning_group_;                    /**< Current planning group name. */
-
-
-    ros_cpp_util::JointTrajPoint robot_joint_states_;   /**< Processed and ordered robot joint states. */
-    ros_cpp_util::JointTrajPoint gripper_joint_states_; /**< Processed and ordered gripper joint states. */
 
     std::shared_future<GoalHandleFollowJointTrajectory::SharedPtr>
         unified_gh_future_; /**< Goal handle future for the unified trajectory
@@ -335,12 +400,6 @@ class CcaRos : public rclcpp::Node
     void validate_input_(const std::vector<cca_ros::PlanningRequest> &reqs);
 
     /**
-     * @brief Callback function for processing joint state updates.
-     * @param msg Incoming joint state message.
-     */
-    void joint_states_cb_(const JointState::SharedPtr msg);
-
-    /**
      * @brief Retrieves the joint states of the robot and gripper.
      * @return KinematicState containing robot and gripper state.
      */
@@ -351,11 +410,12 @@ class CcaRos : public rclcpp::Node
      * @param goal FollowJointTrajectory goal for the trajectory.
      * @param cartesian_trajectory Corresponding Cartesian trajectory.
      * @param task_descriptions Descriptions of tasks for visualization.
+     * @param visualize_trajectory Whether to visualize the trajectory.
      * @return Shared pointer to the visualization service response.
      */
     cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr validate_and_visualize_(
         const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose> &cartesian_trajectory,
-        const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions);
+        const std::vector<cc_affordance_planner::TaskDescription> &task_descriptions, bool visualize_trajectory);
 
     /**
      * @brief Executes the planned trajectory.

@@ -6,36 +6,68 @@
 namespace cca_ros
 {
 
-// Constructor for CcaRos, initializes the node and sets up required parameters and clients.
-CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
-    : Node(node_name, node_options),
-      node_logger_(this->get_logger()),   // Logger for the node
-      val_and_viz_ss_name_("/cca_ros_val_and_viz") // Validation and visualization service name
+CcaRosContext::CcaRosContext(std::shared_ptr<rclcpp::Node> node)
+    : node_(node)
 {
 
     // --- Required params (throw if absent) ---
-    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(this, "cca_joint_states_topic");
-    const std::string robot_name = ros_cpp_util::get_required_str_param(this, "cca_robot");
+    const std::string joint_states_topic = ros_cpp_util::get_required_str_param(node_.get(), "cca_joint_states_topic");
+    const std::string robot_name = ros_cpp_util::get_required_str_param(node_.get(), "cca_robot");
 
     // Extract robot configuration and action-server names for various planning groups
-    planning_group_info_map_ = CcaRos::get_planning_group_info_map(this);
-
-    // Initialize execution action clients for each planning group
-    for (auto& [pg_name, pg_info] : planning_group_info_map_) {
-          pg_info.ex_clients = this->initialize_action_clients_(pg_info.ex_as_names);
-    }
+    planning_group_info_map_ = CcaRos::get_planning_group_info_map(node_.get());
 
     // Initialize service/action clients and subscribers
-    val_and_viz_client_ = this->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
-    joint_states_sub_ = this->create_subscription<JointState>(
-        joint_states_topic,rclcpp::QoS(1000),std::bind(&CcaRos::joint_states_cb_, this, std::placeholders::_1));
+    joint_states_sub_ = node_->create_subscription<JointState>(
+        joint_states_topic, rclcpp::QoS(1000),std::bind(&CcaRosContext::joint_states_cb_, this, std::placeholders::_1));
 
-    // Setup TF buffer to task info lookup from TF tree
-    tf_buffer_   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    // Setup TF buffer to lookup task info from TF tree
+    tf_buffer_   = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
-    RCLCPP_INFO(node_logger_, "Initialized %s node for %s", node_name.c_str(), robot_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "Initialized %s node for %s", node_->get_name(), robot_name.c_str());
 }
+
+const std::vector<std::string> &CcaRosContext::get_joint_names(const std::string &planning_group) const
+{
+    return planning_group_info_map_.at(planning_group).robot_config.joint_names.robot;
+}
+
+std::shared_ptr<rclcpp::Node> CcaRosContext::get_node() const { return node_; }
+
+// Callback for joint_states topic — stores the latest raw message for copy-on-read by planners.
+void CcaRosContext::joint_states_cb_(const JointState::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(joint_states_mutex_);
+    latest_joint_state_msg_ = msg;
+    joint_states_cv_.notify_all();
+}
+
+CcaRos::CcaRos(const std::string &node_name, const rclcpp::NodeOptions &node_options)
+    : CcaRos(std::make_shared<rclcpp::Node>(node_name, node_options))
+{}
+
+// Constructor for CcaRos from a node — creates context internally and exposes it via get_context().
+CcaRos::CcaRos(std::shared_ptr<rclcpp::Node> node)
+    : CcaRos(std::make_shared<CcaRosContext>(node))
+{}
+
+// Constructor for CcaRos from a shared context — initializes per-planner resources only.
+CcaRos::CcaRos(std::shared_ptr<CcaRosContext> context)
+    : context_(context),
+      node_logger_(context->node_->get_logger()),   // Logger for the node
+      val_and_viz_ss_name_("/cca_ros_val_and_viz") // Validation and visualization service name
+{
+    // Initialize per-planner execution action clients for each planning group
+    for (const auto& [pg_name, pg_info] : context_->planning_group_info_map_) {
+        ex_clients_map_[pg_name] = this->initialize_action_clients_(pg_info.ex_as_names);
+    }
+
+    // Initialize validation and visualization service client
+    val_and_viz_client_ = context_->node_->create_client<CcaRosValAndViz>(val_and_viz_ss_name_);
+}
+
+std::shared_ptr<rclcpp::Node> CcaRos::get_node() const { return context_->node_; }
 
 // Destructor for CcaRos, cleans up.
 CcaRos::~CcaRos()
@@ -43,10 +75,17 @@ CcaRos::~CcaRos()
     // Stop status checking thread before other members begin destruction
     result_status_thread_.request_stop();
 
-    // Shutdown ROS
-    rclcpp::shutdown();
 }
 
+std::shared_ptr<CcaRosContext> CcaRos::get_context() const
+{
+    return context_;
+}
+
+const std::vector<std::string> &CcaRos::get_joint_names(const std::string &planning_group) const
+{
+    return context_->get_joint_names(planning_group);
+}
 
 cca_ros::PlanningResponse CcaRos::plan(const cca_ros::PlanningRequest &planning_request) {
     // Delegate to the multi-request planner with a single-element vector
@@ -77,7 +116,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     // Determine robot config for this planning group
     planning_group_ = planning_requests.front().planning_group; // Current planning group
     const affordance_util::RobotConfig& robotConfig = 
-	planning_group_info_map_.at(planning_group_).robot_config;
+	context_->planning_group_info_map_.at(planning_group_).robot_config;
 
     robot_slist_ = robotConfig.Slist;                         // Robot screw axes
     M_ = robotConfig.M;                                       // Home configuration matrix
@@ -88,11 +127,12 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
 
     // Extract execution action server names and clients for this planning group
     const cca_ros::PlanningRequest& first_req = planning_requests.front();
+    const bool visualize_trajectory = first_req.visualize_trajectory; // All requests have the same value due to validation
     const bool execute_trajectory = first_req.execute_trajectory; // All requests have the same value due to validation
     const bool execute_partial_trajectory = first_req.execute_partial_trajectory; // All requests have the same value due to validation
     const std::chrono::seconds& execution_timeout = first_req.execution_timeout; // All requests have the same value due to validation
-    ex_as_names_ = planning_group_info_map_.at(first_req.planning_group).ex_as_names; // Need this for create_goal_msg_ as well as execute_
-    ex_clients_ = planning_group_info_map_.at(first_req.planning_group).ex_clients; // Might as well extract here too although only needed in execute_
+    ex_as_names_ = context_->planning_group_info_map_.at(first_req.planning_group).ex_as_names; // Need this for create_goal_msg_ as well as execute_
+    ex_clients_ = ex_clients_map_.at(first_req.planning_group); // Might as well extract here too although only needed in execute_
 
     // Prepare to collect task descriptions for visualization. We don't directly use task descriptions from planning requests since 
     // sometimes the info is asked to be looked up later using different methods. 
@@ -181,7 +221,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             try {
                 // Lookup transform from ref_frame_ to the lookup frame
                 const geometry_msgs::msg::TransformStamped transform_stamped = 
-                    tf_buffer_->lookupTransform(
+                    context_->tf_buffer_->lookupTransform(
                         ref_frame_, 
                         task_description.affordance_info_from.frame_name,
                         tf2::TimePointZero,  // Get latest available transform
@@ -221,7 +261,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
             try {
                 // Lookup transform from ref_frame_ to the lookup frame
                 const geometry_msgs::msg::TransformStamped transform_stamped = 
-                    tf_buffer_->lookupTransform(
+                    context_->tf_buffer_->lookupTransform(
                         ref_frame_, 
                         task_description.canonical_pose_from.frame_name,
                         tf2::TimePointZero,  // Get latest available transform
@@ -410,7 +450,7 @@ cca_ros::PlanningResponse CcaRos::plan(const std::vector<cca_ros::PlanningReques
     
     // Validate and visualize the complete trajectory
     auto validation_response = this->validate_and_visualize_(
-        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_val_and_viz);
+        final_goal_msg.robot, cartesian_trajectory, task_descriptions_for_val_and_viz, visualize_trajectory);
     
     if (validation_response->success) {
         RCLCPP_INFO(node_logger_, "%s validation service succeeded", val_and_viz_ss_name_.c_str());
@@ -548,21 +588,21 @@ cca_ros::ExecutionActionClients CcaRos::initialize_action_clients_(const cca_ros
     if (!ex_as_names.robot_and_gripper.empty())
     {
         ex_clients.robot_and_gripper =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot_and_gripper);
+            rclcpp_action::create_client<FollowJointTrajectory>(context_->node_, ex_as_names.robot_and_gripper);
     }
 
     // If robot-only execution server is available, initialize it
     if (!ex_as_names.robot.empty())
     {
         ex_clients.robot =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.robot);
+            rclcpp_action::create_client<FollowJointTrajectory>(context_->node_, ex_as_names.robot);
     }
 
     // If gripper-only execution server is available, initialize it
     if (!ex_as_names.gripper.empty())
     {
         ex_clients.gripper =
-            rclcpp_action::create_client<FollowJointTrajectory>(this, ex_as_names.gripper);
+            rclcpp_action::create_client<FollowJointTrajectory>(context_->node_, ex_as_names.gripper);
     }
 
     return ex_clients;
@@ -581,14 +621,14 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
 
     // Ensure planning group is valid
     std::string valid_pg_s;
-    for (const auto& [name, _] : planning_group_info_map_) {
+    for (const auto& [name, _] : context_->planning_group_info_map_) {
         if (!valid_pg_s.empty()){ 
 	    valid_pg_s += ", ";
 	}
         valid_pg_s += name;
     }
 
-    if (planning_group_info_map_.find(planning_group) == planning_group_info_map_.end()) {
+    if (context_->planning_group_info_map_.find(planning_group) == context_->planning_group_info_map_.end()) {
 	throw std::invalid_argument("Planning Request: Specified planning group '" + planning_group + "' is not valid. " + 
 				    "Possible options are: " + valid_pg_s);
     }
@@ -597,10 +637,11 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     const bool single_planning_request = reqs.size() == 1;
     const bool gripper_goal_specified = !std::isnan(reqs.front().task_description.goal.gripper);
     const bool robot_only_trajectory = !gripper_goal_specified;
+    const bool visualize_trajectory = reqs.front().visualize_trajectory;
     const bool execute_trajectory = reqs.front().execute_trajectory;
     const bool execute_partial_trajectory = reqs.front().execute_partial_trajectory;
     const std::chrono::seconds& execution_timeout = reqs.front().execution_timeout;
-    const ExecutionActionServerNames& ex_as_names = planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
+    const ExecutionActionServerNames& ex_as_names = context_->planning_group_info_map_.at(reqs.front().planning_group).ex_as_names;
     const bool robot_ex_as_exists = !ex_as_names.robot.empty();
     const bool gripper_ex_as_exists = !ex_as_names.gripper.empty() || !ex_as_names.robot_and_gripper.empty();
 
@@ -637,6 +678,12 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
             if (req.planning_group != planning_group) {
                 throw std::invalid_argument(
                     index_log + "Inconsistent planning group specification. All tasks must have the same planning group");
+            }
+
+            // Ensure all tasks either ask to visualize or don't
+            if (req.visualize_trajectory != visualize_trajectory) {
+                throw std::invalid_argument(
+                    index_log + "Inconsistent visualize trajectory specification. All tasks must either be visualized together or none of them.");
             }
 
             // Ensure all tasks either ask to execute or don't
@@ -684,43 +731,32 @@ void CcaRos::validate_input_(const std::vector<cca_ros::PlanningRequest>& reqs)
     }
 }
 
-// Callback for joint_states topic.
-void CcaRos::joint_states_cb_(const JointState::SharedPtr msg)
-{
-    robot_joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, robot_joint_names_);
-    gripper_joint_states_ = ros_cpp_util::get_ordered_joint_states(msg, gripper_joint_names_);
-}
-
 // Retrieve robot joint states at the start of the affordance.
 KinematicState CcaRos::read_joint_states_()
 {
-    robot_joint_states_.positions.conservativeResize(robot_joint_names_.size());
-    gripper_joint_states_.positions.conservativeResize(gripper_joint_names_.size());
-    robot_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
-    gripper_joint_states_.positions.setConstant(std::numeric_limits<double>::quiet_NaN());
-
-    auto start_time = this->now();
-    rclcpp::Rate loop_rate(10); // 10 Hz loop rate
-
-    while (rclcpp::ok())
+    // Copy the latest raw message under the lock to minimize lock hold time
+    sensor_msgs::msg::JointState::SharedPtr msg_copy;
     {
-        // Check joint states for NaN values
-        if (!robot_joint_states_.positions.hasNaN() && !gripper_joint_states_.positions.hasNaN())
-        {
-            break;
-        }
-
-        // Check for timeout
-        if ((this->now() - start_time) > rclcpp::Duration(joint_states_read_timeout_))
+        std::unique_lock<std::mutex> lock(context_->joint_states_mutex_);
+        if (!context_->joint_states_cv_.wait_for(
+                lock,
+                std::chrono::duration<double>(joint_states_read_timeout_),
+                [&]() { return context_->latest_joint_state_msg_ != nullptr; }))
         {
             throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
         }
-
-        // Allow for callback processing and sleep
-        loop_rate.sleep();
+        msg_copy = context_->latest_joint_state_msg_; // Shallow copy of shared_ptr under lock
     }
 
-    return KinematicState{robot_joint_states_.positions, gripper_joint_states_.positions[0]};
+    // Extract ordered joint states outside the lock
+    const ros_cpp_util::JointTrajPoint robot_js = ros_cpp_util::get_ordered_joint_states(msg_copy, robot_joint_names_);
+    const ros_cpp_util::JointTrajPoint gripper_js = ros_cpp_util::get_ordered_joint_states(msg_copy, gripper_joint_names_);
+
+    if (robot_js.positions.hasNaN() || gripper_js.positions.hasNaN()) {
+        throw std::runtime_error("Failed to read robot or gripper joint states within timeout.");
+    }
+
+    return KinematicState{robot_js.positions, gripper_js.positions[0]};
 }
 
 std::vector<geometry_msgs::msg::Pose> CcaRos::compute_cartesian_trajectory_(
@@ -804,7 +840,7 @@ cca_ros::GoalMsg CcaRos::create_goal_msg_(
 }
 
 // Validates and visualizes a given trajectory
-cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions){
+cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_visualize_(const FollowJointTrajectoryGoal &goal, const std::vector<geometry_msgs::msg::Pose>& cartesian_trajectory, const std::vector<cc_affordance_planner::TaskDescription>& task_descriptions, bool visualize_trajectory){
 
     // Create visualization request
     auto val_and_viz_serv_req = std::make_shared<CcaRosValAndViz::Request>();
@@ -812,6 +848,7 @@ cca_ros_msgs::srv::CcaRosValAndViz::Response::SharedPtr CcaRos::validate_and_vis
     val_and_viz_serv_req->joint_traj = goal.trajectory;
     val_and_viz_serv_req->cartesian_traj = cartesian_trajectory;
     val_and_viz_serv_req->ref_frame = ref_frame_;
+    val_and_viz_serv_req->visualize = visualize_trajectory;
 
     // Sentinel affordance reference pose (identity)
     geometry_msgs::msg::Pose aff_ref_pose_sentinel;
